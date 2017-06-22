@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+	xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<modelVersion>4.0.0</modelVersion>
+	<artifactId>org.spoofax.jsglr</artifactId>
+	<packaging>jar</packaging>
+	<description>Java implementation of the scannerless generalized LR parser</description>
+	<url>https://github.com/metaborg/jsglr</url>
+
+	<parent>
+		<groupId>org.metaborg</groupId>
+		<artifactId>parent.java</artifactId>
+		<version>2.2.1</version>
+		<relativePath>../../releng/parent/java</relativePath>
+	</parent>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.metaborg</groupId>
+			<artifactId>org.spoofax.terms</artifactId>
+			<version>${metaborg-version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.metaborg</groupId>
+			<artifactId>sdf2table</artifactId>
+			<version>${metaborg-version}</version>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<sourceDirectory>src</sourceDirectory>
+		<testSourceDirectory>test</testSourceDirectory>
+
+		<resources>
+			<resource>
+				<directory>src/org/spoofax/jsglr/client/indentation</directory>
+				<targetPath>org/spoofax/jsglr/client/indentation</targetPath>
+				<includes>
+					<include>LayoutConstraint.tbl</include>
+				</includes>
+			</resource>
+		</resources>
+
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<skipTests>true</skipTests>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+
+	<repositories>
+		<repository>
+			<id>metaborg-release-repo</id>
+			<url>http://artifacts.metaborg.org/content/repositories/releases/</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</repository>
+		<repository>
+			<id>metaborg-snapshot-repo</id>
+			<url>http://artifacts.metaborg.org/content/repositories/snapshots/</url>
+			<releases>
+				<enabled>false</enabled>
+			</releases>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+		</repository>
+	</repositories>
+
+	<pluginRepositories>
+		<pluginRepository>
+			<id>metaborg-release-repo</id>
+			<url>http://artifacts.metaborg.org/content/repositories/releases/</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</pluginRepository>
+		<pluginRepository>
+			<id>metaborg-snapshot-repo</id>
+			<url>http://artifacts.metaborg.org/content/repositories/snapshots/</url>
+			<releases>
+				<enabled>false</enabled>
+			</releases>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+		</pluginRepository>
+	</pluginRepositories>
+
+	<developers>
+		<developer>
+			<name>Eduardo Amorim</name>
+			<email>l.e.desouzaamorim-1@tudelft.nl</email>
+			<organization>Delft University of Technology</organization>
+			<organizationUrl>http://www.ewi.tudelft.nl/en</organizationUrl>
+		</developer>
+	</developers>
+
+	<scm>
+		<connection>scm:git:git@github.com:metaborg/jsglr.git</connection>
+		<developerConnection>scm:git:git@github.com:metaborg/jsglr.git</developerConnection>
+		<url>https://github.com/metaborg/jsglr</url>
+	</scm>
+</project>
