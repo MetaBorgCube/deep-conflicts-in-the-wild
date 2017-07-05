@@ -1,0 +1,6 @@
+---
+title:  Submission for SLE 2017 Artifact Evaluation
+subtitle: Deep Priority Conflicts in the Wild --- A Pilot Study
+header-includes: \providecommand{\subtitle}[1]{\usepackage{titling}\posttitle{\par\large#1\end{center}}}
+output: pdf_document
+---
