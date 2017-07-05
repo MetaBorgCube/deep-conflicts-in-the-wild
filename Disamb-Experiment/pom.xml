@@ -98,6 +98,9 @@
             <configuration>
               <executable>java</executable>
               <arguments>
+                <argument>-Xmx4G</argument>
+                <argument>-Xss16m</argument>
+                <argument>-XX:MaxPermSize=256M</argument>
                 <argument>-classpath</argument>
                 <classpath />
                 <argument>${main-class}</argument>
