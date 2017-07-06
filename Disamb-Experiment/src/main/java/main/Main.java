@@ -66,10 +66,10 @@ public class Main {
 	private final static String[] extensions = { "ml", "java" };
 	private final static String[] mainSDF3normModule = { "OCaml", "java-front" };
 	private final static boolean[] runExperiment = { true, true };
-	private final static boolean[] createTable = { false, false };
+	private final static boolean[] createTable = { true, true };
 	private final static String[] testingFile = { "disamb.ml", "disamb.java" };
 
-	private final static boolean TESTING = true;
+	private final static boolean TESTING = false;
 
 	private final static ITermFactory tf = new TermFactory();
 	private static Logger debugLogger = LoggerFactory.getLogger(Main.class);
