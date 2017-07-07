@@ -71,6 +71,7 @@ public class Main {
 	private final static String[] testingFile = { "disamb.ml", "disamb.java" };
 
 	private final static boolean TESTING = false;
+	private final static boolean SHORTRUN = false;
 
 	private final static ITermFactory tf = new TermFactory();
 	private static Logger debugLogger = LoggerFactory.getLogger(Main.class);
@@ -117,23 +118,33 @@ public class Main {
 		Collection<File> langFiles = FileUtils.listFiles(testLangDir, new String[] { extensions[lang] }, true);
 
 		Collection<File> ignoredFiles = Lists.newArrayList();
-		if(TESTING) {
-			for(File f : langFiles) {
-				if(!f.getPath().contains(testingFile[lang])) {
+		if (TESTING) {
+			for (File f : langFiles) {
+				if (!f.getPath().contains(testingFile[lang])) {
 					ignoredFiles.add(f);
 				}
 			}
 		} else {
-			for(File f : langFiles) {
-				if(f.getPath().contains(testingFile[lang])) {
-					ignoredFiles.add(f);
-					break;
+			if (SHORTRUN) {
+				int size = 10;
+				for (File f : langFiles) {
+					if (f.getPath().contains(testingFile[lang]) || size <= 0) {
+						ignoredFiles.add(f);
+					}
+					size--;
+				}
+			} else {
+				for (File f : langFiles) {
+					if (f.getPath().contains(testingFile[lang])) {
+						ignoredFiles.add(f);
+						break;
+					}
 				}
 			}
 		}
-		
+
 		langFiles.removeAll(ignoredFiles);
-		
+
 		debugLogger.info("{} file(s) created.", langFiles.size());
 		debugLogger.info("-------------------------------------");
 
