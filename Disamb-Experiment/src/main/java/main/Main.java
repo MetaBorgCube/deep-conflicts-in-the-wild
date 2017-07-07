@@ -83,7 +83,7 @@ public class Main {
 				try {
 					runExperiment(i);
 				} catch (Exception e) {
-					debugLogger.error("{} experiment failed with exception\n{}", languages[i], e.getMessage());
+					debugLogger.error("{} experiment failed with exception\n{}", languages[i], e);
 					if (e instanceof MultiBadTokenException) {
 						MultiBadTokenException mbe = (MultiBadTokenException) e;
 						debugLogger.error("parsing failed at line {}", mbe.getLineNumber());
@@ -115,7 +115,26 @@ public class Main {
 		debugLogger.info("Creating the list of all {} Files:", languages[lang]);
 		File testLangDir = new File("test/" + languages[lang] + "/");
 		Collection<File> langFiles = FileUtils.listFiles(testLangDir, new String[] { extensions[lang] }, true);
-		debugLogger.info("{} files created.", langFiles.size() - 1);
+
+		Collection<File> ignoredFiles = Lists.newArrayList();
+		if(TESTING) {
+			for(File f : langFiles) {
+				if(!f.getPath().contains(testingFile[lang])) {
+					ignoredFiles.add(f);
+				}
+			}
+		} else {
+			for(File f : langFiles) {
+				if(f.getPath().contains(testingFile[lang])) {
+					ignoredFiles.add(f);
+					break;
+				}
+			}
+		}
+		
+		langFiles.removeAll(ignoredFiles);
+		
+		debugLogger.info("{} file(s) created.", langFiles.size());
 		debugLogger.info("-------------------------------------");
 
 		final TermTreeFactory factory = new TermTreeFactory(new ParentTermFactory(tf));
@@ -446,7 +465,7 @@ public class Main {
 		debugLogger.info("processed {} states.", finalProcessedStates);
 		debugLogger.info("and used {} productions.", finalProductionsUsed);
 		debugLogger.info("Files parsed: {}", filesParsed);
-		debugLogger.info("Files that did not parse: {}", langFiles.size() - filesParsed - 1);
+		debugLogger.info("Files that did not parse: {}", langFiles.size() - filesParsed);
 		debugLogger.info("-------------------------------------");
 
 		resultLogger.info("\n\n\n" + totalProductions + ";" + totalStates + ";" + finalStates + ";"
