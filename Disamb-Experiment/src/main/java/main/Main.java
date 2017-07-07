@@ -389,6 +389,7 @@ public class Main {
 
 			filesLogger.info(f.getAbsolutePath());
 			filesParsed++;
+			System.gc();
 		}
 
 		long finalStates = pt.getPTgenerator().totalStates();
