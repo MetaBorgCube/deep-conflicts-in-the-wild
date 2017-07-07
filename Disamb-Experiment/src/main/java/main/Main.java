@@ -65,6 +65,7 @@ public class Main {
 	private final static String[] languages = { "OCaml", "Java" };
 	private final static String[] extensions = { "ml", "java" };
 	private final static String[] mainSDF3normModule = { "OCaml", "java-front" };
+	private final static String[] startSymbol = { "Start", "Start" };
 	private final static boolean[] runExperiment = { true, true };
 	private final static boolean[] createTable = { true, true };
 	private final static String[] testingFile = { "disamb.ml", "disamb.java" };
@@ -238,7 +239,7 @@ public class Main {
 
 			SGLRParseResult parseResult;
 			try {
-				parseResult = parserAllFiles.parse(input, f.getName(), "Start");
+				parseResult = parserAllFiles.parse(input, f.getName(), startSymbol[lang]);
 			} catch (Exception e) {
 				debugLogger.info("Parsing failed with exception {}", e.getMessage());
 				resultLogger.info("parsing failed.");
@@ -249,7 +250,7 @@ public class Main {
 
 			SGLRParseResult individualParseResult;
 			try {
-				individualParseResult = individualParser.parse(input, f.getName(), "Start");
+				individualParseResult = individualParser.parse(input, f.getName(), startSymbol[lang]);
 			} catch (Exception e) {
 				debugLogger.info("Parsing failed with exception {}", e.getMessage());
 				resultLogger.info("parsing failed.");
@@ -260,7 +261,7 @@ public class Main {
 
 			SGLRParseResult noOperatorAmbResult;
 			try {
-				noOperatorAmbResult = noOperatorAmbParser.parse(input, f.getName(), "Start");
+				noOperatorAmbResult = noOperatorAmbParser.parse(input, f.getName(), startSymbol[lang]);
 			} catch (Exception e) {
 				debugLogger.info("Operator-style ambiguity parser failed with exception {}", e.getMessage());
 				resultLogger.info("operator-style parsing failed.");
@@ -271,7 +272,7 @@ public class Main {
 
 			SGLRParseResult noDanglingElseResult;
 			try {
-				noDanglingElseResult = noDanglingElseParser.parse(input, f.getName(), "Start");
+				noDanglingElseResult = noDanglingElseParser.parse(input, f.getName(), startSymbol[lang]);
 			} catch (Exception e) {
 				debugLogger.info("Dangling else parser failed with exception {}", e.getMessage());
 				resultLogger.info("dangling else parsing failed.");
@@ -282,7 +283,7 @@ public class Main {
 
 			SGLRParseResult noLongestMatchResult;
 			try {
-				noLongestMatchResult = noLongestMatchParser.parse(input, f.getName(), "Start");
+				noLongestMatchResult = noLongestMatchParser.parse(input, f.getName(), startSymbol[lang]);
 			} catch (Exception e) {
 				debugLogger.info("Longest match parser failed with exception {}", e.getMessage());
 				resultLogger.info("longest match parsing failed.");
