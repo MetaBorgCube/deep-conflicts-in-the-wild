@@ -7,7 +7,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -115,8 +117,9 @@ public class Main {
 		debugLogger.info("-------------------------------------");
 		debugLogger.info("Creating the list of all {} Files:", languages[lang]);
 		File testLangDir = new File("test/" + languages[lang] + "/");
-		Collection<File> langFiles = FileUtils.listFiles(testLangDir, new String[] { extensions[lang] }, true);
+		List<File> langFiles = (List<File>) FileUtils.listFiles(testLangDir, new String[] { extensions[lang] }, true);
 
+		Collections.sort((List<File>) langFiles);
 		Collection<File> ignoredFiles = Lists.newArrayList();
 		if (TESTING) {
 			for (File f : langFiles) {
@@ -498,7 +501,9 @@ public class Main {
 			return true;
 		}
 
-		if (f.getPath().equals("test/OCaml/bucklescript/jscomp/test/ocaml_typedtree_test.ml")) {
+		if (f.getPath().equals("test/OCaml/bucklescript/jscomp/test/ocaml_typedtree_test.ml")
+				|| f.getPath().equals("test/OCaml/bucklescript/jscomp/bin/whole_compiler.ml")
+				|| f.getPath().equals("test/OCaml/bucklescript/jscomp/bin/js_compiler.ml")) {
 			debugLogger.info("SGLR error - parser time out.");
 			resultLogger.info("SGLR error - parser time out.");
 			return true;
