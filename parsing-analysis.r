@@ -356,7 +356,7 @@ pdf(
   outputFileName,
   family = "Times",
   width = 6.5,
-  height = 5.5
+  height = 10
 )
 par(mar = c(2.3, 4.5, 0, 4.3) + 0.15) # c(bottom, left, top, right)
 boxplot((
@@ -368,7 +368,7 @@ boxplot((
 outline = T,
 horizontal = F,
 xaxt = "n",
-ylim = range(0, 40),
+ylim = range(0, 100),
 ylab = "Contextual Grammar Production Coverage (in %)",
 cex.lab = fontScalingFactor,
 cex.axis = fontScalingFactor,
@@ -390,7 +390,7 @@ axis(
 )
 axis(
   side = 2,
-  at = c(0, 5, 10, 15, 20, 25, 30, 35, 40),
+  at = c(0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100),
   cex.lab = fontScalingFactor,
   cex.axis = fontScalingFactor,
   cex.main = fontScalingFactor,
@@ -414,7 +414,7 @@ pdf(
   outputFileName,
   family = "Times",
   width = 6.5,
-  height = 5.5
+  height = 10
 )
 par(mar = c(2.3, 4.5, 0, 4.3) + 0.15) # c(bottom, left, top, right)
 boxplot((
@@ -426,7 +426,7 @@ boxplot((
 outline = T,
 horizontal = F,
 xaxt = "n",
-ylim = range(0, 40),
+ylim = range(0, 100),
 ylab = "Processed States of Lazy Parse Table (in %)",
 cex.lab = fontScalingFactor,
 cex.axis = fontScalingFactor,
@@ -448,7 +448,7 @@ axis(
 )
 axis(
   side = 2,
-  at = c(0, 5, 10, 15, 20, 25, 30, 35, 40),
+  at = c(0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100),
   cex.lab = fontScalingFactor,
   cex.axis = fontScalingFactor,
   cex.main = fontScalingFactor,
