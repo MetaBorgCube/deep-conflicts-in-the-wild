@@ -1,0 +1,3 @@
+Ambiguity 1: 
+tac = delay (fun () -> pr_dbg_header d; tac) >>=
+              fun () -> pr_info_trace d; Proofview.tclUNIT ()

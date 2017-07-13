@@ -1,0 +1,60 @@
+Ambiguity 1: 
+| Error_kind { from_error ; category } :: rest ->
+          match from_error e with
+          | Some x -> begin
+              match category with
+              | `Wrapped f -> f x
+              | #error_category as x -> x
+            end
+          | None -> find e rest
+
+Ambiguity 2: 
+| Error_kind { from_error ; pp } :: errors ->
+          match from_error error with
+          | None -> find errors
+          | Some x -> pp ppf x
+
+Ambiguity 3: 
+| x :: l ->
+        let tx = f x and tl = map_p f l in
+        tx >>= fun x ->
+        tl >>= fun l ->
+        match x, l with
+        | Ok x, Ok l -> Lwt.return (Ok (x :: l))
+        | Error exn1, Error exn2 -> Lwt.return (Error (exn1 @ exn2))
+        | Ok _, Error exn
+        | Error exn, Ok _ -> Lwt.return (Error exn)
+
+Ambiguity 4: 
+| h :: t ->
+        f h >>=? function
+        | None -> map_filter_s f t
+        | Some rh ->
+            map_filter_s f t >>=? fun rt ->
+            return (rh :: rt)
+
+Ambiguity 5: 
+| x :: l ->
+        let tx = f x and tl = iter_p f l in
+        tx >>= fun tx_res ->
+        tl >>= fun tl_res ->
+        match tx_res, tl_res with
+        | Ok (), Ok () -> Lwt.return (Ok ())
+        | Error exn1, Error exn2 -> Lwt.return (Error (exn1 @ exn2))
+        | Ok (), Error exn
+        | Error exn, Ok () -> Lwt.return (Error exn)
+
+Ambiguity 6: 
+| t :: ts ->
+        t >>= function
+        | Error _ as err ->
+            join ts >>=? fun () ->
+            Lwt.return err
+        | Ok () ->
+            join ts
+
+Ambiguity 7: 
+| Error err ->
+      match on_error with
+      | Some f -> f err
+      | None -> Lwt.return (Error err)

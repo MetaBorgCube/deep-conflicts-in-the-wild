@@ -1,0 +1,31 @@
+Ambiguity 1: 
+| ImplConstant (con,flags) ->
+      let oldimpls = snd (List.hd l) in
+      let newimpls = compute_constant_implicits flags [] con in
+      req, [ConstRef con, List.map2 merge_impls oldimpls newimpls]
+  | ImplMutualInductive (kn,flags) ->
+      let newimpls = compute_all_mib_implicits flags [] kn in
+      let rec aux olds news =
+	match olds, news with
+	| (_, oldimpls) :: old, (gr, newimpls) :: tl ->
+	    (gr, List.map2 merge_impls oldimpls newimpls) :: aux old tl
+	| [], [] -> []
+	| _, _ -> assert false
+      in req, aux l newimpls
+
+  | ImplInteractive (ref,flags,o) ->
+      (if isVarRef ref && is_in_section ref then ImplLocal else req),
+      match o with
+      | ImplAuto ->
+	  let oldimpls = snd (List.hd l) in
+	  let newimpls = compute_global_implicits flags [] ref in
+	    [ref,List.map2 merge_impls oldimpls newimpls]
+      | ImplManual userimplsize ->
+	  let oldimpls = snd (List.hd l) in
+	  if flags.auto then
+	    let newimpls = List.hd (compute_global_implicits flags [] ref) in
+	    let p = List.length (snd newimpls) - userimplsize in
+	    let newimpls = on_snd (List.firstn p) newimpls in
+	    [ref,List.map (fun o -> merge_impls o newimpls) oldimpls]
+	  else
+	    [ref,oldimpls]

@@ -1,0 +1,41 @@
+Ambiguity 1: 
+| Cons(key1,_, rest) -> 
+    equal_key key key1 ||
+    match rest with 
+    | Empty -> false 
+    | Cons(key2 , _, rest) -> 
+      equal_key key  key2 ||
+      match rest with 
+      | Empty -> false 
+      | Cons(key3,_,  rest) -> 
+        equal_key key  key3 ||
+        small_bucket_mem key rest
+
+Ambiguity 2: 
+| Cons(key1,i,rest) -> 
+    if equal_key key key1 then i 
+    else match rest with 
+      | Empty -> -1 
+      | Cons(key2,i2,  rest) -> 
+        if equal_key key  key2 then i2 else
+          match rest with 
+          | Empty -> -1 
+          | Cons(key3,i3, rest) -> 
+            if equal_key key  key3 then i3 else
+              small_bucket_rank key rest
+
+Ambiguity 3: 
+| Cons(key1,i,rest) -> 
+    if equal_key key key1 then i, rest  
+    else match rest with 
+      | Empty -> raise old_key_not_exist
+      | Cons(key2,i2,  rest) -> 
+        if equal_key key  key2 then i2, (Cons (key1,i,rest)) else
+          match rest with 
+          | Empty -> raise old_key_not_exist
+          | Cons(key3,i3, rest) -> 
+            if equal_key key  key3 then i3, (Cons (key1,i,Cons(key2,i2,rest))) else
+              let (rank, rest ) = small_bucket_rank_and_delete key rest in 
+              rank, Cons (key1,i, 
+                    Cons (key2,i2, 
+                          Cons(key3,i3,rest)))

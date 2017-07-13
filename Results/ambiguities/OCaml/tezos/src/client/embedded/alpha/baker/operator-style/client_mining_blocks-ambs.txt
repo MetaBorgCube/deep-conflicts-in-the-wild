@@ -1,0 +1,13 @@
+Ambiguity 1: 
+Lwt.return blocks >>=? fun blocks ->
+    sort_blocks cctxt ?compare (List.flatten blocks) >>= return
+
+Ambiguity 2: 
+Client_proto_rpcs.Context.level cctxt block >>=? fun level ->
+  Client_proto_rpcs.Helpers.levels cctxt block cycle >>=? fun (first, last) ->
+  let length = Int32.to_int (Raw_level.diff level.level first) in
+  Client_node_rpcs.Blocks.predecessors cctxt block length >>=? fun blocks ->
+  let blocks =
+    Utils.remove_elem_from_list
+      (length - (1 + Int32.to_int (Raw_level.diff last first))) blocks in
+  return blocks

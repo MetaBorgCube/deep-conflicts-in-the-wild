@@ -1,0 +1,12 @@
+Ambiguity 1: 
+Proofview.Trace.name_tactic trace (Proofview.tclUNIT v) >>= fun v ->
+  Proofview.Unsafe.tclSETENV (Environ.reset_context env) <*>
+  Proofview.Unsafe.tclEVARS sigma <*>
+  Proofview.Unsafe.tclSETGOALS comb <*>
+  Proofview.tclUNIT v
+
+Ambiguity 2: 
+tclENV >>= fun env -> tclEVARMAP >>= fun sigma ->
+   try let sigma = Evarconv.solve_unif_constraints_with_heuristics env sigma in
+       Unsafe.tclEVARSADVANCE sigma
+   with e -> tclZERO e

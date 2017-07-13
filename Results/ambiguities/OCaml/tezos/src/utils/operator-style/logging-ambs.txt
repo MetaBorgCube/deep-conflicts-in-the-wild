@@ -1,0 +1,21 @@
+Ambiguity 1: 
+let open Output in
+  begin
+    match output with
+    | Stderr ->
+        Lwt.return @@
+        Lwt_log.channel ~template ~close_mode:`Keep ~channel:Lwt_io.stderr ()
+    | Stdout ->
+        Lwt.return @@
+        Lwt_log.channel ~template ~close_mode:`Keep ~channel:Lwt_io.stdout ()
+    | File file_name ->
+        Lwt_log.file ~file_name ~template ()
+    | Null ->
+        Lwt.return @@
+        Lwt_log.null
+    | Syslog facility ->
+        Lwt.return @@
+        Lwt_log.syslog ~template ~facility ()
+  end >>= fun logger ->
+  Lwt_log.default := logger ;
+  Lwt.return_unit

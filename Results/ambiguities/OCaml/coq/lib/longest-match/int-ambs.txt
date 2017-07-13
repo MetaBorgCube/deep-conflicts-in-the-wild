@@ -1,0 +1,44 @@
+Ambiguity 1: 
+| DSet _ ->
+    let () = reroot t in
+    match !t with
+    | Root a ->
+      if Array.length a <= i then None
+      else Array.unsafe_get a i
+    | DSet _ -> assert false
+
+Ambiguity 2: 
+| Root a as n ->
+      let len = Array.length a in
+      if i < len then
+        let old = Array.unsafe_get a i in
+        if old == v then t
+        else
+          let () = Array.unsafe_set a i v in
+          let res = ref n in
+          let () = t := DSet (i, old, res) in
+          res
+      else match v with
+      | None -> t (** Nothing to do! *)
+      | Some _ -> (** we must resize *)
+        let nlen = next len (succ i) in
+        let nlen = min nlen Sys.max_array_length in
+        let () = assert (i < nlen) in
+        let a' = Array.make nlen None in
+        let () = Array.blit a 0 a' 0 len in
+        let () = Array.unsafe_set a' i v in
+        let res = ref (Root a') in
+        let () = t := DSet (i, None, res) in
+        res
+
+Ambiguity 3: 
+| Map (_, v) ->
+    match PArray.get v k with
+    | None -> false
+    | Some _ -> true
+
+Ambiguity 4: 
+| Map (_, v) ->
+    match PArray.get v k with
+    | None -> raise Not_found
+    | Some x -> x

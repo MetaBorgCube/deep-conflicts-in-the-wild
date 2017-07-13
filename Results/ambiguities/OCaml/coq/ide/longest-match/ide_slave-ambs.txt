@@ -1,0 +1,6 @@
+Ambiguity 1: 
+| CErrors.Quit -> dummy, None, Pp.str "Quit is not allowed by coqide!"
+  | e ->
+      match Stateid.get info with
+      | Some (valid, _) -> valid, loc_of info, mk_msg ()
+      | None -> dummy, loc_of info, mk_msg ()

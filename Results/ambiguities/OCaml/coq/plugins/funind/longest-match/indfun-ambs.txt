@@ -1,0 +1,8 @@
+Ambiguity 1: 
+(function ((_na,(_,ord),_args,_body,_type),_not) ->
+		       match ord with 
+			 | Constrexpr.CMeasureRec _ | Constrexpr.CWfRec _ ->
+			     error
+			       ("Cannot use mutual definition with well-founded recursion or measure")
+			 | _ -> ()
+		    )

@@ -1,0 +1,57 @@
+Ambiguity 1: 
+| None ->
+      match Stack.strip_n_app nparams sk1 with
+      | Some (params1, c1, extra_args1) -> params1, c1, extra_args1
+      | _ -> raise Not_found
+
+Ambiguity 2: 
+| [f] -> f evd
+  | f1::l ->
+      match f1 evd with
+      | Success _ as x -> x
+      | UnifFailure _ -> ise_try evd l
+
+Ambiguity 3: 
+| [f] -> f i
+    | f1::l ->
+        match f1 i with
+	| Success i' -> ise_and i' l
+	| UnifFailure _ as x -> x
+
+Ambiguity 4: 
+| n ->
+        match f i v1.(n) v2.(n) with
+	| Success i' -> allrec i' (n-1)
+	| UnifFailure _ as x -> x
+
+Ambiguity 5: 
+| Success evd ->
+              match reconsider_unif_constraints (evar_conv_x ts) evd with
+              | UnifFailure _ -> error "Cannot find an instance"
+              | Success evd ->
+              evd
+
+Ambiguity 6: 
+| a::l ->
+          try
+            let conv_algo = evar_conv_x ts in
+            let evd = check_evar_instance evd evk (EConstr.of_constr a) conv_algo in
+            let evd = Evd.define evk a evd in
+            match reconsider_unif_constraints conv_algo evd with
+            | Success evd -> solve_unconstrained_evars_with_candidates ts evd
+            | UnifFailure _ -> aux l
+          with
+          | IllTypedInstance _ -> aux l
+          | e when Pretype_errors.precatchable_exception e -> aux l
+
+Ambiguity 7: 
+| _ -> 
+	if progress then aux evd stuck false []
+	else 
+	  match stuck with
+	  | [] -> (* We're finished *) evd
+	  | (pbty,env,t1,t2 as pb) :: _ ->
+            let t1 = EConstr.of_constr t1 in
+            let t2 = EConstr.of_constr t2 in
+	     (* There remains stuck problems *)
+             error_cannot_unify env evd pb t1 t2

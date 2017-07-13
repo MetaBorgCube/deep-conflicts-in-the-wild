@@ -1,0 +1,11 @@
+Ambiguity 1: 
+| Some curr_event ->
+        match !selected_event with
+          Some sel_event when frame_number >= !current_frame ->
+            selected_event :=
+              Some(move_up (frame_number - !current_frame) sel_event);
+            current_frame := frame_number
+        | _ ->
+            set_initial_frame();
+            selected_event := Some(move_up frame_number curr_event);
+            current_frame := frame_number

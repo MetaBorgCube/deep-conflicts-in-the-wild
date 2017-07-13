@@ -1,0 +1,15 @@
+Ambiguity 1: 
+| hj::restjl ->
+      match EConstr.kind !evdref (whd_all env !evdref typ) with
+      | Prod (_,c1,c2) ->
+	 if Evarconv.e_cumul env evdref hj.uj_type c1 then
+	   apply_rec (n+1) (subst1 hj.uj_val c2) restjl
+	 else
+	   error_cant_apply_bad_type env !evdref (n, c1, hj.uj_type) funj argjv
+      | Evar ev ->
+	  let (evd',t) = Evardefine.define_evar_as_product !evdref ev in
+          evdref := evd';
+          let (_,_,c2) = destProd evd' t in
+	  apply_rec (n+1) (subst1 hj.uj_val c2) restjl
+      | _ ->
+	  error_cant_apply_not_functional env !evdref funj argjv

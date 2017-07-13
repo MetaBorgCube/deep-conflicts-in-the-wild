@@ -1,0 +1,80 @@
+Ambiguity 1: 
+assert (len > 0);
+    if len = 1 then dst.(dstofs) <- a.(srcofs) else
+    let l1 = len / 2 in
+    let l2 = len - l1 in
+    sortto (srcofs+l1) dst (dstofs+l1) l2;
+    sortto srcofs a (srcofs+l2) l1;
+    merge (srcofs+l2) l1 dst (dstofs+l1) l2 dst dstofs
+
+Ambiguity 2: 
+sortto srcofs dst dstofs len =
+    if len <= cutoff then isortto srcofs dst dstofs len else
+    let l1 = len / 2 in
+    let l2 = len - l1 in
+    sortto (srcofs+l1) dst (dstofs+l1) l2;
+    sortto srcofs a (srcofs+l2) l1;
+    merge (srcofs+l2) l1 dst (dstofs+l1) l2 dst dstofs
+
+Ambiguity 3: 
+sortto srcofs dst dstofs len =
+    if len <= cutoff then isortto srcofs dst dstofs len else
+    let l1 = len / 2 in
+    let l2 = len - l1 in
+    sortto (srcofs+l1) dst (dstofs+l1) l2;
+    sortto srcofs a (srcofs+l2) l1;
+    merge (srcofs+l2) l1 dst (dstofs+l1) l2 dst dstofs
+
+Ambiguity 4: 
+sortto srcofs dst dstofs len =
+    if len <= cutoff then isortto srcofs dst dstofs len else
+    let l1 = len / 2 in
+    let l2 = len - l1 in
+    sortto (srcofs+l1) dst (dstofs+l1) l2;
+    sortto srcofs a (srcofs+l2) l1;
+    merge (srcofs+l2) l1 dst (dstofs+l1) l2 dst dstofs
+
+Ambiguity 5: 
+sortto srcofs dst dstofs len =
+    if len <= cutoff then isortto srcofs dst dstofs len else
+    let l1 = len / 2 in
+    let l2 = len - l1 in
+    sortto (srcofs+l1) dst (dstofs+l1) l2;
+    sortto srcofs a (srcofs+l2) l1;
+    merge (srcofs+l2) l1 dst (dstofs+l1) l2 dst dstofs
+
+Ambiguity 6: 
+sortto srcofs dst dstofs len =
+    if len <= cutoff then isortto srcofs dst dstofs len else
+    let l1 = len / 2 in
+    let l2 = len - l1 in
+    sortto (srcofs+l1) dst (dstofs+l1) l2;
+    sortto srcofs a (srcofs+l2) l1;
+    merge (srcofs+l2) l1 dst (dstofs+l1) l2 dst dstofs
+
+Ambiguity 7: 
+sortto srcofs dst dstofs len =
+    if len <= cutoff then isortto srcofs dst dstofs len else
+    let l1 = len / 2 in
+    let l2 = len - l1 in
+    sortto (srcofs+l1) dst (dstofs+l1) l2;
+    sortto srcofs a (srcofs+l2) l1;
+    merge (srcofs+l2) l1 dst (dstofs+l1) l2 dst dstofs
+
+Ambiguity 8: 
+sortto srcofs dst dstofs len =
+    if len <= cutoff then isortto srcofs dst dstofs len else
+    let l1 = len / 2 in
+    let l2 = len - l1 in
+    sortto (srcofs+l1) dst (dstofs+l1) l2;
+    sortto srcofs a (srcofs+l2) l1;
+    merge (srcofs+l2) l1 dst (dstofs+l1) l2 dst dstofs
+
+Ambiguity 9: 
+sortto srcofs dst dstofs len =
+    if len <= cutoff then isortto srcofs dst dstofs len else
+    let l1 = len / 2 in
+    let l2 = len - l1 in
+    sortto (srcofs+l1) dst (dstofs+l1) l2;
+    sortto srcofs a (srcofs+l2) l1;
+    merge (srcofs+l2) l1 dst (dstofs+l1) l2 dst dstofs

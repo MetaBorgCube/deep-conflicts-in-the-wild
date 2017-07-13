@@ -1,0 +1,7 @@
+Ambiguity 1: 
+| _ ->
+          match name.[0] with
+            'A'..'Z' -> Odoc_global.hidden_modules := name :: !Odoc_global.hidden_modules
+          | _ ->
+              incr Odoc_global.errors;
+              prerr_endline (M.not_a_module_name name)

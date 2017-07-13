@@ -1,0 +1,8 @@
+Ambiguity 1: 
+| Some bt ->
+      match get_backtrace dst with
+      | None ->
+        Exninfo.add dst backtrace bt
+      | Some nbt ->
+        let bt = bt @ nbt in
+        Exninfo.add dst backtrace bt

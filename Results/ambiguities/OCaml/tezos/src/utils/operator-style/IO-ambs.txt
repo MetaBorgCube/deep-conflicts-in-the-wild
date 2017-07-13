@@ -1,0 +1,23 @@
+Ambiguity 1: 
+let b = read_bigstring fd in
+         fn b >>= fun r ->
+         Unix.close fd;
+         Lwt.return r
+
+Ambiguity 2: 
+Lwt_unix.(openfile file
+                   [O_RDWR; O_NONBLOCK; O_CREAT] 0o644) >>= fun fd ->
+       try
+         write_bigstring fd ba >>= fun r ->
+         Lwt_unix.close fd >>= fun () ->
+         Lwt.return r
+       with e ->
+         Lwt_unix.close fd >>= fun () ->
+         Lwt.fail e
+
+Ambiguity 3: 
+Lwt_unix.opendir dir >>= fun hdir ->
+  Lwt_unix.readdir_n hdir 3 >>= fun files ->
+  let res = Array.length files = 2 in
+  Lwt_unix.closedir hdir >>= fun () ->
+  Lwt.return res

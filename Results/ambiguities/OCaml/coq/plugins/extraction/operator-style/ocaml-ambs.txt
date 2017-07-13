@@ -1,0 +1,5 @@
+Ambiguity 1: 
+pp_parameters pl ++ str prefix ++ name ++
+  pp_equiv pl name ip_equiv ++ str " =" ++
+  if Int.equal (Array.length ctyps) 0 then str " unit (* empty inductive *)"
+  else fnl () ++ v 0 (prvecti pp_constructor ctyps)

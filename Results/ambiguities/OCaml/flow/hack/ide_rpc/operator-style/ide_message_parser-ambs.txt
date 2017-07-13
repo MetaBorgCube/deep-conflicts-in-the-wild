@@ -1,0 +1,8 @@
+Ambiguity 1: 
+rpc_parser_result.result >>= fun result ->
+    rpc_parser_result.protocol >>= fun protocol ->
+    Ide_rpc_method_parser.parse
+      ~version
+      ~protocol
+      ~method_name:result.method_name
+      ~params:result.params

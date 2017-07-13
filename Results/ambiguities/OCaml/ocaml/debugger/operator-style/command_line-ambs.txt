@@ -1,0 +1,18 @@
+Ambiguity 1: 
+let loading_mode_variable ppf =
+  (find_ident
+     "loading mode"
+     (matching_elements (ref loading_modes) fst)
+     (fun (_, mode) ppf lexbuf ->
+        eol lexbuf; set_launching_function mode)
+     (function ppf -> error "Syntax error.")
+     ppf),
+  function ppf ->
+    let rec find = function
+      | [] -> ()
+      | (name, funct) :: l ->
+          if funct == !launching_func then fprintf ppf "%s" name else find l
+    in
+      find loading_modes;
+      fprintf ppf "@."
+

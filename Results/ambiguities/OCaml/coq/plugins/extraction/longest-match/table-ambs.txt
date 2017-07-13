@@ -1,0 +1,9 @@
+Ambiguity 1: 
+let safe_pr_long_global r =
+  try Printer.pr_global r
+  with Not_found -> match r with
+    | ConstRef kn ->
+	let mp,_,l = repr_con kn in
+	str ((string_of_mp mp)^"."^(Label.to_string l))
+    | _ -> assert false
+

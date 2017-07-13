@@ -1,0 +1,44 @@
+Ambiguity 1: 
+| Some id ->
+	       match EConstr.kind (project g) (pf_unsafe_type_of g (mkVar id)) with
+		 | App(eq,[|_;t1;t2|]) when EConstr.eq_constr (project g) eq eq_ind ->
+		     if Equality.discriminable (pf_env g) (project g) t1 t2
+		     then Proofview.V82.of_tactic (Equality.discrHyp id) g
+		     else if Equality.injectable (pf_env g) (project g) t1 t2
+		     then tclTHENSEQ [Proofview.V82.of_tactic (Equality.injHyp None id);thin [id];intros_with_rewrite]  g
+		     else tclIDTAC g
+		 | _ -> tclIDTAC g
+
+Ambiguity 2: 
+begin
+		     let f1,_ = decompose_app sigma args.(1) in
+		     try
+		       if not (isConst sigma f1) then raise NoFunction;
+		       let finfos = find_Function_infos (fst (destConst sigma f1)) in
+		       let f_correct = mkConst(Option.get finfos.correctness_lemma)
+		       and kn = fst finfos.graph_ind
+		       in
+		       functional_inversion kn hid f1 f_correct g
+		     with | NoFunction | Option.IsNone | Not_found ->
+		       try
+			 let f2,_ = decompose_app sigma args.(2) in
+			 if not (isConst sigma f2) then raise NoFunction;
+			 let finfos = find_Function_infos (fst (destConst sigma f2)) in
+			 let f_correct = mkConst(Option.get finfos.correctness_lemma)
+			 and kn = fst finfos.graph_ind
+			 in
+			 functional_inversion kn hid  f2 f_correct g
+		       with
+			 | NoFunction ->
+			     user_err  (str "Hypothesis " ++ Ppconstr.pr_id hid ++ str " must contain at least one Function")
+			 | Option.IsNone  ->
+			     if do_observe ()
+			     then
+			       error "Cannot use equivalence with graph for any side of the equality"
+			     else user_err  (str "Cannot find inversion information for hypothesis " ++ Ppconstr.pr_id hid)
+			 | Not_found ->
+			     if do_observe ()
+			     then
+			       error "No graph found for any side of equality"
+			     else user_err  (str "Cannot find inversion information for hypothesis " ++ Ppconstr.pr_id hid)
+		   end

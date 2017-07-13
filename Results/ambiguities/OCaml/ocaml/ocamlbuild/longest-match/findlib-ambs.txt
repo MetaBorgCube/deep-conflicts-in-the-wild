@@ -1,0 +1,50 @@
+Ambiguity 1: 
+let rec query name =
+  try
+    Hashtbl.find packages name
+  with Not_found ->
+    try
+      let n, d, v, a_byte, lo, l =
+        run_and_parse
+          (Lexers.ocamlfind_query Const.Source.ocamlfind_query)
+          "%s query -l -predicates byte %s" ocamlfind name
+      in
+      let a_native =
+        run_and_parse
+          (Lexers.trim_blanks Const.Source.ocamlfind_query)
+          "%s query -a-format -predicates native %s" ocamlfind name
+      in
+      let deps =
+        run_and_parse
+          (Lexers.blank_sep_strings Const.Source.ocamlfind_query)
+          "%s query -r -p-format %s" ocamlfind name
+      in
+      let deps = List.filter ((<>) n) deps in
+      let deps =
+        try
+          List.map query deps
+        with Findlib_error (Package_not_found dep_name) ->
+          (* Ocamlfind cannot find a package which it returned as a dependency.
+             This should not happen. *)
+          error (Dependency_not_found (name, dep_name))
+      in
+      let package = {
+        name = n;
+        description = d;
+        version = v;
+        archives_byte = a_byte;
+        archives_native = a_native;
+        link_options = lo;
+        location = l;
+        dependencies = deps;
+      } in
+      Hashtbl.add packages n package;
+      package
+    with
+      | Failure _ ->
+          (* TODO: Improve to differenciate whether ocamlfind cannot be
+             run or is not installed *)
+          error Cannot_run_ocamlfind
+      | Lexers.Error (s,_) ->
+          error (Cannot_parse_query (name, s))
+

@@ -1,0 +1,9 @@
+Ambiguity 1: 
+| Some block ->
+        match Node_rpc_services.Blocks.parse_block block with
+        | Error _ ->
+            Format.eprintf
+              "Error: can't parse the -block option: %S.@."
+              block ;
+            exit 1
+        | Ok block -> block

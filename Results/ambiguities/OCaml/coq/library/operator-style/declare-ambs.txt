@@ -1,0 +1,27 @@
+Ambiguity 1: 
+open_constant i ((sp,kn), obj) =
+  (** Never open a local definition *)
+  if obj.cst_locl then ()
+  else
+    let con = Global.constant_of_delta_kn kn in
+    Nametab.push (Nametab.Exactly i) sp (ConstRef con);
+    match (Global.lookup_constant con).const_body with
+    | (Def _ | Undef _) -> ()
+    | OpaqueDef lc ->
+        match Opaqueproof.get_constraints (Global.opaque_tables ()) lc with
+        | Some f when Future.is_val f ->
+	   Global.push_context_set false (Future.force f)
+        | _ -> ()
+
+Ambiguity 2: 
+kn' =
+    if obj.cst_was_seff then begin
+      obj.cst_was_seff <- false;  
+      if Global.exists_objlabel (Label.of_id (basename sp))
+      then constant_of_kn kn
+      else CErrors.anomaly Pp.(str"Ex seff not found: " ++ Id.print(basename sp))
+    end else
+      let () = check_exists sp in
+      let kn', exported = Global.add_constant dir id obj.cst_decl in
+      obj.cst_exported <- exported;
+      kn'

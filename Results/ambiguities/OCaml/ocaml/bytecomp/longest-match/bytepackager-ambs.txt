@@ -1,0 +1,17 @@
+Ambiguity 1: 
+| m :: rem ->
+      match m.pm_kind with
+      | PM_intf ->
+          rename_append_bytecode_list ppf packagename oc mapping defined ofs
+                                      prefix subst rem
+      | PM_impl compunit ->
+          let size =
+            rename_append_bytecode ppf packagename oc mapping defined ofs
+                                   prefix subst m.pm_file compunit in
+          let id = Ident.create_persistent m.pm_name in
+          let root = Path.Pident (Ident.create_persistent prefix) in
+          rename_append_bytecode_list ppf packagename oc mapping (id :: defined)
+            (ofs + size) prefix
+            (Subst.add_module id (Path.Pdot (root, Ident.name id, Path.nopos))
+                              subst)
+            rem

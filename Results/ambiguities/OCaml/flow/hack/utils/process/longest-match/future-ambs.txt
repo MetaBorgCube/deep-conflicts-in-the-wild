@@ -1,0 +1,10 @@
+Ambiguity 1: 
+| Incomplete (process, transformer) ->
+    let status, result, err = Process.read_and_wait_pid process in
+    match status with
+    | Unix.WEXITED 0 ->
+      let result = transformer result in
+      let () = promise := Complete result in
+      result
+    | _ ->
+      raise (Future_sig.Process_failure (status, err))

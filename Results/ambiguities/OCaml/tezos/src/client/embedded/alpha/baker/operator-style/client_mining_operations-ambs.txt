@@ -1,0 +1,41 @@
+Ambiguity 1: 
+Client_node_rpcs.validate_block cctxt net_id block >>= function
+            | Error error ->
+                lwt_log_info
+                  "@[<v 2>Found endorsement for an invalid block@,%a@["
+                  pp_print_error error >>= fun () ->
+                Lwt.return_none
+            | Ok () ->
+                Client_node_rpcs.Blocks.preapply cctxt (`Hash block) [hash] >>= function
+                | Ok _ ->
+                    Lwt.return (Some { hash ; source ; block ; slots })
+                | Error error ->
+                    lwt_log_error
+                      "@[<v 2>Error while prevalidating endorsements@,%a@["
+                      pp_print_error error >>= fun () ->
+                    Lwt.return_none
+
+Ambiguity 2: 
+monitor_endorsement cctxt =
+  monitor cctxt ~contents:true ~check:true () >>=? fun ops_stream ->
+  let endorsement_stream, push = Lwt_stream.create () in
+  Lwt.async begin fun () ->
+    Lwt_stream.closed ops_stream >|= fun () -> push None
+  end ;
+  Lwt.async begin fun () ->
+    Lwt_stream.iter_p
+      (fun ops ->
+         match ops with
+         | Error _ as err ->
+             push (Some err) ;
+             Lwt.return_unit
+         | Ok ops ->
+             Lwt_list.iter_p
+               (fun e ->
+                  filter_valid_endorsement cctxt e >>= function
+                  | None -> Lwt.return_unit
+                  | Some e -> push (Some (Ok e)) ; Lwt.return_unit)
+               ops)
+      ops_stream
+  end ;
+  return endorsement_stream

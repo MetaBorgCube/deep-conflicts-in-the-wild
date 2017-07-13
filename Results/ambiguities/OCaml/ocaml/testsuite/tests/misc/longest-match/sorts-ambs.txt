@@ -1,0 +1,86 @@
+Ambiguity 1: 
+| h1::t1 ->
+       match l2 with
+       | []     -> mergepairs ((l1 @@ accu)::accu2) rest
+       | h2::t2 -> if cmp h1 h2 <= 0
+                   then merge rest accu2 (h1::accu) t1 l2
+                   else merge rest accu2 (h2::accu) l1 t2
+
+Ambiguity 2: 
+| h1::t1 ->
+       match l2 with
+       | []     -> mergepairs_rev ((l1 @@ accu)::accu2) rest
+       | h2::t2 -> if cmp h2 h1 <= 0
+                   then merge_rev rest accu2 (h1::accu) t1 l2
+                   else merge_rev rest accu2 (h2::accu) l1 t2
+
+Ambiguity 3: 
+| h1::t1 ->
+         match l2 with
+         | []     -> mergepairs ((l1 @@ accu)::accu2) rest
+         | h2::t2 -> if cmp h1 h2 <= 0
+                     then merge rest accu2 (h1::accu) t1 l2
+                     else merge rest accu2 (h2::accu) l1 t2
+
+Ambiguity 4: 
+| h1::t1 ->
+         match l2 with
+         | []     -> mergepairs_rev ((l1 @@ accu)::accu2) rest
+         | h2::t2 -> if cmp h2 h1 <= 0
+                     then merge_rev rest accu2 (h1::accu) t1 l2
+                     else merge_rev rest accu2 (h2::accu) l1 t2
+
+Ambiguity 5: 
+| h1 :: t1 ->
+        match l2 with
+          [] -> List.rev_append l1 acc
+        | h2 :: t2 ->
+            if order h1 h2
+            then  rev_merge_append order t1 l2 (h1::acc)
+            else  rev_merge_append order l1 t2 (h2::acc)
+
+Ambiguity 6: 
+| h1 :: t1 ->
+        match l2 with
+          | [] -> List.rev_append l1 acc
+          | h2 :: t2 ->
+              if order h2 h1
+              then  rev_merge_append' order t1 l2 (h1::acc)
+              else  rev_merge_append' order l1 t2 (h2::acc)
+
+Ambiguity 7: 
+| h1 :: t1 ->
+        match l2 with
+          [] -> l1
+        | h2 :: t2 ->
+            if order h1 h2
+            then h1 :: merge order t1 l2
+            else h2 :: merge order l1 t2
+
+Ambiguity 8: 
+| h1 :: t1 ->
+        match l2 with
+          [] -> l1
+        | h2 :: t2 ->
+            if order h1 h2 <= 0
+            then h1 :: merge order t1 l2
+            else h2 :: merge order l1 t2
+
+Ambiguity 9: 
+| 3, x::y::z::t ->
+       ((if cmp x y <= 0 then
+           if cmp y z <= 0 then [x; y; z]
+           else if cmp x z <= 0 then [x; z; y]
+           else [z; x; y]
+         else
+           if cmp x z <= 0 then [y; x; z]
+           else if cmp y z <= 0 then [y; z; x]
+           else [z; y; x]),
+        t)
+    | n, _ ->
+       let n1 = n/2 in
+       let n2 = n - n1 in
+       let (l1, rest1) = sort_prefix n1 l in
+       match sort_prefix n2 rest1 with
+       | (h2::t2, rest2) -> ((merge2 l1 h2 t2), rest2)
+       | _ -> assert false

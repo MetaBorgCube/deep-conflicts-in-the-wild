@@ -1,0 +1,18 @@
+Ambiguity 1: 
+| items ->
+     match pr_item env items with
+     | None -> []
+     | Some (tree, valopt, items) -> (tree, valopt) :: item_list env items
+
+Ambiguity 2: 
+| Some d ->
+          match d, dir_arg with
+          | Directive_none f, Pdir_none -> f (); true
+          | Directive_string f, Pdir_string s -> f s; true
+          | Directive_int f, Pdir_int n -> f n; true
+          | Directive_ident f, Pdir_ident lid -> f lid; true
+          | Directive_bool f, Pdir_bool b -> f b; true
+          | _ ->
+              fprintf ppf "Wrong type of argument for directive `%s'.@."
+                dir_name;
+              false

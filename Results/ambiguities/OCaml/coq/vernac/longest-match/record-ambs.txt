@@ -1,0 +1,15 @@
+Ambiguity 1: 
+| BadTypedProj (fi,ctx,te) ->
+	match te with
+	  | ElimArity (_,_,_,_,Some (_,_,NonInformativeToInformative)) ->
+              (pr_id fi ++
+		strbrk" cannot be defined because it is informative and " ++
+		Printer.pr_inductive (Global.env()) indsp ++
+		strbrk " is not.")
+	  | ElimArity (_,_,_,_,Some (_,_,StrongEliminationOnNonSmallType)) ->
+	      (pr_id fi ++
+		strbrk" cannot be defined because it is large and " ++
+		Printer.pr_inductive (Global.env()) indsp ++
+		strbrk " is not.")
+	  | _ ->
+              (pr_id fi ++ strbrk " cannot be defined because it is not typable.")

@@ -1,0 +1,28 @@
+Ambiguity 1: 
+let run_command_execv_unix  cmd =
+  match Unix.fork () with 
+  | 0 -> 
+    log cmd;
+    Unix.chdir cmd.cwd;
+    Unix.execv cmd.cmd cmd.args 
+  | pid -> 
+    match Unix.waitpid [] pid  with 
+    | pid, process_status ->       
+      match process_status with 
+      | Unix.WEXITED eid ->
+        if eid <> 0 then 
+          begin 
+            fail cmd;
+            exit eid    
+          end;
+      | Unix.WSIGNALED _ | Unix.WSTOPPED _ -> 
+        begin 
+          Format.fprintf Format.err_formatter "@{<error>Interrupted:@} %s@." cmd.cmd;
+          exit 2 
+        end        
+
+
+(** TODO: the args are not quoted, here 
+  we are calling a very limited set of `bsb` commands, so that 
+  we are safe
+*)

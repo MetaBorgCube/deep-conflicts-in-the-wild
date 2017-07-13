@@ -1,0 +1,32 @@
+Ambiguity 1: 
+begin
+   if state.pp_curr_depth < state.pp_max_boxes then
+     let elem = make_queue_elem (size_of_int 0) Pp_tend 0 in
+     enqueue_advance state elem;
+     state.pp_curr_depth <- state.pp_curr_depth - 1
+  end
+
+Ambiguity 2: 
+pp_set_min_space_left state n =
+  if n >= 1 then
+    let n = pp_limit n in
+    state.pp_min_space_left <- n;
+    state.pp_max_indent <- state.pp_margin - state.pp_min_space_left;
+    pp_rinit state
+
+Ambiguity 3: 
+pp_set_margin state n =
+  if n >= 1 then
+    let n = pp_limit n in
+    state.pp_margin <- n;
+    let new_max_indent =
+      (* Try to maintain max_indent to its actual value. *)
+      if state.pp_max_indent <= state.pp_margin
+      then state.pp_max_indent else
+      (* If possible maintain pp_min_space_left to its actual value,
+         if this leads to a too small max_indent, take half of the
+         new margin, if it is greater than 1. *)
+       max (max (state.pp_margin - state.pp_min_space_left)
+                (state.pp_margin / 2)) 1 in
+    (* Rebuild invariants. *)
+    pp_set_max_indent state new_max_indent

@@ -1,0 +1,31 @@
+Ambiguity 1: 
+return (Hh_json.json_of_string content)
+    >>= fun json ->
+      begin match json with
+      | Hh_json.JSON_Object props -> return props
+      | _ -> fail "expected options to be a JSON object"
+      end
+    >>= fun props ->
+      List.fold_left (fun opts (k, v) -> opts >>= (fun opts ->
+        match k with
+        | "esproposal_class_instance_fields" -> get_bool k v >>= fun v ->
+          return { opts with Parser_env.esproposal_class_instance_fields = v }
+
+        | "esproposal_class_static_fields" -> get_bool k v >>= fun v ->
+          return { opts with Parser_env.esproposal_class_static_fields = v }
+
+        | "esproposal_decorators" -> get_bool k v >>= fun v ->
+          return { opts with Parser_env.esproposal_decorators = v }
+
+        | "esproposal_export_star_as" -> get_bool k v >>= fun v ->
+          return { opts with Parser_env.esproposal_export_star_as = v }
+
+        | "types" -> get_bool k v >>= fun v ->
+          return { opts with Parser_env.types = v }
+
+        | "use_strict" -> get_bool k v >>= fun v ->
+          return { opts with Parser_env.use_strict = v }
+
+        | _ ->
+          failf "unknown option %S" k
+      )) (return Parser_env.default_parse_options) props

@@ -1,0 +1,13 @@
+Ambiguity 1: 
+| Some first ->
+              let rec iter_last n =
+                if n <= first then
+                  None
+                else
+                  match s.[n] with
+                    '\t'  -> iter_last (n-1)
+                  | _ -> Some n
+              in
+              match iter_last (len-1) with
+                None -> String.sub s first 1
+              | Some last -> String.sub s first ((last-first)+1)

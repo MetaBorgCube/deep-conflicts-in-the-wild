@@ -1,0 +1,27 @@
+Ambiguity 1: 
+| _  ->
+      let dests =
+        List.fold_left
+          (fun r mv -> Ints.add (dest mv) r)
+          Ints.empty mvs in
+      let rem,here =
+        List.partition
+          (fun mv -> Ints.mem (orig mv) dests)
+          mvs in
+      match here with
+      | [] ->
+          begin match rem with
+          | Copy (d,_)::_ ->
+              let d' = do_alloc_temp () in
+              Copy (d',d)::
+              do_rec r
+                (List.map
+                   (fun mv ->
+                     if orig mv = d then
+                       Copy (dest mv,d')
+                     else
+                       mv)
+                   rem)
+          | _ -> assert false
+          end
+      | _  -> do_rec (here@r) rem

@@ -1,0 +1,31 @@
+Ambiguity 1: 
+| Some iter ->
+          let filter = function
+            | Sil.Hpointsto (e, _, _) when Exp.equal e callee_ret_pvar -> Some ()
+            | _ -> None in
+          match Prop.prop_iter_find iter filter with
+          | None -> post_p2
+          | Some iter' ->
+              match fst (Prop.prop_iter_current tenv iter'), ret_id with
+              | Sil.Hpointsto (_, Sil.Eexp (e', inst), _), _ when exp_is_exn e' ->
+                  (* resuls is an exception: set in caller *)
+                  let p = Prop.prop_iter_remove_curr_then_to_prop tenv iter' in
+                  prop_set_exn tenv caller_pname p (Sil.Eexp (e', inst))
+              | Sil.Hpointsto (_, Sil.Eexp (e', _), _), Some (id, _) ->
+                  let p = Prop.prop_iter_remove_curr_then_to_prop tenv iter' in
+                  Prop.conjoin_eq tenv e' (Exp.Var id) p
+              | Sil.Hpointsto (_, Sil.Estruct (ftl, _), _), _
+                when Int.equal (List.length ftl) (if is_none ret_id then 0 else 1) ->
+                  (* TODO(jjb): Is this case dead? *)
+                  let rec do_ftl_ids p = function
+                    | [], None -> p
+                    | (_, Sil.Eexp (e', _)) :: ftl', Some (ret_id, _) ->
+                        let p' = Prop.conjoin_eq tenv e' (Exp.Var ret_id) p in
+                        do_ftl_ids p' (ftl', None)
+                    | _ -> p in
+                  let p = Prop.prop_iter_remove_curr_then_to_prop tenv iter' in
+                  do_ftl_ids p (ftl, ret_id)
+              | Sil.Hpointsto _, _ ->
+                  (* returning nothing or unexpected sexp, turning into nondet *)
+                  Prop.prop_iter_remove_curr_then_to_prop tenv iter'
+              | _ -> assert false

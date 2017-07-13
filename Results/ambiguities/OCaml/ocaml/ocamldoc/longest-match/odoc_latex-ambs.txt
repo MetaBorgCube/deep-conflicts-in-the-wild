@@ -1,0 +1,16 @@
+Ambiguity 1: 
+| Some i ->
+            match i.Odoc_info.i_desc with
+              None -> ([], self#text_of_info ~block: true i_opt)
+            | Some t ->
+                let (first,_) = Odoc_info.first_sentence_and_rest_of_text t in
+                let (_, rest) = Odoc_info.first_sentence_and_rest_of_text (self#text_of_info ~block: false i_opt) in
+                (Odoc_info.text_no_title_no_list first, rest)
+
+Ambiguity 2: 
+| Class_method met -> self#latex_of_method fmt met
+      | Class_comment t ->
+          match t with
+          | [] -> ()
+          | (Title (_,_,_)) :: _ -> self#latex_of_text fmt t
+          | _ -> self#latex_of_text fmt [ Title ((Name.depth class_name) + 2, None, t) ]

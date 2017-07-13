@@ -1,0 +1,9 @@
+Ambiguity 1: 
+let bytes_read = Unix.read fd buffer 0 chunk_size in
+      if bytes_read = 0 then
+        (** EOF reached. *)
+        fd_ref := None
+      else
+        let chunk = String.sub buffer 0 bytes_read in
+        Stack.push chunk acc;
+        maybe_consume fd_ref acc

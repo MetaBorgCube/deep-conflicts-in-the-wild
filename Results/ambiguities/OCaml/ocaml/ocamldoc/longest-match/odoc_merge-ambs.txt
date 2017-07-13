@@ -1,0 +1,37 @@
+Ambiguity 1: 
+| m :: q ->
+        (* look for another module with the same name *)
+        let (l_same, l_others) = List.partition
+            (fun m2 -> m.m_name = m2.m_name)
+            q
+        in
+        match l_same with
+          [] ->
+            (* no other module to merge with *)
+            m :: (iter l_others)
+        | m2 :: [] ->
+            (
+             (* we can merge m with m2 if there is an implementation
+                and an interface.*)
+             let f b = if !Odoc_global.inverse_merge_ml_mli then not b else b in
+             match f m.m_is_interface, f m2.m_is_interface with
+               true, false -> (merge_modules merge_options m m2) :: (iter l_others)
+             | false, true -> (merge_modules merge_options m2 m) :: (iter l_others)
+             | false, false ->
+                 if !Odoc_global.inverse_merge_ml_mli then
+                   (* two Module.ts for the .mli ! *)
+                   raise (Failure (Odoc_messages.two_interfaces m.m_name))
+                 else
+                   (* two Module.t for the .ml ! *)
+                   raise (Failure (Odoc_messages.two_implementations m.m_name))
+             | true, true ->
+                 if !Odoc_global.inverse_merge_ml_mli then
+                   (* two Module.t for the .ml ! *)
+                   raise (Failure (Odoc_messages.two_implementations m.m_name))
+                 else
+                   (* two Module.ts for the .mli ! *)
+                   raise (Failure (Odoc_messages.two_interfaces m.m_name))
+            )
+        | _ ->
+            (* too many Module.t ! *)
+            raise (Failure (Odoc_messages.too_many_module_objects m.m_name))

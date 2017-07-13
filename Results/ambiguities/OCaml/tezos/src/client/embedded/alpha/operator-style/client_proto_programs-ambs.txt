@@ -1,0 +1,109 @@
+Ambiguity 1: 
+;
+          | Script.Int (loc, _) | String (loc, _) | Prim (loc, _, _) as expr :: rest ->
+              begin match List.assoc loc type_map with
+                | exception Not_found ->
+                    Format.fprintf ppf "%a ;@,"
+                      print_typed_code_unwrapped expr ;
+                    loop rest
+                | (before, _) ->
+                    Format.fprintf ppf "/* %a */@,%a ;@,"
+                      print_stack before
+                      print_typed_code_unwrapped expr ;
+                    loop rest
+              end
+
+Ambiguity 2: 
+Program.load cctxt >>=? fun list ->
+         Lwt_list.iter_s (fun (n, _) -> cctxt.message "%s" n) list >>= fun () ->
+         return ()
+
+Ambiguity 3: 
+Program.to_source cctxt program >>=? fun source ->
+         cctxt.message "%s\n" source >>= fun () ->
+         return ()
+
+Ambiguity 4: 
+Client_proto_rpcs.Helpers.trace_code cctxt.rpc_config
+             cctxt.config.block program (storage, input) >>= function
+           | Ok (storage, output, trace) ->
+               cctxt.message
+                 "@[<v 0>@[<v 2>storage@,%a@]@,\
+                  @[<v 2>output@,%a@]@,@[<v 2>trace@,%a@]@]@."
+                 (print_expr no_locations) storage
+                 (print_expr no_locations) output
+                 (Format.pp_print_list
+                    (fun ppf (loc, gas, stack) ->
+                       Format.fprintf ppf
+                         "- @[<v 0>location: %d (remaining gas: %d)@,\
+                            [ @[<v 0>%a ]@]@]"
+                         loc gas
+                         (Format.pp_print_list (print_expr no_locations))
+                         stack))
+                 trace >>= fun () ->
+               return ()
+           | Error errs ->
+               cctxt.warning "%a" pp_print_error errs >>= fun () ->
+               cctxt.error "error running program" >>= fun () ->
+               return ()
+
+Ambiguity 5: 
+Client_proto_rpcs.Helpers.run_code cctxt.rpc_config
+             cctxt.config.block program (storage, input) >>= function
+           | Ok (storage, output) ->
+               cctxt.message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@]@."
+                 (print_expr no_locations) storage
+                 (print_expr no_locations) output >>= fun () ->
+               return ()
+           | Error errs ->
+               cctxt.warning "%a" pp_print_error errs >>= fun () ->
+               cctxt.error "error running program" >>= fun () ->
+               return ()
+
+Ambiguity 6: 
+Client_proto_rpcs.Helpers.typecheck_code cctxt.rpc_config cctxt.config.block program >>= function
+         | Ok type_map ->
+             let type_map, program = unexpand_macros type_map program in
+             cctxt.message "Well typed" >>= fun () ->
+             if !show_types then
+               cctxt.message "%a" (print_program no_locations) (program, type_map) >>= fun () ->
+               return ()
+             else return ()
+         | Error errs ->
+             report_typechecking_errors cctxt errs >>= fun () ->
+             failwith "ill-typed program"
+
+Ambiguity 7: 
+Client_proto_rpcs.Helpers.typecheck_data cctxt.Client_commands.rpc_config
+           cctxt.config.block (data, exp_ty) >>= function
+         | Ok () ->
+             cctxt.message "Well typed" >>= fun () ->
+             return ()
+         | Error errs ->
+             report_typechecking_errors cctxt errs >>= fun () ->
+             failwith "ill-typed data"
+
+Ambiguity 8: 
+Client_proto_rpcs.Helpers.hash_data cctxt.Client_commands.rpc_config
+           cctxt.config.block data >>= function
+         | Ok hash ->
+             cctxt.message "%S" hash >>= fun () ->
+             return ()
+         | Error errs ->
+             cctxt.warning "%a" pp_print_error errs  >>= fun () ->
+             failwith "ill-formed data"
+
+Ambiguity 9: 
+Client_proto_rpcs.Helpers.hash_data cctxt.rpc_config
+           cctxt.config.block data >>= function
+         | Ok hash ->
+             let signature = Ed25519.sign key (MBytes.of_string hash) in
+             cctxt.message "Hash: %S@.Signature: %S"
+               hash
+               (signature |>
+                Data_encoding.Binary.to_bytes Ed25519.Signature.encoding |>
+                Hex_encode.hex_of_bytes) >>= fun () ->
+             return ()
+         | Error errs ->
+             cctxt.warning "%a" pp_print_error errs >>= fun () ->
+             failwith "ill-formed data"

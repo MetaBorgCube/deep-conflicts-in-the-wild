@@ -1,0 +1,15 @@
+Ambiguity 1: 
+let run args =
+  try
+    ignore (g args.(0)); print_string "No exception\n"
+  with exn ->
+    Printf.printf "Uncaught exception %s\n" (Printexc.to_string exn);
+    get_backtrace () |> function
+    | None -> ()
+    | Some trace ->
+      Array.iteri
+        (fun i slot -> match Printexc.Slot.format i slot with
+          | None -> ()
+          | Some line -> print_endline line)
+        trace
+

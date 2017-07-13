@@ -1,0 +1,54 @@
+Ambiguity 1: 
+Ftactic.lift (push_trace (loc,LtacNotationCall s) ist) >>= fun trace ->
+        let ist = {
+          lfun = lfun;
+          extra = TacStore.set ist.extra f_trace trace; } in
+        val_interp ist body >>= fun v ->
+        Ftactic.lift (tactic_of_value ist v)
+
+Ambiguity 2: 
+interp_ltac_reference loc true ist f >>= fun fv ->
+      Ftactic.List.map (fun a -> interp_tacarg ist a) l >>= fun largs ->
+      interp_app loc ist fv largs
+
+Ambiguity 3: 
+begin Proofview.tclORELSE
+            begin
+              let ist = {
+                lfun = newlfun;
+                extra = TacStore.set ist.extra f_trace []; } in
+              catch_error_tac trace (val_interp ist body) >>= fun v ->
+              Ftactic.return (name_vfun (push_appl appl largs) v)
+            end
+	    begin fun (e, info) ->
+              Proofview.tclLIFT (debugging_exception_step ist false e (fun () -> str "evaluation")) <*>
+	      Proofview.tclZERO ~info e
+            end
+        end >>= fun v ->
+        (* No errors happened, we propagate the trace *)
+        let v = append_trace trace v in
+        Proofview.tclLIFT begin
+          debugging_step ist
+	    (fun () ->
+	      str"evaluation returns"++fnl()++pr_value None v)
+        end <*>
+        if List.is_empty lval then Ftactic.return v else interp_app loc ist v lval
+
+Ambiguity 4: 
+interp_genarg ist (Genarg.in_gen (glbwit wit1) p) >>= fun p ->
+      interp_genarg ist (Genarg.in_gen (glbwit wit2) q) >>= fun q ->
+      Ftactic.return (Val.Dyn (Val.typ_pair, (p, q)))
+
+Ambiguity 5: 
+begin match env with
+  | Some e -> Proofview.tclUNIT e
+  | None -> Proofview.tclENV
+  end >>= fun env ->
+  Proofview.tclEVARMAP >>= fun sigma ->
+  let name () = Pptactic.pr_atomic_tactic env sigma tacexpr in
+  Proofview.Trace.name_tactic name tac
+
+Ambiguity 6: 
+Proofview.tclUNIT () >>= fun () -> (* delay for [default_ist] *)
+  Proofview.tclLIFT db_initialize <*>
+  interp_tactic (default_ist ()) t

@@ -1,0 +1,7 @@
+Ambiguity 1: 
+pick hyps >>= fun decl ->
+    let id = NamedDecl.get_id decl in
+    let refresh = is_local_def decl in
+    pattern_match_term refresh pat (NamedDecl.get_type decl) () <*>
+    put_terms (id_map_try_add_name hypname (EConstr.mkVar id) empty_term_subst) <*>
+    return id

@@ -1,0 +1,40 @@
+Ambiguity 1: 
+| Process_running pid ->
+    maybe_consume stdout_fd acc;
+    maybe_consume stderr_fd acc_err;
+    match Unix.waitpid [Unix.WNOHANG] pid with
+    | 0, _ ->
+      ()
+    | _, status ->
+      let () = process_status := Process_exited status in
+      (** Process has exited. Non-blockingly consume residual output. *)
+      let () = maybe_consume stdout_fd acc in
+      let () = maybe_consume stderr_fd acc_err in
+      ()
+
+Ambiguity 2: 
+| Process_running pid ->
+  let fds = filter_none [stdout_fd; stderr_fd;] in
+  if fds = []
+  then
+    (** EOF reached for all FDs. Blocking wait. *)
+    let _, status = Unix.waitpid [] pid in
+    let () = process_status := Process_exited status in
+    status, (Stack.merge_bytes acc), (Stack.merge_bytes acc_err)
+  else
+    (** EOF hasn't been reached for all FDs. Here's where we switch from
+     * reading the pipes to attempting a non-blocking waitpid. *)
+    match Unix.waitpid [Unix.WNOHANG] pid with
+    | 0, _ ->
+      (** Process hasn't exited. We want to avoid a spin-loop
+       * alternating between non-blocking read from pipes and
+       * non-blocking waitpid, so we insert a select here. *)
+      let _, _, _ = Unix.select fds [] [] 0.1 in
+      (** And here we switch from waitpid back to reading. *)
+      read_and_wait_pid process
+    | _, status ->
+      (** Process has exited. Non-blockingly consume residual output. *)
+      let () = maybe_consume stdout_fd acc in
+      let () = maybe_consume stderr_fd acc_err in
+      let () = process_status := Process_exited status in
+      status, (Stack.merge_bytes acc), (Stack.merge_bytes acc_err)

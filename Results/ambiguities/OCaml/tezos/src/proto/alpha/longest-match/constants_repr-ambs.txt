@@ -1,0 +1,5 @@
+Ambiguity 1: 
+| Some json ->
+      match Data_encoding.Json.(destruct constants_encoding json) with
+      | exception exn -> fail (Constant_read exn)
+      | c -> return c

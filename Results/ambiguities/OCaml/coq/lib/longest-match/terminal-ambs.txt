@@ -1,0 +1,5 @@
+Ambiguity 1: 
+| Some _ ->
+  match o2 with
+  | None -> o1
+  | Some _ -> o2

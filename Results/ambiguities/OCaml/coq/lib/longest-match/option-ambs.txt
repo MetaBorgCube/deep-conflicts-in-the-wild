@@ -1,0 +1,10 @@
+Ambiguity 1: 
+| h :: t -> match f h with
+	 | None -> find f t
+	 | x -> x
+
+Ambiguity 2: 
+| x :: l ->
+      match f x with
+      | None -> raise Exit
+      | Some y -> y :: aux f l

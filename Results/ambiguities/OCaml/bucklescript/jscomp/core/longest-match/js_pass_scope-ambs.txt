@@ -1,0 +1,25 @@
+Ambiguity 1: 
+| Some x
+                 ->
+                 (** 
+                     when x is an immediate immutable value, 
+                     (like integer .. )
+                     not a reference, it should be Immutable
+                     or string, 
+                     type system might help here
+                     TODO:
+                 *)
+                 match x.expression_desc with
+                 | Fun _  | Number _ | Str _ 
+                   -> self 
+                 | _ -> 
+                   (* if Ident_set.(is_empty @@ *)
+                   (*   inter self#get_mutable_values  *)
+                   (*     ( ({<  *)
+                   (*         defined_idents = Ident_set.empty;  *)
+                   (*         used_idents = Ident_set.empty; *)
+                   (*         >} # expression x) # get_used_idents)) then *)
+                   (*   (\* FIXME: still need to check expression is pure or not*\) *)
+                   (*   self *)
+                   (* else  *)
+                   self#add_loop_mutable_variable ident

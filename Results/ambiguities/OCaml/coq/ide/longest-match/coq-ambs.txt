@@ -1,0 +1,12 @@
+Ambiguity 1: 
+| `DELETE_EVENT | `NO ->
+      let () = pb_mes#destroy () in
+      let cmd_sel = GWindow.file_selection
+	~title:"Coqtop to execute (edit your preference then)"
+	~filename:(coqtop_path ()) ~urgency_hint:true () in
+      match cmd_sel#run () with
+	| `OK ->
+	  let () = custom_coqtop := (Some cmd_sel#filename) in
+	  let () = cmd_sel#destroy () in
+	  filter_coq_opts args
+	| `CANCEL | `DELETE_EVENT | `HELP -> exit 0

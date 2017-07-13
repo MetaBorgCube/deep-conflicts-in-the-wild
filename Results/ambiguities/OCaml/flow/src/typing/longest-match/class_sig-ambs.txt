@@ -1,0 +1,10 @@
+Ambiguity 1: 
+| (start_loc, _)::ds ->
+  let loc = List.fold_left (fun start_loc (end_loc, _) ->
+    Loc.btwn start_loc end_loc
+  ) start_loc ds in
+  match Context.esproposal_decorators cx with
+  | Options.ESPROPOSAL_ENABLE -> failwith "Decorators cannot be enabled!"
+  | Options.ESPROPOSAL_IGNORE -> ()
+  | Options.ESPROPOSAL_WARN ->
+    Flow_js.add_output cx (Flow_error.EExperimentalDecorators loc)

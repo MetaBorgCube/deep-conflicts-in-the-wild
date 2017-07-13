@@ -1,0 +1,19 @@
+Ambiguity 1: 
+| Klabel _ :: c  -> make_branch_2 lbl n cont c
+  | Kpop m :: c    -> make_branch_2 lbl (n + m) cont c
+  | _              ->
+      match lbl with
+        Some lbl -> (Kbranch lbl, cont)
+      | None     -> let lbl = new_label() in (Kbranch lbl, Klabel lbl :: cont)
+
+Ambiguity 2: 
+| _ ->
+        match code_as_jump ifnot sz with
+        | Some label ->
+            let cont = comp_expr env ifso sz cont in
+            Kbranchifnot label :: cont
+        | _ ->
+            let (branch_end, cont1) = make_branch cont in
+            let (lbl_not, cont2) = label_code(comp_expr env ifnot sz cont1) in
+            Kbranchifnot lbl_not ::
+            comp_expr env ifso sz (branch_end :: cont2)

@@ -1,0 +1,43 @@
+Ambiguity 1: 
+| [] ->
+         if foundone == None && !typeclasses_debug > 0 then
+           Feedback.msg_debug
+             (pr_depth info.auto_depth ++ str": no match for " ++
+                Printer.pr_econstr_env (Goal.V82.env s gl) s concl ++
+                spc () ++ str ", " ++ int (List.length poss) ++
+                str" possibilities");
+         match foundone with
+         | Some e -> fk e
+         | None -> fk NotApplicable
+
+Ambiguity 2: 
+| Some (goals, evm') ->
+       let goals =
+         if !typeclasses_dependency_order then
+           top_sort evm' goals
+         else List.map (fun (ev, _) -> ev) (Evar.Map.bindings goals)
+       in
+       let res = run_list_tac tac p goals
+           (make_autogoals ~only_classes ~unique ~st hints goals evm') in
+       match get_result res with
+       | None -> raise Not_found
+       | Some (evm', fk) ->
+          Some (evars_reset_evd ~with_conv_pbs:true ~with_univs:false evm' evm, fk)
+
+Ambiguity 3: 
+| Dfs ->
+       match depth with
+       | None -> fix (eauto_tac hints)
+       | Some depth -> fix_limit depth (eauto_tac hints)
+
+Ambiguity 4: 
+| [] ->
+         if !foundone == false && !typeclasses_debug > 0 then
+           Feedback.msg_debug
+             (pr_depth info.search_depth ++ str": no match for " ++
+                Printer.pr_econstr_env (Goal.env gl) s concl ++
+                str ", " ++ int (List.length poss) ++
+                str" possibilities");
+         match e with
+         | (ReachedLimitEx,ie) -> Proofview.tclZERO ~info:ie ReachedLimitEx
+         | (_,ie) -> Proofview.tclZERO ~info:ie NotApplicableEx

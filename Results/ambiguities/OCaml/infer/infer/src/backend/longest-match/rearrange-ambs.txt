@@ -1,0 +1,36 @@
+Ambiguity 1: 
+| Sil.Hdllseg (_, _, first, _, _, last, _) ->
+        let result_first = Prover.is_root tenv prop first lexp in
+        match result_first with
+        | None -> Prover.is_root tenv prop last lexp
+        | Some _ -> result_first
+
+Ambiguity 2: 
+| Some iter ->
+        match Prop.prop_iter_current tenv iter with
+        | (Sil.Hpointsto (_, _, texp), off) ->
+            if Config.type_size then check_type_size tenv pname prop texp off typ_from_instr;
+            iter_rearrange_ptsto pname tenv prop iter lexp inst
+        | (Sil.Hlseg (Sil.Lseg_NE, para, e1, e2, elist), _) ->
+            iter_rearrange_ne_lseg tenv recurse_on_iters iter para e1 e2 elist
+        | (Sil.Hlseg (Sil.Lseg_PE, para, e1, e2, elist), _) ->
+            iter_rearrange_pe_lseg tenv recurse_on_iters default_case_iter iter para e1 e2 elist
+        | (Sil.Hdllseg (Sil.Lseg_NE, para_dll, e1, e2, e3, e4, elist), _) ->
+            begin
+              match Prover.is_root tenv prop e1 lexp, Prover.is_root tenv prop e4 lexp with
+              | None, None -> assert false
+              | Some _, _ -> iter_rearrange_ne_dllseg_first tenv recurse_on_iters iter para_dll e1 e2 e3 e4 elist
+              | _, Some _ -> iter_rearrange_ne_dllseg_last tenv recurse_on_iters iter para_dll e1 e2 e3 e4 elist
+            end
+        | (Sil.Hdllseg (Sil.Lseg_PE, para_dll, e1, e2, e3, e4, elist), _) ->
+            begin
+              match Prover.is_root tenv prop e1 lexp, Prover.is_root tenv prop e4 lexp with
+              | None, None -> assert false
+              | Some _, _ -> iter_rearrange_pe_dllseg_first tenv recurse_on_iters default_case_iter iter para_dll e1 e2 e3 e4 elist
+              | _, Some _ -> iter_rearrange_pe_dllseg_last tenv recurse_on_iters default_case_iter iter para_dll e1 e2 e3 e4 elist
+            end
+
+Ambiguity 3: 
+| getter:: tl -> match getter prop exp with
+        | Some _ as some_attr -> some_attr
+        | None -> fold_getters tl

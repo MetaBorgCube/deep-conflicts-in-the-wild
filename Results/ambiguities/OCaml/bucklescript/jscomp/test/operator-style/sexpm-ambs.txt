@@ -1,0 +1,35 @@
+Ambiguity 1: 
+_refill t k_succ k_fail =
+    t.refill t.buf 0 (Bytes.length t.buf)
+    >>= fun n ->
+    t.i <- 0;
+    t.len <- n;
+    if n = 0 then k_fail t else k_succ t
+
+Ambiguity 2: 
+atom k t =
+    if t.i = t.len then _refill t (atom k) (_return_atom None k)
+    else match _get t with
+    | '\\' -> _error t "unexpected '\\' in non-quoted string"
+    | '"' -> _error t "unexpected '\"' in the middle of an atom"
+    | (' ' | '\n' | '\t' | '(' | ')') as c ->
+        _return_atom (Some c) k t
+    | c ->
+        Buffer.add_char t.atom c;
+        atom k t
+
+Ambiguity 3: 
+quoted k t =
+    if t.i = t.len then _refill t (quoted k) _error_eof
+    else match _get t with
+    | '\\' ->
+        (* read escaped char and continue *)
+        escaped
+          (fun c ->
+            Buffer.add_char t.atom c;
+            quoted k t
+          ) t
+    | '"' -> _return_atom None k t
+    | c ->
+        Buffer.add_char t.atom c;
+        quoted k t

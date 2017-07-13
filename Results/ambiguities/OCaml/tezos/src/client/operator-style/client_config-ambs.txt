@@ -1,0 +1,67 @@
+Ambiguity 1: 
+let cfg =
+    if not (Sys.file_exists config_file) then
+      { Cfg_file.default with base_dir = base_dir }
+    else
+      match
+        Utils.read_file ~bin:false config_file
+        |> Data_encoding_ezjsonm.from_string
+      with
+      | exception (Sys_error msg) ->
+          Format.eprintf
+            "Error: can't read the configuration file: %s\n%s@."
+            config_file msg ;
+          exit 1
+      | exception _ ->
+          Format.eprintf "Warning: config file not found@." ;
+          { Cfg_file.default with base_dir = base_dir }
+      | Error msg ->
+          Format.eprintf
+            "Error: can't parse the configuration file: %s\n%s@."
+            config_file msg ;
+          exit 1
+      | Ok cfg_json ->
+          try Cfg_file.from_json cfg_json
+          with exn ->
+            Format.eprintf
+              "Error: can't parse the configuration file: %s\n%a@."
+              config_file (fun ppf exn -> Json_encoding.print_error ppf exn) exn ;
+            exit 1 in
+  let tls = cfg.tls || preparse_bool "-tls" argv in
+  let node_addr =
+    match preparse "-addr" argv with
+    | None -> cfg.node_addr
+    | Some node_addr -> node_addr in
+  let node_port =
+    match preparse "-port" argv with
+    | None -> cfg.node_port
+    | Some port ->
+        try int_of_string port
+        with _ ->
+          Format.eprintf
+            "Error: can't parse the -port option: %S.@." port ;
+          exit 1 in
+  let block =
+    match preparse "-block" Sys.argv with
+    | None -> Client_commands.default_cfg.block
+    | Some block ->
+        match Node_rpc_services.Blocks.parse_block block with
+        | Error _ ->
+            Format.eprintf
+              "Error: can't parse the -block option: %S.@."
+              block ;
+            exit 1
+        | Ok block -> block in
+  let cfg = { cfg with tls ; node_port ; node_addr } in
+  if Sys.file_exists base_dir && not (Sys.is_directory base_dir) then begin
+    Format.eprintf "Error: %s is not a directory.@." base_dir ;
+    exit 1 ;
+  end ;
+  IO.mkdir base_dir ;
+  if Sys.file_exists config_dir && not (Sys.is_directory config_dir) then begin
+    Format.eprintf "Error: %s is not a directory.@." config_dir ;
+    exit 1 ;
+  end ;
+  IO.mkdir config_dir ;
+  if not (Sys.file_exists config_file) then Cfg_file.write config_file cfg ;
+  (cfg, block)

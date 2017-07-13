@@ -1,0 +1,15 @@
+Ambiguity 1: 
+| Ok json ->
+          match Data_encoding.Json.destruct encoding json with
+          | exception _ -> (* TODO print_error *)
+              cctxt.Client_commands.error
+                "didn't understand the endorsement file"
+          | map ->
+              return map
+
+Ambiguity 2: 
+| None ->
+        get_signing_slots
+          cctxt.rpc_config ?max_priority block src_pkh level >>=? function
+        | slot::_ -> return slot
+        | [] -> cctxt.error "No slot found at level %a" Raw_level.pp level

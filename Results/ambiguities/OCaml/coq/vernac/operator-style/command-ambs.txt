@@ -1,0 +1,19 @@
+Ambiguity 1: 
+do_fixpoint local poly l =
+  if Flags.is_program_mode () then do_program_fixpoint local poly l
+  else
+    let fixl, ntns = extract_fixpoint_components true l in
+    let (_, _, _, info as fix) = interp_fixpoint fixl ntns in
+    let possible_indexes =
+      List.map compute_possible_guardness_evidences info in
+    declare_fixpoint local poly fix possible_indexes ntns;
+    if not (check_safe ()) then Feedback.feedback Feedback.AddedAxiom else ()
+
+Ambiguity 2: 
+let fixl,ntns = extract_cofixpoint_components l in
+    if Flags.is_program_mode () then
+      do_program_recursive local poly Obligations.IsCoFixpoint fixl ntns
+    else
+      let cofix = interp_cofixpoint fixl ntns in
+      declare_cofixpoint local poly cofix ntns;
+      if not (check_safe ()) then Feedback.feedback Feedback.AddedAxiom else ()

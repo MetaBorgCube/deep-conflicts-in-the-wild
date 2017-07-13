@@ -1,0 +1,131 @@
+Ambiguity 1: 
+| ele2 :: _ ->
+              let loc = ele2.Parsetree.pctf_loc in
+            match ele2.Parsetree.pctf_desc with
+              Parsetree.Pctf_val (_, _, _, _)
+            | Parsetree.Pctf_method (_, _, _, _)
+            | Parsetree.Pctf_constraint (_, _)
+            | Parsetree.Pctf_attribute _ -> loc.Location.loc_start.Lexing.pos_cnum
+            | Parsetree.Pctf_inherit class_type ->
+                class_type.Parsetree.pcty_loc.Location.loc_start.Lexing.pos_cnum
+            | Parsetree.Pctf_extension _ -> assert false
+
+Ambiguity 2: 
+| item :: q ->
+              let loc = item.Parsetree.pctf_loc in
+              match item.Parsetree.pctf_desc with
+
+        | Parsetree.Pctf_val (name, mutable_flag, virtual_flag, _) ->
+            (* of (string * mutable_flag * core_type option * Location.t)*)
+            let (comment_opt, eles_comments) = get_comments_in_class last_pos loc.Location.loc_start.Lexing.pos_cnum in
+            let complete_name = Name.concat current_class_name name in
+            let typ =
+              try Signature_search.search_attribute_type name class_signature
+              with Not_found ->
+                raise (Failure (Odoc_messages.attribute_type_not_found current_class_name name))
+            in
+            let subst_typ = Odoc_env.subst_type env typ in
+            let att =
+              {
+                att_value =
+                {
+                  val_name = complete_name ;
+                  val_info = comment_opt ;
+                  val_type = subst_typ;
+                  val_recursive = false ;
+                  val_parameters = [] ;
+                  val_code = None ;
+                  val_loc = { loc_impl = None ; loc_inter = Some loc} ;
+                } ;
+                att_mutable = mutable_flag = Asttypes.Mutable ;
+                att_virtual = virtual_flag = Asttypes.Virtual ;
+              }
+            in
+            let pos_limit2 = get_pos_limit2 q in
+            let pos_end = loc.Location.loc_end.Lexing.pos_cnum in
+            let (maybe_more, info_after_opt) =
+              My_ir.just_after_special
+                !file_name
+                (get_string_of_file pos_end pos_limit2)
+            in
+            att.att_value.val_info <- merge_infos att.att_value.val_info info_after_opt ;
+            let (inher_l, eles) = f (pos_end + maybe_more) q in
+            (inher_l, eles_comments @ ((Class_attribute att) :: eles))
+
+        | Parsetree.Pctf_method (name, private_flag, virtual_flag, _) ->
+            (* of (string * private_flag * virtual_flag * core_type) *)
+            let (comment_opt, eles_comments) = get_comments_in_class last_pos loc.Location.loc_start.Lexing.pos_cnum in
+            let (met, maybe_more) = get_method name comment_opt private_flag loc q in
+            let met2 =
+              match virtual_flag with
+              | Concrete -> met
+              | Virtual -> { met with met_virtual = true }
+            in
+            let (inher_l, eles) = f (loc.Location.loc_end.Lexing.pos_cnum + maybe_more) q in
+            (inher_l, eles_comments @ ((Class_method met2) :: eles))
+
+        | (Parsetree.Pctf_constraint (_, _)) ->
+            (* of (core_type * core_type) *)
+            (* A VOIR : cela correspond aux contraintes, non ? on ne les garde pas pour l'instant *)
+            let (comment_opt, eles_comments) = get_comments_in_class last_pos loc.Location.loc_start.Lexing.pos_cnum in
+            let (inher_l, eles) = f loc.Location.loc_end.Lexing.pos_cnum q in
+            (inher_l, eles_comments @ eles)
+
+        | Parsetree.Pctf_inherit class_type ->
+            let loc = class_type.Parsetree.pcty_loc in
+            let (comment_opt, eles_comments) =
+              get_comments_in_class last_pos loc.Location.loc_start.Lexing.pos_cnum
+            in
+            let pos_limit2 = get_pos_limit2 q in
+            let pos_end = loc.Location.loc_end.Lexing.pos_cnum in
+            let (maybe_more, info_after_opt) =
+              My_ir.just_after_special
+                !file_name
+                (get_string_of_file pos_end pos_limit2)
+            in
+            let comment_opt2 = merge_infos comment_opt info_after_opt in
+            let text_opt = match comment_opt2 with None -> None | Some i -> i.Odoc_types.i_desc in
+            let inh  =
+              match class_type.Parsetree.pcty_desc with
+                Parsetree.Pcty_constr (longident, _) ->
+                  (*of Longident.t * core_type list*)
+                  let name = Name.from_longident longident.txt in
+                  let ic =
+                    {
+                      ic_name = Odoc_env.full_class_or_class_type_name env name ;
+                      ic_class = None ;
+                      ic_text = text_opt ;
+                    }
+                  in
+                  ic
+
+              | Parsetree.Pcty_signature _
+              | Parsetree.Pcty_arrow _ ->
+                    (* we don't have a name for the class signature, so we call it "object ... end"  *)
+                  {
+                    ic_name = Odoc_messages.object_end ;
+                    ic_class = None ;
+                    ic_text = text_opt ;
+                  }
+              | Parsetree.Pcty_extension _ -> assert false
+            in
+            let (inher_l, eles) = f (pos_end + maybe_more) q in
+            (inh :: inher_l , eles_comments @ eles)
+        | Parsetree.Pctf_attribute _ ->
+            let (comment_opt, eles_comments) = get_comments_in_class last_pos loc.Location.loc_start.Lexing.pos_cnum in
+            let (inher_l, eles) = f loc.Location.loc_end.Lexing.pos_cnum q in
+            (inher_l, eles_comments @ eles)
+
+        | Parsetree.Pctf_extension _ -> assert false
+
+Ambiguity 3: 
+| Some i ->
+                match i.i_desc with
+                  None -> []
+                | Some t -> [Element_module_comment t]
+
+Ambiguity 4: 
+| Some module_type ->
+                match sig_mtype with
+                | Some sig_mtype -> Some (analyse_module_type_kind env complete_name module_type sig_mtype)
+                | None -> None

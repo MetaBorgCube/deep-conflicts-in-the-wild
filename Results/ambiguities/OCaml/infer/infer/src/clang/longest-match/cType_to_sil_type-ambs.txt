@@ -1,0 +1,99 @@
+Ambiguity 1: 
+and type_desc_of_attr_type translate_decl tenv type_info attr_info =
+  match type_info.Clang_ast_t.ti_desugared_type with
+  | Some type_ptr ->
+      (match CAst_utils.get_type type_ptr with
+       | Some Clang_ast_t.ObjCObjectPointerType (_, qual_type) ->
+           let typ = qual_type_to_sil_type translate_decl tenv qual_type in
+           Typ.Tptr (typ, pointer_attribute_of_objc_attribute attr_info)
+       | _ -> type_ptr_to_type_desc translate_decl tenv type_ptr)
+  | None -> Typ.Tvoid
+
+and type_desc_of_c_type translate_decl tenv c_type : Typ.desc =
+  let open Clang_ast_t in
+  match c_type with
+  | NoneType _ -> Tvoid
+  | BuiltinType (_, builtin_type_kind) ->
+      type_desc_of_builtin_type_kind builtin_type_kind
+  | PointerType (_, qual_type)
+  | ObjCObjectPointerType (_, qual_type) ->
+      let typ = qual_type_to_sil_type translate_decl tenv qual_type in
+      let desc = typ.Typ.desc in
+      if Typ.equal_desc desc (get_builtin_objc_type `ObjCClass) then
+        desc
+      else Typ.Tptr (typ, Typ.Pk_pointer)
+  | ObjCObjectType (_, objc_object_type_info) ->
+      type_ptr_to_type_desc translate_decl tenv objc_object_type_info.Clang_ast_t.base_type
+  | BlockPointerType (_, qual_type) ->
+      let typ = qual_type_to_sil_type translate_decl tenv qual_type in
+      Typ.Tptr (typ, Typ.Pk_pointer)
+  | IncompleteArrayType (_, {arti_element_type; arti_stride})
+  | DependentSizedArrayType (_, {arti_element_type; arti_stride}) ->
+      build_array_type translate_decl tenv arti_element_type None arti_stride
+  | VariableArrayType (_, {arti_element_type; arti_stride}, _) ->
+      build_array_type translate_decl tenv arti_element_type None arti_stride
+  | ConstantArrayType (_, {arti_element_type; arti_stride}, n) ->
+      build_array_type translate_decl tenv arti_element_type (Some n) arti_stride
+  | FunctionProtoType _
+  | FunctionNoProtoType _ ->
+      Typ.Tfun false
+  | ParenType (_, qual_type) ->
+      (qual_type_to_sil_type translate_decl tenv qual_type).Typ.desc
+  | DecayedType (_, qual_type) ->
+      (qual_type_to_sil_type translate_decl tenv qual_type).Typ.desc
+  | RecordType (_, pointer)
+  | EnumType (_, pointer) ->
+      decl_ptr_to_type_desc translate_decl tenv pointer
+  | ElaboratedType (type_info) ->
+      (match type_info.Clang_ast_t.ti_desugared_type with (* TODO desugar to qualtype *)
+         Some type_ptr -> type_ptr_to_type_desc translate_decl tenv type_ptr
+       | None -> Typ.Tvoid)
+  | ObjCInterfaceType (_, pointer) ->
+      decl_ptr_to_type_desc translate_decl tenv pointer
+  | RValueReferenceType (_, qual_type)
+  | LValueReferenceType (_, qual_type) ->
+      let typ = qual_type_to_sil_type translate_decl tenv qual_type in
+      Typ.Tptr (typ, Typ.Pk_reference)
+  | AttributedType (type_info, attr_info) -> (* TODO desugar to qualtyp *)
+      type_desc_of_attr_type translate_decl tenv type_info attr_info
+  | _ -> (* TypedefType, etc *)
+      let type_info = Clang_ast_proj.get_type_tuple c_type in
+      match type_info.Clang_ast_t.ti_desugared_type with (* TODO desugar typedeftype to qualtype *)
+      | Some typ -> type_ptr_to_type_desc translate_decl tenv typ
+      | None -> Typ.Tvoid
+
+and decl_ptr_to_type_desc translate_decl tenv decl_ptr : Typ.desc =
+  let open Clang_ast_t in
+  let typ = Clang_ast_extend.DeclPtr decl_ptr in
+  try Clang_ast_extend.TypePointerMap.find typ !CFrontend_config.sil_types_map
+  with Not_found ->
+  match CAst_utils.get_decl decl_ptr with
+  | Some (CXXRecordDecl _ as d)
+  | Some (RecordDecl _ as d)
+  | Some (ClassTemplateSpecializationDecl _ as d)
+  | Some (ObjCInterfaceDecl _ as d)
+  | Some (ObjCImplementationDecl _ as d)
+  | Some (ObjCProtocolDecl _ as d)
+  | Some (ObjCCategoryDecl _ as d)
+  | Some (ObjCCategoryImplDecl _ as d)
+  | Some (EnumDecl _ as d) -> translate_decl tenv d
+  | Some _ ->
+      Logging.err_debug "Warning: Wrong decl found for  pointer %s "
+        (Clang_ast_j.string_of_pointer decl_ptr);
+      Typ.Tvoid
+  | None ->
+      Logging.err_debug "Warning: Decl pointer %s not found."
+        (Clang_ast_j.string_of_pointer decl_ptr);
+      Typ.Tvoid
+
+and clang_type_ptr_to_type_desc translate_decl tenv type_ptr =
+  try
+    Clang_ast_extend.TypePointerMap.find type_ptr !CFrontend_config.sil_types_map
+  with Not_found ->
+    (match CAst_utils.get_type type_ptr with
+     | Some c_type ->
+         let type_desc = type_desc_of_c_type translate_decl tenv c_type in
+         CAst_utils.update_sil_types_map type_ptr type_desc;
+         type_desc
+     | _ -> Typ.Tvoid)
+

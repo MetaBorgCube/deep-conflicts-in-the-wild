@@ -1,0 +1,45 @@
+Ambiguity 1: 
+| None ->
+                match cnt_texp with
+                | Sizeof ({typ=cnt_typ} as sizeof_data) ->
+                    (* type of struct at adr_base is unknown (typically Tvoid), but
+                       type of contents is known, so construct struct type for single fld:cnt_typ *)
+                    let name = Typ.Name.C.from_string ("counterfeit" ^ string_of_int !count) in
+                    incr count ;
+                    let fields = [(fld, cnt_typ, Annot.Item.empty)] in
+                    ignore (Tenv.mk_struct tenv ~fields name) ;
+                    Exp.Sizeof {sizeof_data with typ=Typ.mk (Tstruct name)}
+                | _ ->
+                    (* type of struct at adr_base and of contents are both unknown: give up *)
+                    raise (Failure "expand_hpred_pointer: Unexpected non-sizeof type in Lfield")
+
+Ambiguity 2: 
+| Some iter1' ->
+                  let elist2 = List.map ~f:(fun e -> Sil.exp_sub (snd subs) e) _elist2 in
+                  (* force instantiation of existentials *)
+                  let subs' = exp_list_imply tenv calc_missing subs (f2:: elist2) (f2:: elist2) in
+                  let prop1' = Prop.prop_iter_remove_curr_then_to_prop tenv iter1' in
+                  let hpred1 = match Prop.prop_iter_current tenv iter1' with
+                    | hpred1, b ->
+                        if b then ProverState.add_missing_pi (Sil.Aneq(_e2, _f2)); (* for PE |- NE *)
+                        hpred1
+                  in match hpred1 with
+                  | Sil.Hlseg _ -> (subs', prop1')
+                  | Sil.Hpointsto _ -> (* unroll rhs list and try again *)
+                      let n' = Exp.Var (Ident.create_fresh Ident.kprimed) in
+                      let (_, para_inst2) = Sil.hpara_instantiate para2 _e2 n' elist2 in
+                      let hpred_list2 = para_inst2@[Prop.mk_lseg tenv Sil.Lseg_PE para2 n' _f2 _elist2] in
+                      L.d_increase_indent 1;
+                      let res =
+                        decrease_indent_when_exception
+                          (fun () ->
+                             try sigma_imply tenv calc_index_frame calc_missing subs prop1 hpred_list2
+                             with exn when SymOp.exn_not_failure exn ->
+                               begin
+                                 (L.d_strln_color Red) "backtracking lseg: trying rhs of length exactly 1";
+                                 let (_, para_inst3) = Sil.hpara_instantiate para2 _e2 _f2 elist2 in
+                                 sigma_imply tenv calc_index_frame calc_missing subs prop1 para_inst3
+                               end) in
+                      L.d_decrease_indent 1;
+                      res
+                  | Sil.Hdllseg _ -> assert false

@@ -1,0 +1,17 @@
+Ambiguity 1: 
+while !i < len && Char.code s.[!i] < 128 && not (has_UU !i) do
+    incr i
+  done;
+  if !i = len then s else
+    let out = Buffer.create (2*len) in
+    Buffer.add_substring out s 0 !i;
+    while !i < len do
+      let j, n = next_utf8 s !i in
+      if n >= 128 then
+        (Printf.bprintf out "_UU%04x_" n; i := !i + j)
+      else if has_UU !i then
+        (Buffer.add_string out "_UUU"; i := !i + 3)
+      else
+        (Buffer.add_char out s.[!i]; incr i)
+    done;
+    Buffer.contents out

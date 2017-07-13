@@ -1,0 +1,12 @@
+Ambiguity 1: 
+init l f =
+  if l = 0 then [||] else
+  if l < 0 then invalid_arg "Array.init"
+  (* See #6575. We could also check for maximum array size, but this depends
+     on whether we create a float array or a regular one... *)
+  else
+   let res = Array.make l (f 0 [@bs]) in
+   for i = 1 to pred l do
+     Array.unsafe_set res i (f i [@bs])
+   done;
+   res

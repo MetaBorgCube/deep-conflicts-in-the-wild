@@ -1,0 +1,65 @@
+Ambiguity 1: 
+assert (len >= 0);
+        if len <= 0
+        then ofs, List.rev acc
+        else
+          let ofs', v = read buf ofs len in
+          assert (ofs' > ofs);
+          loop (v :: acc) ofs'  (len - (ofs' - ofs))
+
+Ambiguity 2: 
+fun len buf ofs ->
+                    let ofs, v = read len buf ofs in
+                    ofs, inj v
+
+Ambiguity 3: 
+buf ofs len ->
+           if len = 0 then ofs, None
+           else
+             let ofs', v = read buf ofs len in
+             assert (ofs' = ofs + len) ;
+             ofs + len, Some v
+
+Ambiguity 4: 
+if buf.unread < delta_ofs then (*not enough data*)
+        raise Need_more_data ;
+      if delta_ofs = 0 then (*we'll read nothing*)
+        buf, reader (MBytes.create 0) 0 0
+      else
+        let new_ofs = absolute_ofs + delta_ofs in
+        let ofs = absolute_ofs - buf.past_len in (*relative ofs wrt 'future'*)
+        buf.unread <- buf.unread-delta_ofs ; (*'delta_ofs' cells will be read*)
+        assert (not (Queue.is_empty buf.future)) ; (*we have some data to read*)
+        let b, len_b = Queue.peek buf.future in
+        let buf = { buf with ofs = new_ofs } in
+        if ofs + delta_ofs > len_b then
+          (*should read data from many mbytes*)
+          buf, read_from_many_blocks reader buf ofs delta_ofs
+        else
+          begin
+            if ofs + delta_ofs = len_b then
+              begin (*the rest of b will be entirely read. Put it in 'past'*)
+                ignore (Queue.pop buf.future) ;
+                Queue.push b buf.past ;
+                buf.past_len <- buf.past_len + len_b ;
+              end ;
+            buf, reader b ofs delta_ofs
+          end
+
+Ambiguity 5: 
+concat_mbyte_chunks queue tot_len =
+    if Queue.length queue = 1 then Queue.pop queue (* no copy *)
+    else (* copy smaller mbytes into one big mbyte *)
+      let buf = MBytes.create tot_len in
+      let cpt = ref 0 in
+      let tot_len' = ref tot_len in
+      while not (Queue.is_empty queue) do
+        let mb = Queue.pop queue in
+        let len = MBytes.length mb in
+        tot_len' := !tot_len' - len ;
+        assert (!tot_len' >= 0) ;
+        MBytes.blit mb 0 buf !cpt len ;
+        cpt := !cpt + len ;
+      done ;
+      assert (!tot_len' = 0) ;
+      buf

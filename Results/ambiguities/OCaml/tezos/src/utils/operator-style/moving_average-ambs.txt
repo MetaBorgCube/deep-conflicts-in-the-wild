@@ -1,0 +1,16 @@
+Ambiguity 1: 
+inner sleep =
+    sleep >>= fun () ->
+    let sleep = Lwt_unix.sleep 1. in
+    let now = Mtime.elapsed () in
+    let elapsed = int_of_float (Mtime.(to_ms now -. to_ms !prev)) in
+    prev := now;
+    Inttbl.iter
+      (fun _ c ->
+         c.average <-
+           (c.alpha * c.current) / elapsed + (1000 - c.alpha) * c.average / 1000;
+         c.current <- 0)
+      counters ;
+    List.iter (fun f -> f ()) !update_hook ;
+    Lwt_condition.broadcast updated () ;
+    inner sleep

@@ -1,0 +1,7 @@
+Ambiguity 1: 
+(lhs,eqnty,rhs) =
+          if closed0 !evd ti then
+	    (xi,ti,ai)
+          else
+	    let sigma, res = make_iterated_tuple env' !evd ai (xi,ti) in
+	      evd := sigma; res

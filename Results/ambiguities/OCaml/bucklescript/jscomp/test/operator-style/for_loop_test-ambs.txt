@@ -1,0 +1,26 @@
+Ambiguity 1: 
+for j = 0 to j_len - 1 do
+      incr v ;
+      collect !v ;
+      arr.(i * j_len + j)<- 
+      fun _ -> 
+        (* prerr_endline @@ Printf.sprintf "<%d" !vv ;  *)
+        (* prerr_endline @@ Printf.sprintf ">%d" !vv ;  *)
+        vv := !vv + !v; 
+        (* v should not be captured inside , 
+           since for next iteration, 
+           we are bound the same v
+
+           there are four iterations of this function
+           
+           the first two bound one v 
+
+           the second two bound the other one
+
+           -- sometimes it's hard to tell the difference,  
+           when v is not relevant to the outer [index]
+           actually we have to lexical scope the whole for statement
+         *)
+
+    done;
+    arr2.(i) <- fun _ -> vv2 := !vv2 + !v

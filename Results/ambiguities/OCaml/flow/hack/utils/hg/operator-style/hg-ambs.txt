@@ -1,0 +1,17 @@
+Ambiguity 1: 
+Future.make process @@ fun result ->
+    let lines = Sys_utils.split_lines result in
+    let nonempty str = String.length str > 0 in
+    List.filter lines ~f:nonempty |> List.hd_exn
+
+Ambiguity 2: 
+let process = Process.exec "hg" ["id"; "-i"; "--cwd"; repo; ] in
+  Future.make process @@ fun result ->
+    let result = String.trim result in
+    if String.length result < 1 then
+      raise Malformed_result
+    else
+      if result.[(String.length result) - 1] = '+' then
+        (String.sub result 0 ((String.length result) - 1)), true
+      else
+        result, false

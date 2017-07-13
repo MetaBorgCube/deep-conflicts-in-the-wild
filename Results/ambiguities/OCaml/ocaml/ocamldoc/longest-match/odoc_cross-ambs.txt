@@ -1,0 +1,231 @@
+Ambiguity 1: 
+| None ->
+             let mmt_opt =
+               try Some (Mod (lookup_module ma.ma_name))
+               with Not_found ->
+                 try Some (Modtype (lookup_module_type ma.ma_name))
+                 with Not_found -> None
+             in
+             match mmt_opt with
+               None -> (acc_b, (Name.head m.m_name) :: acc_inc,
+                        (* we don't want to output warning messages for
+                           "sig ... end" or "struct ... end" modules not found *)
+                        (if ma.ma_name = Odoc_messages.struct_end ||
+                          ma.ma_name = Odoc_messages.sig_end then
+                          acc_names
+                        else
+                          (NF_mmt ma.ma_name) :: acc_names)
+                       )
+             | Some mmt ->
+                 ma.ma_module <- Some mmt ;
+                 (true, acc_inc, acc_names)
+
+Ambiguity 2: 
+| None ->
+              let mt_opt =
+                try Some (lookup_module_type mta.mta_name)
+                with Not_found -> None
+              in
+              match mt_opt with
+                None -> (acc_b, (Name.head m.m_name) :: acc_inc,
+                   (* we don't want to output warning messages for
+                      "sig ... end" or "struct ... end" modules not found *)
+                   (if mta.mta_name = Odoc_messages.struct_end ||
+                      mta.mta_name = Odoc_messages.sig_end then
+                      acc_names
+                    else
+                      (NF_mt mta.mta_name) :: acc_names)
+                  )
+              | Some mt ->
+                  mta.mta_module <- Some mt ;
+                  (true, acc_inc, acc_names)
+
+Ambiguity 3: 
+| None ->
+              let mt_opt =
+                try Some (lookup_module_type mta.mta_name)
+                with Not_found -> None
+              in
+              match mt_opt with
+                None -> (acc_b, (Name.head mt.mt_name) :: acc_inc,
+                   (* we don't want to output warning messages for
+                      "sig ... end" or "struct ... end" modules not found *)
+                   (if mta.mta_name = Odoc_messages.struct_end ||
+                      mta.mta_name = Odoc_messages.sig_end then
+                      acc_names
+                    else
+                      (NF_mt mta.mta_name) :: acc_names)
+                  )
+              | Some mt ->
+                  mta.mta_module <- Some mt ;
+                  (true, acc_inc, acc_names)
+
+Ambiguity 4: 
+| None ->
+            let mmt_opt =
+              try Some (Mod (lookup_module im.im_name))
+              with Not_found ->
+                try Some (Modtype (lookup_module_type im.im_name))
+                with Not_found -> None
+            in
+            match mmt_opt with
+              None -> (acc_b_modif, (Name.head m_name) :: acc_incomplete_top_module_names,
+                       (* we don't want to output warning messages for
+                           "sig ... end" or "struct ... end" modules not found *)
+                        (if im.im_name = Odoc_messages.struct_end ||
+                          im.im_name = Odoc_messages.sig_end then
+                          acc_names_not_found
+                        else
+                          (NF_mmt im.im_name) :: acc_names_not_found)
+                      )
+            | Some mmt ->
+                im.im_module <- Some mmt ;
+                (true, acc_incomplete_top_module_names, acc_names_not_found)
+
+Ambiguity 5: 
+| Some ea ->
+            match ea.ea_ex with
+              Some _ ->
+                (acc_b_modif, acc_incomplete_top_module_names, acc_names_not_found)
+            | None ->
+                let ex_opt =
+                  try Some (lookup_exception ea.ea_name)
+                  with Not_found -> None
+                in
+                match ex_opt with
+                  None -> (acc_b_modif, (Name.head m_name) :: acc_incomplete_top_module_names, (NF_ex ea.ea_name) :: acc_names_not_found)
+                | Some e ->
+                    ea.ea_ex <- Some e ;
+                    (true, acc_incomplete_top_module_names, acc_names_not_found)
+
+Ambiguity 6: 
+| None ->
+            let cct_opt =
+              try Some (Cl (lookup_class ic.ic_name))
+              with Not_found ->
+                try Some (Cltype (lookup_class_type ic.ic_name, []))
+                with Not_found -> None
+            in
+            match cct_opt with
+              None -> (acc_b2, (Name.head c.cl_name) :: acc_inc2,
+                       (* we don't want to output warning messages for "object ... end" classes not found *)
+                       (if ic.ic_name = Odoc_messages.object_end then acc_names2 else (NF_cct ic.ic_name) :: acc_names2))
+            | Some cct ->
+                ic.ic_class <- Some cct ;
+                (true, acc_inc2, acc_names2)
+
+Ambiguity 7: 
+| None ->
+             let cl_opt =
+               try Some (lookup_class capp.capp_name)
+               with Not_found -> None
+             in
+             match cl_opt with
+               None -> (acc_b, (Name.head c.cl_name) :: acc_inc,
+                        (* we don't want to output warning messages for "object ... end" classes not found *)
+                        (if capp.capp_name = Odoc_messages.object_end then acc_names else (NF_c capp.capp_name) :: acc_names))
+             | Some c ->
+                 capp.capp_class <- Some c ;
+                 (true, acc_inc, acc_names)
+
+Ambiguity 8: 
+| None ->
+             let cl_opt =
+               try Some (lookup_class cco.cco_name)
+               with Not_found -> None
+             in
+             match cl_opt with
+               None ->
+                 (
+                  let clt_opt =
+                    try Some (lookup_class_type cco.cco_name)
+                    with Not_found -> None
+                  in
+                  match clt_opt with
+                    None ->
+                      (acc_b, (Name.head c.cl_name) :: acc_inc,
+                        (* we don't want to output warning messages for "object ... end" classes not found *)
+                       (if cco.cco_name = Odoc_messages.object_end then acc_names else (NF_cct cco.cco_name) :: acc_names))
+                  | Some ct ->
+                      cco.cco_class <- Some (Cltype (ct, [])) ;
+                      (true, acc_inc, acc_names)
+                 )
+             | Some c ->
+                 cco.cco_class <- Some (Cl c) ;
+                 (true, acc_inc, acc_names)
+
+Ambiguity 9: 
+| None ->
+              let cct_opt =
+                try Some (Cltype (lookup_class_type ic.ic_name, []))
+                with Not_found ->
+                  try Some (Cl (lookup_class ic.ic_name))
+                  with Not_found -> None
+              in
+              match cct_opt with
+                None -> (acc_b2, (Name.head ct.clt_name) :: acc_inc2,
+                         (* we don't want to output warning messages for "object ... end" class types not found *)
+                         (if ic.ic_name = Odoc_messages.object_end then acc_names2 else (NF_cct ic.ic_name) :: acc_names2))
+              | Some cct ->
+                  ic.ic_class <- Some cct ;
+                  (true, acc_inc2, acc_names2)
+
+Ambiguity 10: 
+| None ->
+             let cct_opt =
+               try Some (Cltype (lookup_class_type cta.cta_name, []))
+               with Not_found ->
+                 try Some (Cl (lookup_class cta.cta_name))
+                 with Not_found -> None
+             in
+             match cct_opt with
+               None -> (acc_b, (Name.head ct.clt_name) :: acc_inc,
+                        (* we don't want to output warning messages for "object ... end" class types not found *)
+                        (if cta.cta_name = Odoc_messages.object_end then acc_names else (NF_cct cta.cta_name) :: acc_names))
+             | Some c ->
+                 cta.cta_class <- Some c ;
+                 (true, acc_inc, acc_names)
+
+Ambiguity 11: 
+| Some xa ->
+             match xa.xa_xt with
+                 Some _ ->
+                   (acc_b_modif, acc_incomplete_top_module_names, acc_names_not_found)
+               | None ->
+                   let xt_opt =
+                     try Some (lookup_extension xa.xa_name)
+                     with Not_found -> None
+                   in
+                     match xt_opt with
+                         None -> (acc_b_modif, (Name.head xt.xt_name) :: acc_incomplete_top_module_names, (NF_xt xa.xa_name) :: acc_names_not_found)
+                       | Some x ->
+                           xa.xa_xt <- Some x ;
+                           (true, acc_incomplete_top_module_names, acc_names_not_found)
+
+Ambiguity 12: 
+| (_, None) ->
+             match parent_name with
+               None ->
+                 Odoc_global.pwarning (Odoc_messages.cross_element_not_found initial_name);
+                 Ref (initial_name, None, text_option)
+             | Some p ->
+                 let parent_name =
+                   match Name.father p with
+                     "" -> None
+                   | s -> Some s
+                 in
+                 iter_parent ?parent_name (Name.concat p initial_name)
+
+Ambiguity 13: 
+| (_, None) ->
+               match parent_name with
+                 None ->
+                   Odoc_global.pwarning (not_found_of_kind kind initial_name);
+                   Ref (initial_name, None, text_option)
+               | Some p ->
+                   let parent_name =
+                     match Name.father p with
+                       "" -> None
+                     | s -> Some s
+                   in
+                   iter_parent ?parent_name (Name.concat p initial_name)

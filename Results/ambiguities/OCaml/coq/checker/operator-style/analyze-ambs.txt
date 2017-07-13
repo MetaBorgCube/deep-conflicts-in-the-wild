@@ -1,0 +1,51 @@
+Ambiguity 1: 
+let data = input_byte chan in
+  if prefix_small_block <= data then
+    let tag = data land 0x0F in
+    let len = (data lsr 4) land 0x07 in
+    RBlock (tag, len)
+  else if prefix_small_int <= data then
+    RInt (data land 0x3F)
+  else if prefix_small_string <= data then
+    let len = data land 0x1F in
+    RString (input_string len chan)
+  else if data > code_max then
+    assert false
+  else match (Obj.magic data) with
+  | CODE_INT8 ->
+    RInt (input_int8s chan)
+  | CODE_INT16 ->
+    RInt (input_int16s chan)
+  | CODE_INT32 ->
+    RInt (input_int32s chan)
+  | CODE_INT64 ->
+    RInt (input_int64s chan)
+  | CODE_SHARED8 ->
+    RPointer (input_int8u chan)
+  | CODE_SHARED16 ->
+    RPointer (input_int16u chan)
+  | CODE_SHARED32 ->
+    RPointer (input_int32u chan)
+  | CODE_BLOCK32 ->
+    RBlock (input_header32 chan)
+  | CODE_BLOCK64 ->
+    RBlock (input_header64 chan)
+  | CODE_STRING8 ->
+    let len = input_int8u chan in
+    RString (input_string len chan)
+  | CODE_STRING32 ->
+    let len = input_int32u chan in
+    RString (input_string len chan)
+  | CODE_CODEPOINTER ->
+    let addr = input_int32u chan in
+    for i = 0 to 15 do ignore (input_byte chan); done;
+    RCode addr
+  | CODE_DOUBLE_ARRAY32_LITTLE
+  | CODE_DOUBLE_BIG
+  | CODE_DOUBLE_LITTLE
+  | CODE_DOUBLE_ARRAY8_BIG
+  | CODE_DOUBLE_ARRAY8_LITTLE
+  | CODE_DOUBLE_ARRAY32_BIG
+  | CODE_INFIXPOINTER
+  | CODE_CUSTOM ->
+    Printf.eprintf "Unhandled code %04x\n%!" data; assert false

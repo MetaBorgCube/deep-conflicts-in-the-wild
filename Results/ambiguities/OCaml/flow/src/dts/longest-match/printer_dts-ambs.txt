@@ -1,0 +1,133 @@
+Ambiguity 1: 
+and module_used_statement acc = Statement.(function
+  (* This handles the following case:
+
+     declare module M {
+       export class A { }
+     }
+     declare module N {
+       export var x: M.A
+     }
+     delcare module P {
+       export var z: typeof N.x
+     }
+  *)
+  | loc, VariableDeclaration { VariableDeclaration.
+      declarations; _
+    } -> VariableDeclaration.(
+      match declarations with
+      | [(_, {Declarator.id; _})] ->
+        module_used_pattern acc id
+      | _ -> failwith_location loc
+        "Only single declarator handled currently"
+    )
+  (* This case means that the child modules are imported by default.*)
+  | _, ModuleDeclaration { Module.id; _ } ->
+    SSet.add (get_name [] id) acc
+  (* This case check for possible module references in export
+       assignments. Note this does not look for object notation. Eg.,
+
+     declare module M { }
+     declare module "N" {
+       export = M // this is reference to a module
+     }
+  *)
+  | _, ExportAssignment id -> (match id with
+    | _, {Identifier. name; _} -> SSet.add name acc
+  )
+  (* This case checks for object notation in extend property of a
+       class. Eg.,
+     export class C extends M.D { }
+  *)
+  | _, AmbientClassDeclaration { AmbientClass. extends; body; _ } ->
+    let acc = module_used_body acc body in
+    (match extends with
+    | Some (_, t) -> module_used_generic acc t
+    | _ -> acc
+    )
+  (* This case checks for object notation in extend property of an
+       interface. Eg.,
+     export interface C extends M.D { }
+  *)
+  | _, InterfaceDeclaration { Interface. extends; body; _ } ->
+    let acc = module_used_body acc body in
+    let fold_intermediate x y = module_used_generic x (snd y) in
+    List.fold_left fold_intermediate acc extends
+  (* This case checks for function declaration's parameters and returnType.
+    Eg.,
+          export function f(x: M.C): typeof P.x
+    This would return "M" :: "P" :: []
+  *)
+  | _, AmbientFunctionDeclaration{ AmbientFunctionDeclaration. params;
+      returnType; _ } ->
+    let acc = module_used_type acc returnType in
+    let fold_intermediate x y = module_used_pattern x y in
+    List.fold_left fold_intermediate acc params
+  (* This case checks for TypeAliases
+    Eg.,
+          type A = number | M.C
+    This would return "M" :: []
+  *)
+  | _, TypeAlias {TypeAlias. right; _} ->
+    module_used_type acc right
+
+  | _ -> acc
+)
+
+and module_used_pattern acc = Pattern.(function
+  | _, Identifier id -> module_used_id acc id
+  | loc, _ -> failwith_location loc
+    "Only identifier allowed in variable declaration"
+)
+
+and module_used_id acc = function
+  | _, { Identifier. typeAnnotation; _ } ->
+      match typeAnnotation with
+      | None -> acc
+      | Some x -> module_used_type acc x
+
+and module_used_type acc = Type.(function
+  | _, Generic t -> module_used_generic acc t
+  | _, Typeof x ->
+    (match x with _, {IdPath.ids; _}-> module_used_ids acc ids)
+  | loc, Object t -> module_used_body acc (loc, t)
+  | _, Intersection l ->
+      let fold_intermediate x y = module_used_type x y in
+      List.fold_left fold_intermediate acc l
+  | _, Union l ->
+      let fold_intermediate x y = module_used_type x y in
+      List.fold_left fold_intermediate acc l
+  | _ -> acc
+)
+
+Ambiguity 2: 
+let print_header fmt = function _ ->
+      match list_modules_used, imports with
+      | [], [] -> ()
+      | _ -> fprintf fmt "%s@,%a%a%s@,"
+        "// ** IMPORTS TO EMULATE NESTING **"
+        (list_ ~sep:"" (import_module false)) list_modules_used
+        (list_ ~sep:"" import_members) imports
+        "// ** END OF IMPORTS SECTION **"
+    in
+    fprintf fmt "@[<v>%s@,declare module %S {@;<0 2>@[<v>%a%a@]@,}@]"
+      (spf "// Module declared on line %d in .d.ts file" (get_line_number loc))
+      (generate_mangled_name name prefix)
+      print_header ()
+      (statements false new_scope) (filter_not_modules body)
+
+Ambiguity 3: 
+let print_header fmt = function _ ->
+        match list_modules_used  with
+        | [] -> ()
+        | _ -> fprintf fmt "%s@,%a%s@,"
+          "// ** IMPORTS TO EMULATE NESTING **"
+          (list_ ~sep:"" (import_module false)) list_modules_used
+          "// ** END OF IMPORTS SECTION **"
+      in
+      fprintf fmt "@[<v>%s@,declare module %S {@;<0 2>@[<v>%a%a@]@,}@]"
+        (spf "// Module declared on line %d in .d.ts file"
+          (get_line_number loc))
+        name
+        print_header ()
+        (statements false scope) (filter_not_modules body)

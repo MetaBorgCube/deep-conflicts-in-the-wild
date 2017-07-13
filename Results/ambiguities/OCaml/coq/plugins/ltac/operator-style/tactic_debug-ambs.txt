@@ -1,0 +1,55 @@
+Ambiguity 1: 
+int_of_string s >>= fun num ->
+        (if num<0 then run_invalid_arg () else return ()) >>
+        (skip:=num) >> (skipped:=0)
+
+Ambiguity 2: 
+begin
+      Proofview.NonLogical.print_notice (str"\b\r\b\r") >>
+      !skipped >>= fun skipped ->
+      msg_tac_debug (str "Executed expressions: " ++ int skipped ++ fnl())
+    end >>
+    !skipped >>= fun x ->
+    skipped := x+1
+
+Ambiguity 3: 
+Proofview.NonLogical.print_notice (fnl () ++ str "TcDebug (" ++ int level ++ str ") > ") >>
+    if Pervasives.(!batch) then return (DebugOn (level+1)) else
+    let exit = (skip:=0) >> (skipped:=0) >> raise Sys.Break in
+    Proofview.NonLogical.catch Proofview.NonLogical.read_line
+      begin function (e, info) -> match e with
+        | End_of_file -> exit
+        | e -> raise ~info e
+      end
+    >>= fun inst ->
+    match inst with
+    | ""  -> return (DebugOn (level+1))
+    | "s" -> return (DebugOff)
+    | "x" -> Proofview.NonLogical.print_char '\b' >> exit
+    | "h"| "?" ->
+      begin
+        help () >>
+        prompt level
+      end
+    | _ ->
+        Proofview.NonLogical.catch (run_com inst >> runtrue >> return (DebugOn (level+1)))
+          begin function (e, info) -> match e with
+            | Failure _ | Invalid_argument _ -> prompt level
+            | e -> raise ~info e
+          end
+
+Ambiguity 4: 
+(!skip >>= fun s -> skip:=s-1) >>
+      runfalse >>
+      !skip >>= fun new_skip ->
+      (if Int.equal new_skip 0 then skipped:=0 else return ()) >>
+      return (DebugOn (lev+1))
+
+Ambiguity 5: 
+!breakpoint >>= fun breakpoint ->
+  match db, breakpoint with
+  | DebugOff, _ -> return false
+  | _, Some _ -> return false
+  | _ ->
+      !skip >>= fun skip ->
+      return (Int.equal skip 0)

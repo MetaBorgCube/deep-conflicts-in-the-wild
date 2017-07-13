@@ -1,0 +1,64 @@
+Ambiguity 1: 
+let intern_non_tactic_reference strict ist r =
+  (* An ltac reference *)
+  try Reference (intern_ltac_variable ist r)
+  with Not_found ->
+  (* A constr reference *)
+  try ConstrMayEval (ConstrTerm (intern_constr_reference strict ist r))
+  with Not_found ->
+  (* Tolerance for compatibility, allow not to use "ltac:" *)
+  try intern_isolated_global_tactic_reference r
+  with Not_found ->
+  (* By convention, use IntroIdentifier for unbound ident, when not in a def *)
+  match r with
+  | Ident (loc,id) when not strict ->
+    let ipat = in_gen (glbwit wit_intro_pattern) (loc, IntroNaming (IntroIdentifier id)) in
+    TacGeneric ipat
+  | _ ->
+  (* Reference not found *)
+  error_global_not_found (snd (qualid_of_reference r))
+
+
+
+Ambiguity 2: 
+let intern_evaluable_global_reference ist r =
+  let lqid = qualid_of_reference r in
+  try evaluable_of_global_reference ist.genv (locate_global_with_alias ~head:true lqid)
+  with Not_found ->
+  match r with
+  | Ident (loc,id) when not !strict_check -> EvalVarRef id
+  | _ -> error_global_not_found (snd lqid)
+
+
+
+Ambiguity 3: 
+let interp_ref r =
+    try Inl (intern_evaluable ist r)
+    with e when Logic.catchable_exception e ->
+      (* Compatibility. In practice, this means that the code above
+         is useless. Still the idea of having either an evaluable
+         ref or a pattern seems interesting, with "head" reduction
+         in case of an evaluable ref, and "strong" reduction in the
+         subterm matched when a pattern *)
+      let loc = loc_of_smart_reference r in
+      let r = match r with
+      | AN r -> r
+      | _ -> Qualid (loc,qualid_of_path (path_of_global (smart_global r))) in
+      let sign = { Constrintern.ltac_vars = ist.ltacvars; Constrintern.ltac_bound = Id.Set.empty } in
+      let c = Constrintern.interp_reference sign r in
+      match c with
+      | GRef (_,r,None) ->
+          Inl (ArgArg (evaluable_of_global_reference ist.genv r,None))
+      | GVar (_,id) ->
+          let r = evaluable_of_global_reference ist.genv (VarRef id) in
+          Inl (ArgArg (r,None))
+      | _ ->
+          let bound_names = Glob_ops.bound_glob_vars c in
+          Inr (bound_names,(c,None),dummy_pat) in
+  (l, match p with
+  | Inl r -> interp_ref r
+  | Inr (CAppExpl(_,(None,r,None),[])) ->
+      (* We interpret similarly @ref and ref *)
+      interp_ref (AN r)
+  | Inr c ->
+      Inr (intern_typed_pattern ist c))

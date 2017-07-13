@@ -1,0 +1,43 @@
+Ambiguity 1: 
+begin function (e, info) -> match e with
+    | PretypeError (env, evd, NoOccurrenceFound (c', _)) ->
+      Proofview.tclZERO (PretypeError (env, evd, NoOccurrenceFound (c', cls)))
+    | e -> Proofview.tclZERO ~info e
+    end
+
+Ambiguity 2: 
+| Some t ->
+    let rels, t = decompose_prod_assum (project gl) t in
+    let env = push_rel_context rels (Proofview.Goal.env gl) in
+    match decompose_app (project gl) t with
+      | _, [dom1; _; dom2;_] -> is_conv env (Tacmach.New.project gl) dom1 dom2
+      | _ -> false
+
+Ambiguity 3: 
+begin function
+              | (e, info) ->
+                  Proofview.tclEVARMAP >>= fun sigma ->
+	          let env' = push_rel_context rels env in
+	          let rels',t' = splay_prod_assum env' sigma t in (* Search for underlying eq *)
+	          match match_with_equality_type sigma t' with
+	            | Some (hdcncl,args) ->
+		  let lft2rgt = adjust_rewriting_direction args lft2rgt in
+		  leibniz_rewrite_ebindings_clause cls lft2rgt tac c
+		    (it_mkProd_or_LetIn t' (rels' @ rels)) l with_evars frzevars dep_proof_ok hdcncl
+	            | None -> Proofview.tclZERO ~info e
+            (* error "The provided term does not end with an equality or a declared rewrite relation." *)  
+            end
+
+Ambiguity 4: 
+begin function (e, info) -> match e with
+    | Constr_matching.PatternMatchingFailure ->
+	tclZEROMSG (str "Not a primitive equality here.")
+    | e when catchable_exception e ->
+	tclZEROMSG
+          (strbrk "Cannot find a well-typed generalization of the goal that makes the proof progress.")
+    | e -> Proofview.tclZERO ~info e
+  end
+
+Ambiguity 5: 
+| _ ->
+      match EConstr.kind sigma y with Var y -> y | _ -> failwith "caught"

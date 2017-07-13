@@ -1,0 +1,130 @@
+Ambiguity 1: 
+| Unlock ->
+                { astate with locks = false; }
+            | LockedIfTrue ->
+                begin
+                  match ret_opt with
+                  | Some ret_access_path ->
+                      let attribute_map =
+                        AttributeMapDomain.add_attribute
+                          (ret_access_path, [])
+                          (Choice Choice.LockHeld)
+                          astate.attribute_map in
+                      { astate with attribute_map; }
+                  | None ->
+                      failwithf
+                        "Procedure %a specified as returning boolean, but returns nothing"
+                        Typ.Procname.pp callee_pname
+                end
+            | NoEffect ->
+                match get_summary pdesc callee_pname actuals loc tenv with
+                | Some (callee_threads, callee_locks, callee_accesses, return_attributes) ->
+                    let update_caller_accesses pre callee_accesses caller_accesses =
+                      let combined_accesses =
+                        PathDomain.with_callsite callee_accesses (CallSite.make callee_pname loc)
+                        |> PathDomain.join (AccessDomain.get_accesses pre caller_accesses) in
+                      AccessDomain.add pre combined_accesses caller_accesses in
+                    let locks = callee_locks || astate.locks in
+                    let threads = callee_threads || astate.threads in
+                    let unprotected = is_unprotected locks pdesc in
+                    (* add [ownership_accesses] to the [accesses_acc] with a protected pre if
+                       [exp] is owned, and an appropriate unprotected pre otherwise *)
+                    let add_ownership_access ownership_accesses actual_exp accesses_acc =
+                      match actual_exp with
+                      | HilExp.Constant _ ->
+                          (* the actual is a constant, so it's owned in the caller. *)
+                          accesses_acc
+                      | HilExp.AccessPath actual_access_path ->
+                          if is_owned actual_access_path astate.attribute_map
+                          then
+                            (* the actual passed to the current callee is owned. drop all the
+                                 conditional accesses for that actual, since they're all safe *)
+                            accesses_acc
+                          else
+                            let pre =
+                              if unprotected
+                              then
+                                let base = fst actual_access_path in
+                                match FormalMap.get_formal_index base extras with
+                                | Some formal_index ->
+                                    (* the actual passed to the current callee is rooted in a
+                                         formal *)
+                                    AccessPrecondition.Unprotected (Some formal_index)
+                                | None ->
+                                    match
+                                      AttributeMapDomain.get_conditional_ownership_index
+                                        actual_access_path
+                                        astate.attribute_map
+                                    with
+                                    | Some formal_index ->
+                                        (* access path conditionally owned if [formal_index] is
+                                             owned *)
+                                        AccessPrecondition.Unprotected (Some formal_index)
+                                    | None ->
+                                        (* access path not rooted in a formal and not
+                                             conditionally owned *)
+                                        AccessPrecondition.unprotected
+                              else
+                                (* access protected by held lock *)
+                                AccessPrecondition.Protected in
+                            update_caller_accesses pre ownership_accesses accesses_acc
+                      | _ ->
+                          (* couldn't find access path, don't know if it's owned *)
+                          update_caller_accesses
+                            AccessPrecondition.unprotected ownership_accesses accesses_acc in
+                    let accesses =
+                      let update_accesses pre callee_accesses accesses_acc = match pre with
+                        | AccessPrecondition.Protected ->
+                            update_caller_accesses pre callee_accesses accesses_acc
+                        | AccessPrecondition.Unprotected None ->
+                            let pre' =
+                              if unprotected
+                              then pre
+                              else AccessPrecondition.Protected in
+                            update_caller_accesses pre' callee_accesses accesses_acc
+                        | AccessPrecondition.Unprotected (Some index) ->
+                            add_ownership_access
+                              callee_accesses (List.nth_exn actuals index) accesses_acc in
+                      AccessDomain.fold update_accesses callee_accesses astate.accesses in
+                    let attribute_map =
+                      propagate_return_attributes
+                        ret_opt
+                        return_attributes
+                        actuals
+                        astate.attribute_map
+                        extras in
+                    { locks; threads; accesses; attribute_map; }
+                | None ->
+                    let should_assume_returns_ownership (call_flags : CallFlags.t) actuals =
+                      (* assume non-interface methods with no summary and no parameters return
+                         ownership *)
+                      not (call_flags.cf_interface) && List.is_empty actuals in
+                    if is_box callee_pname
+                    then
+                      match ret_opt, actuals with
+                      | Some ret, HilExp.AccessPath actual_ap :: _
+                        when AttributeMapDomain.has_attribute
+                            actual_ap Functional astate.attribute_map ->
+                          (* TODO: check for constants, which are functional? *)
+                          let attribute_map =
+                            AttributeMapDomain.add_attribute
+                              (ret, [])
+                              Functional
+                              astate.attribute_map in
+                          { astate with attribute_map; }
+                      | _ ->
+                          astate
+                    else if should_assume_returns_ownership call_flags actuals
+                    then
+                      match ret_opt with
+                      | Some ret ->
+                          let attribute_map =
+                            AttributeMapDomain.add_attribute
+                              (ret, [])
+                              Attribute.unconditionally_owned
+                              astate.attribute_map in
+                          { astate with attribute_map; }
+                      | None ->
+                          astate
+                    else
+                      astate

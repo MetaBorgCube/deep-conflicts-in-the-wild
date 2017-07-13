@@ -1,0 +1,43 @@
+Ambiguity 1: 
+obj_stats d t =
+  if Obj.is_int t then m := max d !m
+  else if Obj.tag t >= Obj.no_scan_tag then
+    if Obj.tag t = Obj.string_tag then
+      (c := !c + Obj.size t; b := !b + 1; m := max d !m)
+    else if Obj.tag t = Obj.double_tag then
+      (s := !s + 2; b := !b + 1; m := max d !m)
+    else if Obj.tag t = Obj.double_array_tag then
+      (s := !s + 2 * Obj.size t; b := !b + 1; m := max d !m)
+    else (b := !b + 1; m := max d !m)
+  else
+    let n = Obj.size t in
+    s := !s + n; b := !b + 1;
+    block_stats (d + 1) (n - 1) t
+
+Ambiguity 2: 
+let rec compute_size o pos =
+  if not (Obj.is_block o) then 0
+  else
+    try
+      let _ = get_size o in 0 (* already seen *)
+    with Not_found ->
+      let n = Obj.size o in
+      add_size o (-1) pos (* temp size, for cyclic values *);
+      let tag = Obj.tag o in
+      let size =
+        if tag < Obj.no_scan_tag then
+          1 + n + sum n (fun i -> compute_size (Obj.field o i) (i::pos))
+        else if tag = Obj.string_tag then
+          1 + n
+        else if tag = Obj.double_tag then
+          size_of_double
+        else if tag = Obj.double_array_tag then
+          size_of_double * n
+        else
+          1
+      in
+      add_size o size pos;
+      size
+
+(** Provides the global object in which we'll search shared sizes *)
+

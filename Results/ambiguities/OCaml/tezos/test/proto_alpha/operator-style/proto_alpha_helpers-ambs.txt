@@ -1,0 +1,145 @@
+Ambiguity 1: 
+Client_node_rpcs.Blocks.info rpc_config block >>=? fun block_info ->
+    Client_proto_rpcs.Context.next_level rpc_config block >>=? fun next_level ->
+    Client_proto_rpcs.Helpers.Forge.Delegate.proposals rpc_config block
+      ~net:block_info.net_id
+      ~source:pk
+      ~period:next_level.voting_period
+      ~proposals
+      () >>=? fun bytes ->
+    let signed_bytes = Environment.Ed25519.Signature.append sk bytes in
+    Client_node_rpcs.inject_operation
+      rpc_config ?async ?force signed_bytes >>=? fun oph ->
+    return oph
+
+Ambiguity 2: 
+Client_node_rpcs.Blocks.info rpc_config block >>=? fun block_info ->
+    Client_proto_rpcs.Context.next_level rpc_config block >>=? fun next_level ->
+    Client_proto_rpcs.Helpers.Forge.Delegate.ballot rpc_config block
+      ~net:block_info.net_id
+      ~source:pk
+      ~period:next_level.voting_period
+      ~proposal
+      ~ballot
+      () >>=? fun bytes ->
+    let signed_bytes = Environment.Ed25519.Signature.append sk bytes in
+    Client_node_rpcs.inject_operation
+      rpc_config ?async ?force signed_bytes >>=? fun oph ->
+    return oph
+
+Ambiguity 3: 
+Client_node_rpcs.Blocks.info rpc_config block >>=? fun bi ->
+    let proto_level = Utils.unopt ~default:bi.proto_level proto_level in
+    let seed_nonce_hash = Nonce.hash seed_nonce in
+    Client_proto_rpcs.Context.next_level rpc_config block >>=? fun level ->
+    let operations_hash =
+      Operation_list_list_hash.compute
+        [Operation_list_hash.compute operation_list] in
+    let shell =
+      { Store.Block_header.net_id = bi.net_id ; predecessor = bi.hash ;
+        timestamp ; fitness ; operations_hash ;
+        level = Raw_level.to_int32 level.level ;
+        proto_level } in
+    mine_stamp
+      block src_sk shell priority seed_nonce_hash >>=? fun proof_of_work_nonce ->
+    Client_proto_rpcs.Helpers.Forge.block rpc_config
+      block
+      ~net:bi.net_id
+      ~predecessor:bi.hash
+      ~timestamp
+      ~fitness
+      ~operations_hash
+      ~level:level.level
+      ~proto_level
+      ~priority
+      ~seed_nonce_hash
+      ~proof_of_work_nonce
+      () >>=? fun unsigned_header ->
+    let signed_header = Environment.Ed25519.Signature.append src_sk unsigned_header in
+    Client_node_rpcs.inject_block rpc_config
+      ?force signed_header [operation_list] >>=? fun block_hash ->
+    return block_hash
+
+Ambiguity 4: 
+Client_mining_blocks.info rpc_config block >>=? fun bi ->
+  let seed_nonce =
+    match Nonce.of_bytes @@
+      Sodium.Random.Bigbytes.generate Constants.nonce_length with
+    | Error _ -> assert false
+    | Ok nonce -> nonce in
+  let timestamp = Time.add (Time.now ()) 1L in
+  Client_proto_rpcs.Context.level rpc_config block >>=? fun level ->
+  let level = Raw_level.succ level.level in
+  get_first_priority level contract block >>=? fun priority ->
+  (Lwt.return (Fitness_repr.to_int64 bi.fitness) >|=
+   Register_client_embedded_proto_alpha.wrap_error) >>=? fun fitness ->
+  let fitness =
+    Fitness_repr.from_int64 @@
+    Int64.add fitness (Int64.of_int fitness_gap) in
+  inject_block
+    ~force
+    ?proto_level
+    ~priority
+    ~timestamp
+    ~fitness
+    ~seed_nonce
+    ~src_sk:contract.sk
+    block
+    operations
+
+Ambiguity 5: 
+Client_mining_blocks.info rpc_config block >>=? fun bi ->
+    get_first_priority bi.level.level contract block >>=? fun prio ->
+    Mining.endorsement_reward ~block_priority:prio >|=
+    Register_client_embedded_proto_alpha.wrap_error >>|?
+    Tez.to_cents
+
+Ambiguity 6: 
+Client_blocks.get_block_hash rpc_config block >>=? fun block_hash ->
+    Client_node_rpcs.Blocks.net rpc_config block >>=? fun net ->
+    Client_proto_rpcs.Helpers.Forge.Delegate.endorsement rpc_config
+      block
+      ~net
+      ~source
+      ~block:block_hash
+      ~slot:slot
+      () >>=? fun bytes ->
+    let signed_bytes = Environment.Ed25519.Signature.append src_sk bytes in
+    Client_node_rpcs.inject_operation
+      rpc_config ?force ?async signed_bytes >>=? fun oph ->
+    return oph
+
+Ambiguity 7: 
+Client_proto_rpcs.Context.level rpc_config block >>=? fun level ->
+    let level = Raw_level.succ @@ level.level in
+    begin
+      match slot with
+      | Some slot -> return slot
+      | None -> begin
+          signing_slots
+            block contract.Account.pkh
+            level >>=? function
+          | slot::_ -> return slot
+          | [] ->
+              failwith "No slot found at level %a" Raw_level.pp level
+        end
+    end >>=? fun slot ->
+    inject_endorsement
+      block level contract.sk contract.pk slot ~force >>=? fun oph ->
+    return oph
+
+Ambiguity 8: 
+Client_proto_rpcs.Context.level rpc_config block >>=? fun level ->
+    let level = Raw_level.succ @@ level.level in
+    get_endorser_list result b1 level block >>=? fun () ->
+    get_endorser_list result b2 level block >>=? fun () ->
+    get_endorser_list result b3 level block >>=? fun () ->
+    get_endorser_list result b4 level block >>=? fun () ->
+    get_endorser_list result b5 level block >>=? fun () ->
+    return result
+
+Ambiguity 9: 
+display_level block =
+  Client_proto_rpcs.Context.level rpc_config block >>=? fun lvl ->
+  Format.eprintf "Level: %a@." Level.pp_full lvl ;
+  return ()

@@ -1,0 +1,50 @@
+Ambiguity 1: 
+ilow, ihigh, with_inter =
+    if not !ok_inter then
+      let rlow = ref (-1) and rhigh = ref (-1)
+      and best_cost= ref (too_much,too_much) in
+      for i=1 to lcases-2 do
+        let low, high, inside, outside = coupe_inter i i cases in
+         if low=high then begin
+           let _,(cmi,cinside) = opt_count false inside
+           and _,(cmo,coutside) = opt_count false outside
+           and cmij = {n=1 ; ni=0}
+           and cij = {n=1 ; ni=0} in
+           add_test cij cinside ;
+           add_test cij coutside ;
+           if less_tests cmi cmo then
+             add_test cmij cmo
+           else
+             add_test cmij cmi ;
+           if less2tests (cmij,cij) !best_cost then begin
+             rlow := i ;
+             rhigh := i ;
+             best_cost := (cmij,cij)
+           end
+         end
+      done ;
+      !rlow, !rhigh, !best_cost
+    else
+      let rlow = ref (-1) and rhigh = ref (-1)
+      and best_cost= ref (too_much,too_much) in
+      for i=1 to lcases-2 do
+        for j=i to lcases-2 do
+          let low, high, inside, outside = coupe_inter i j cases in
+          let _,(cmi,cinside) = opt_count false inside
+          and _,(cmo,coutside) = opt_count false outside
+          and cmij = {n=1 ; ni=(if low=high then 0 else 1)}
+          and cij = {n=1 ; ni=(if low=high then 0 else 1)} in
+          add_test cij cinside ;
+          add_test cij coutside ;
+          if less_tests cmi cmo then
+            add_test cmij cmo
+          else
+            add_test cmij cmi ;
+          if less2tests (cmij,cij) !best_cost then begin
+            rlow := i ;
+            rhigh := j ;
+            best_cost := (cmij,cij)
+          end
+        done
+      done ;
+      !rlow, !rhigh, !best_cost

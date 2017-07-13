@@ -1,0 +1,15 @@
+Ambiguity 1: 
+replace_string_ old_str new_str i str buffer =
+  if i >= String.length str then
+    ()
+  else
+    (* found match *)
+    if is_prefixed old_str str i then
+      (* split string *)
+      let old_str_len = String.length old_str in
+      Buffer.add_string buffer new_str;
+      replace_string_ old_str new_str (i + old_str_len) str buffer
+    else
+      let start = String.sub str i 1 in
+      Buffer.add_string buffer start;
+      replace_string_ old_str new_str (i + 1) str buffer

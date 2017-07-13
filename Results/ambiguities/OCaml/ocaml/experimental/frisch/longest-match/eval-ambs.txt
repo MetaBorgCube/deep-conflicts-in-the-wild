@@ -1,0 +1,23 @@
+Ambiguity 1: 
+| Pstr_extension(({txt="eval.start";_},
+                        PStr [{pstr_desc=Pstr_eval (e, _);_}]
+                       ), _) when get_lid e = Some "both" ->
+          eval_str_items := Some true;
+          empty_str_item
+      | Pstr_extension(({txt="eval.start";_}, PStr []), _) ->
+          eval_str_items := Some false;
+          empty_str_item
+      | Pstr_extension(({txt="eval.stop";_}, PStr []), _) ->
+          eval_str_items := None;
+          empty_str_item
+      | _ ->
+          let s = super.structure_item this i in
+          match !eval_str_items with
+          | None -> s
+          | Some both ->
+              if not (run (Ptop_def [s])) then begin
+                Location.print_error Format.err_formatter s.pstr_loc;
+                Format.eprintf "this structure item raised an exception@.";
+                exit 2
+              end;
+              if both then s else empty_str_item

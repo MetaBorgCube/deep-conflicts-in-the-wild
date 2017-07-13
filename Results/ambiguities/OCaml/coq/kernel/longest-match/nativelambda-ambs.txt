@@ -1,0 +1,5 @@
+Ambiguity 1: 
+| Some tps ->
+       match Cemitcodes.force tps with
+       | Cemitcodes.BCalias kn' -> get_alias env (kn', u)
+       | _ -> p

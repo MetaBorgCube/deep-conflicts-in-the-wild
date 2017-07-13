@@ -1,0 +1,9 @@
+Ambiguity 1: 
+ask_kill_program () =
+  if not !loaded then
+    true
+  else
+    let answer = yes_or_no "A program is being debugged already. Kill it" in
+      if answer then
+        kill_program ();
+      answer

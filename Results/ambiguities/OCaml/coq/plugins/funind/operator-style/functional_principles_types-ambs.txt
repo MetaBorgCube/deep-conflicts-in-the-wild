@@ -1,0 +1,32 @@
+Ambiguity 1: 
+(get_name decl,
+     let args,ty = decompose_prod (EConstr.Unsafe.to_constr (get_type decl)) in
+     let s = destSort ty in
+       Global.add_constraints (Univ.enforce_leq (univ_of_sort toSort) (univ_of_sort s) Univ.Constraint.empty);
+       Term.compose_prod args (mkSort toSort)
+    )
+
+Ambiguity 2: 
+new_principle_type _ _  -> 
+    if Option.is_empty sorts
+    then
+      (*     let id_of_f = Label.to_id (con_label f) in *)
+      let register_with_sort fam_sort =
+	let evd' = Evd.from_env (Global.env ()) in
+	let evd',s = Evd.fresh_sort_in_family env evd' fam_sort in
+	let name = Indrec.make_elimination_ident base_new_princ_name fam_sort in
+	let evd',value = change_property_sort evd' s new_principle_type new_princ_name in
+	let evd' = fst (Typing.type_of ~refresh:true (Global.env ()) evd' (EConstr.of_constr value)) in
+	(* Pp.msgnl (str "new principle := " ++ pr_lconstr value); *)
+	let ce = Declare.definition_entry ~poly:(Flags.is_universe_polymorphism ()) ~univs:(snd (Evd.universe_context evd')) value in
+	ignore(
+	  Declare.declare_constant
+	    name
+	    (DefinitionEntry ce,
+	     Decl_kinds.IsDefinition (Decl_kinds.Scheme))
+	);
+	Declare.definition_message name;
+	names := name :: !names
+      in
+      register_with_sort InProp;
+      register_with_sort InSet

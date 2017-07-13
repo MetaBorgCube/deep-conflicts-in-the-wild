@@ -1,0 +1,32 @@
+Ambiguity 1: 
+list t prefix >>= fun prefixes ->
+          Lwt_list.map_p (function
+              | `Key prefix | `Dir prefix -> loop (i+1) prefix []) prefixes
+          >|= List.flatten
+
+Ambiguity 2: 
+list t prefix >>= fun prefixes ->
+          Lwt_list.map_p (function
+              | `Key prefix | `Dir prefix ->
+                  match Utils.remove_prefix d (List.hd (List.rev prefix)) with
+                  | None -> Lwt.return_nil
+                  | Some _ -> loop (i+1) prefix [])
+            prefixes
+          >|= List.flatten
+
+Ambiguity 3: 
+list t prefix >>= fun prefixes ->
+          Lwt_list.map_p (function
+              | `Key prefix | `Dir prefix -> loop (i+1) prefix ds) prefixes
+          >|= List.flatten
+
+Ambiguity 4: 
+read_all s >>= fun old_set ->
+      Lwt_list.iter_p (remove s)
+        Set.(elements (diff old_set new_set)) >>= fun () ->
+      Lwt_list.iter_p (store s) Set.(elements (diff new_set old_set))
+
+Ambiguity 5: 
+read_all s >>= fun old_set ->
+    Lwt_list.iter_p (remove s) Set.(elements (diff old_set new_set)) >>= fun () ->
+    Lwt_list.iter_p (store s) Set.(elements (diff new_set old_set))

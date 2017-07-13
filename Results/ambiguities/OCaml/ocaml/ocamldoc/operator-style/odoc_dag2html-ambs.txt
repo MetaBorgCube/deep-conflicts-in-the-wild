@@ -1,0 +1,72 @@
+Ambiguity 1: 
+loop1 les l =
+            if l = next_j then loop les next_j
+            else
+              let next_l =
+                let y = t.table.(k).(l) in
+                match y.elem with
+                  Elem _ | Ghost _ ->
+                    let rec loop l =
+                      if l = Array.length t.table.(i) then l
+                      else if t.table.(k).(l) = y then loop (l + 1)
+                      else l
+                    in
+                    loop (l + 1)
+                | _ -> l + 1
+              in
+              if next_l > next_j then
+                begin
+                  Printf.eprintf
+                    "assert false i %d k %d l %d next_l %d next_j %d\n" i k l
+                    next_l next_j;
+                  flush stderr
+                end;
+              let next_l = min next_l next_j in
+              let colspan = 3 * (next_l - l) - 2 in
+              let les =
+                match t.table.(i).(l).elem, t.table.(i + 1).(l).elem with
+                  Nothing, _ | _, Nothing ->
+                    (colspan + 2, LeftA, TDstring "&nbsp;") :: les
+                | _ ->
+                    let ph s =
+                      if phony t.table.(k).(l).elem then TDstring "&nbsp;"
+                      else s
+                    in
+                    if l = j && next_l = next_j then
+                      let les = (1, LeftA, TDstring "&nbsp;") :: les in
+                      let s = ph (TDstring "|") in
+                      let les = (colspan, CenterA, s) :: les in
+                      let les = (1, LeftA, TDstring "&nbsp;") :: les in les
+                    else if l = j then
+                      let les = (1, LeftA, TDstring "&nbsp;") :: les in
+                      let s = ph (TDhr RightA) in
+                      let les = (colspan, RightA, s) :: les in
+                      let s = ph (TDhr CenterA) in
+                      let les = (1, LeftA, s) :: les in les
+                    else if next_l = next_j then
+                      let s = ph (TDhr CenterA) in
+                      let les = (1, LeftA, s) :: les in
+                      let s = ph (TDhr LeftA) in
+                      let les = (colspan, LeftA, s) :: les in
+                      let les = (1, LeftA, TDstring "&nbsp;") :: les in les
+                    else
+                      let s = ph (TDhr CenterA) in
+                      (colspan + 2, LeftA, s) :: les
+              in
+              loop1 les next_l
+
+Ambiguity 2: 
+loop j1 j2 =
+      if j1 >= j2 then ()
+      else
+        let v = line.(j1) in
+        line.(j1) <- line.(j2); line.(j2) <- v; loop (j1 + 1) (j2 - 1)
+
+Ambiguity 3: 
+loop y j =
+      if j >= Array.length line then ()
+      else if line.(j).span = y || t1.(i).(j).elem = t1.(i).(j - 1).elem then
+        let y = line.(j).span in
+        line.(j).span <- x;
+        if i > 0 then t1.(i - 1).(j).span <- t1.(i - 1).(j - 1).span;
+        loop y (j + 1)

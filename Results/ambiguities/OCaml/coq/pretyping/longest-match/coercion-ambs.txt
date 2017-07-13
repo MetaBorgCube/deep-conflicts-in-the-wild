@@ -1,0 +1,79 @@
+Ambiguity 1: 
+| h::restl -> (* On devrait pouvoir s'arranger pour qu'on n'ait pas a faire hnf_constr *)
+      match EConstr.kind !evdref (whd_all env !evdref typ) with
+      | Prod (_,c1,c2) ->
+        if check && not (e_cumul env evdref (Retyping.get_type_of env !evdref h) c1) then
+	  raise NoCoercion;
+        apply_rec (h::acc) (subst1 h c2) restl
+      | _ -> anomaly (Pp.str "apply_coercion_args")
+
+Ambiguity 2: 
+| None ->
+	match disc_subset !evdref y with
+	Some (u, p) ->
+	  let c = coerce_unify env x u in
+	    Some
+	      (fun x ->
+		 let cx = app_opt env evdref c x in
+		 let evar = make_existential loc env evdref (mkApp (p, [| cx |]))
+		 in
+		   (papp evdref sig_intro [| u; p; cx; evar |]))
+	| None ->
+	    raise NoSubtacCoercion
+
+Ambiguity 3: 
+let rec inh_conv_coerce_to_fail loc env evd rigidonly v t c1 =
+  try (the_conv_x_leq env t c1 evd, v)
+  with UnableToUnify (best_failed_evd,e) ->
+    try inh_coerce_to_fail env evd rigidonly v t c1
+    with NoCoercion ->
+      match
+      EConstr.kind evd (whd_all env evd t),
+      EConstr.kind evd (whd_all env evd c1)
+      with
+      | Prod (name,t1,t2), Prod (_,u1,u2) ->
+          (* Conversion did not work, we may succeed with a coercion. *)
+          (* We eta-expand (hence possibly modifying the original term!) *)
+	  (* and look for a coercion c:u1->t1 s.t. fun x:u1 => v' (c x)) *)
+	  (* has type forall (x:u1), u2 (with v' recursively obtained) *)
+          (* Note: we retype the term because template polymorphism may have *)
+          (* weakened its type *)
+	  let name = match name with
+	    | Anonymous -> Name Namegen.default_dependent_ident
+	    | _ -> name in
+	  let open Context.Rel.Declaration in
+	  let env1 = push_rel (LocalAssum (name,u1)) env in
+	  let (evd', v1) =
+	    inh_conv_coerce_to_fail loc env1 evd rigidonly
+              (Some (mkRel 1)) (lift 1 u1) (lift 1 t1) in
+          let v1 = Option.get v1 in
+	  let v2 = Option.map (fun v -> beta_applist evd' (lift 1 v,[v1])) v in
+	  let t2 = match v2 with
+	    | None -> subst_term evd' v1 t2
+	    | Some v2 -> Retyping.get_type_of env1 evd' v2 in
+	  let (evd'',v2') = inh_conv_coerce_to_fail loc env1 evd' rigidonly v2 t2 u2 in
+	    (evd'', Option.map (fun v2' -> mkLambda (name, u1, v2')) v2')
+      | _ -> raise (NoCoercionNoUnifier (best_failed_evd,e))
+
+(* Look for cj' obtained from cj by inserting coercions, s.t. cj'.typ = t *)
+
+
+Ambiguity 4: 
+NoCoercionNoUnifier (best_failed_evd,e) ->
+      try
+	if Flags.is_program_mode () then
+	  coerce_itf loc env evd (Some cj.uj_val) cj.uj_type t
+	else raise NoSubtacCoercion
+      with
+      | NoSubtacCoercion when not resolve_tc || not !use_typeclasses_for_conversion ->
+	  error_actual_type ~loc env best_failed_evd cj t e
+      | NoSubtacCoercion ->
+	let evd' = saturate_evd env evd in
+      	  try
+	    if evd' == evd then 
+	      error_actual_type ~loc env best_failed_evd cj t e
+	    else 
+      	      inh_conv_coerce_to_fail loc env evd' rigidonly (Some cj.uj_val) cj.uj_type t
+	  with NoCoercionNoUnifier (_evd,_error) ->
+	    error_actual_type ~loc env best_failed_evd cj t e
+  

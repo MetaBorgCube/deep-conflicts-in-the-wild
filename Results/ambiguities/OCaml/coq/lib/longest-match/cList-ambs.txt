@@ -1,0 +1,26 @@
+Ambiguity 1: 
+| x :: xs -> match f accu x with CSig.Stop x -> x | CSig.Cont i -> aux i xs
+
+Ambiguity 2: 
+| x :: l ->
+  match f x with
+  | None -> find_map f l
+  | Some y -> y
+
+Ambiguity 3: 
+| x :: l ->
+    match f x with
+    | None -> map_filter_loop f p l
+    | Some y ->
+      let c = { head = y; tail = [] } in
+      p.tail <- cast c;
+      map_filter_loop f c l
+
+Ambiguity 4: 
+| x :: l ->
+    match f i x with
+    | None -> map_filter_i_loop f (succ i) p l
+    | Some y ->
+      let c = { head = y; tail = [] } in
+      p.tail <- cast c;
+      map_filter_i_loop f (succ i) c l

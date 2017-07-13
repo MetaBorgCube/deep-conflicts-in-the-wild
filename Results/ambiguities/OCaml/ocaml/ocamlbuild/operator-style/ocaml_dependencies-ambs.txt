@@ -1,0 +1,19 @@
+Ambiguity 1: 
+let through_dep f = function
+          | Some _ as cycle -> cycle
+          | None ->
+             if List.mem f path
+             then (* we have found a cycle *)
+               Some (List.rev path)
+             else if not (Resources.mem f files)
+             then
+               (* the neighbor is not in the set of paths known to have a cycle *)
+               None
+             else
+               (* look for cycles going through this neighbor *)
+               dfs (f :: path) f
+        in
+        if Resources.mem fn !dead_ends then None
+        else match Resources.fold through_dep (dependencies_of fn) None with
+          | Some _ as cycle -> cycle
+          | None -> dead_ends := Resources.add fn !dead_ends; None

@@ -1,0 +1,6 @@
+Ambiguity 1: 
+if (buffer <> magic_number) then Bsb_bsc_version_mismatch
+    else
+      let res : t = input_value ic  in
+      close_in ic ;
+      cont res

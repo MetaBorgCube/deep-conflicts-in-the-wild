@@ -1,0 +1,19 @@
+Ambiguity 1: 
+| Node(ll, lv, lr, _) ->   
+      if height ll >= height lr then
+        create ll lv (create lr v r)
+      else 
+        match lr with
+        | Empty -> Empty (* impossible *)
+        | Node(lrl, lrv, lrr, _)->
+          create (create ll lv lrl) lrv (create lrr v r)
+
+Ambiguity 2: 
+| Node(rl, rv, rr, _) ->
+      if height rr >= height rl then
+        create (create l v rl) rv rr
+      else 
+        match rl with
+        | Empty -> Empty (* impossible *)
+        | Node(rll, rlv, rlr, _) ->
+          create (create l v rll) rlv (create rlr rv rr)

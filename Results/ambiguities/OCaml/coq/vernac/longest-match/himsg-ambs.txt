@@ -1,0 +1,63 @@
+Ambiguity 1: 
+| Some e ->
+     let rec aux p1 p2 = function
+     | OccurCheck (evk,rhs) ->
+        [str "cannot define " ++ quote (pr_existential_key sigma evk) ++
+	strbrk " with term " ++ pr_leconstr_env env sigma rhs ++
+        strbrk " that would depend on itself"]
+     | NotClean ((evk,args),env,c) ->
+        [str "cannot instantiate " ++ quote (pr_existential_key sigma evk)
+        ++ strbrk " because " ++ pr_leconstr_env env sigma c ++
+	strbrk " is not in its scope" ++
+        (if Array.is_empty args then mt() else
+         strbrk ": available arguments are " ++
+         pr_sequence (pr_leconstr_env env sigma) (List.rev (Array.to_list args)))]
+     | NotSameArgSize | NotSameHead | NoCanonicalStructure ->
+        (* Error speaks from itself *) []
+     | ConversionFailed (env,t1,t2) ->
+        if EConstr.eq_constr sigma t1 p1 && EConstr.eq_constr sigma t2 p2 then [] else
+        let env = make_all_name_different env sigma in
+        let t1 = Evarutil.nf_evar sigma t1 in
+        let t2 = Evarutil.nf_evar sigma t2 in
+        if not (EConstr.eq_constr sigma t1 p1) || not (EConstr.eq_constr sigma t2 p2) then
+          let t1, t2 = pr_explicit env sigma t1 t2 in
+          [str "cannot unify " ++ t1 ++ strbrk " and " ++ t2]
+        else []
+     | MetaOccurInBody evk ->
+        [str "instance for " ++ quote (pr_existential_key sigma evk) ++
+	strbrk " refers to a metavariable - please report your example" ++
+        strbrk "at " ++ str Coq_config.wwwbugtracker ++ str "."]
+     | InstanceNotSameType (evk,env,t,u) ->
+        let t, u = pr_explicit env sigma t u in
+        [str "unable to find a well-typed instantiation for " ++
+        quote (pr_existential_key sigma evk) ++
+        strbrk ": cannot ensure that " ++
+        t ++ strbrk " is a subtype of " ++ u]
+     | UnifUnivInconsistency p ->
+        if !Constrextern.print_universes then
+	  [str "universe inconsistency: " ++
+          Univ.explain_universe_inconsistency Universes.pr_with_global_universes p]
+	else
+          [str "universe inconsistency"]
+     | CannotSolveConstraint ((pb,env,t,u),e) ->
+        let t = EConstr.of_constr t in
+        let u = EConstr.of_constr u in
+        let t = Evarutil.nf_evar sigma t in
+        let u = Evarutil.nf_evar sigma u in
+        let env = make_all_name_different env sigma in
+        (strbrk "cannot satisfy constraint " ++ pr_leconstr_env env sigma t ++
+        str " == " ++ pr_leconstr_env env sigma u)
+        :: aux t u e
+     | ProblemBeyondCapabilities ->
+        []
+     in
+     match aux p1 p2 e with
+     | [] -> mt ()
+     | l -> spc () ++ str "(" ++
+            prlist_with_sep pr_semicolon (fun x -> x) l ++ str ")"
+
+Ambiguity 2: 
+| None ->
+      match Typeclasses.class_of_constr sigma (EConstr.of_constr c) with
+      | Some _ -> strbrk " (no type class instance found)"
+      | _ -> mt ()

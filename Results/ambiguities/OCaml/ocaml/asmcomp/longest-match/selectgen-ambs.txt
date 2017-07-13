@@ -1,0 +1,119 @@
+Ambiguity 1: 
+| Some(simple_args, env) ->
+          let ty = oper_result_type op in
+          let (new_op, new_args) = self#select_operation op simple_args in
+          let dbg = debuginfo_op op in
+          match new_op with
+            Icall_ind ->
+              let r1 = self#emit_tuple env new_args in
+              let rarg = Array.sub r1 1 (Array.length r1 - 1) in
+              let rd = self#regs_for ty in
+              let (loc_arg, stack_ofs) = Proc.loc_arguments rarg in
+              let loc_res = Proc.loc_results rd in
+              self#insert_move_args rarg loc_arg stack_ofs;
+              self#insert_debug (Iop Icall_ind) dbg
+                          (Array.append [|r1.(0)|] loc_arg) loc_res;
+              self#insert_move_results loc_res rd stack_ofs;
+              Some rd
+          | Icall_imm lbl ->
+              let r1 = self#emit_tuple env new_args in
+              let rd = self#regs_for ty in
+              let (loc_arg, stack_ofs) = Proc.loc_arguments r1 in
+              let loc_res = Proc.loc_results rd in
+              self#insert_move_args r1 loc_arg stack_ofs;
+              self#insert_debug (Iop(Icall_imm lbl)) dbg loc_arg loc_res;
+              self#insert_move_results loc_res rd stack_ofs;
+              Some rd
+          | Iextcall(lbl, alloc) ->
+              let (loc_arg, stack_ofs) =
+                self#emit_extcall_args env new_args in
+              let rd = self#regs_for ty in
+              let loc_res = self#insert_op_debug (Iextcall(lbl, alloc)) dbg
+                                    loc_arg (Proc.loc_external_results rd) in
+              self#insert_move_results loc_res rd stack_ofs;
+              Some rd
+          | Ialloc _ ->
+              let rd = self#regs_for typ_addr in
+              let size = size_expr env (Ctuple new_args) in
+              self#insert (Iop(Ialloc size)) [||] rd;
+              self#emit_stores env new_args rd;
+              Some rd
+          | op ->
+              let r1 = self#emit_tuple env new_args in
+              let rd = self#regs_for ty in
+              Some (self#insert_op_debug op dbg r1 rd)
+
+Ambiguity 2: 
+| exp :: rem ->
+      (* This ensures right-to-left evaluation, consistent with the
+         bytecode compiler *)
+      match self#emit_parts_list env rem with
+        None -> None
+      | Some(new_rem, new_env) ->
+          match self#emit_parts new_env exp with
+            None -> None
+          | Some(new_exp, fin_env) -> Some(new_exp :: new_rem, fin_env)
+
+Ambiguity 3: 
+| exp :: rem ->
+      (* Again, force right-to-left evaluation *)
+      let loc_rem = emit_list rem in
+      match self#emit_expr env exp with
+        None -> assert false  (* should have been caught in emit_parts *)
+      | Some loc_exp -> loc_exp :: loc_rem
+
+Ambiguity 4: 
+| Some regs ->
+          match op with
+            Istore(_, _, _) ->
+              for i = 0 to Array.length regs - 1 do
+                let r = regs.(i) in
+                let kind = if r.typ = Float then Double_u else Word in
+                self#insert (Iop(Istore(kind, !a, false)))
+                            (Array.append [|r|] regs_addr) [||];
+                a := Arch.offset_addressing !a (size_component r.typ)
+              done
+          | _ ->
+              self#insert (Iop op) (Array.append regs regs_addr) [||];
+              a := Arch.offset_addressing !a (size_expr env e)
+
+Ambiguity 5: 
+| Some(simple_args, env) ->
+          let (new_op, new_args) = self#select_operation op simple_args in
+          match new_op with
+            Icall_ind ->
+              let r1 = self#emit_tuple env new_args in
+              let rarg = Array.sub r1 1 (Array.length r1 - 1) in
+              let (loc_arg, stack_ofs) = Proc.loc_arguments rarg in
+              if stack_ofs = 0 then begin
+                self#insert_moves rarg loc_arg;
+                self#insert (Iop Itailcall_ind)
+                            (Array.append [|r1.(0)|] loc_arg) [||]
+              end else begin
+                let rd = self#regs_for ty in
+                let loc_res = Proc.loc_results rd in
+                self#insert_move_args rarg loc_arg stack_ofs;
+                self#insert_debug (Iop Icall_ind) dbg
+                            (Array.append [|r1.(0)|] loc_arg) loc_res;
+                self#insert(Iop(Istackoffset(-stack_ofs))) [||] [||];
+                self#insert Ireturn loc_res [||]
+              end
+          | Icall_imm lbl ->
+              let r1 = self#emit_tuple env new_args in
+              let (loc_arg, stack_ofs) = Proc.loc_arguments r1 in
+              if stack_ofs = 0 then begin
+                self#insert_moves r1 loc_arg;
+                self#insert (Iop(Itailcall_imm lbl)) loc_arg [||]
+              end else if lbl = !current_function_name then begin
+                let loc_arg' = Proc.loc_parameters r1 in
+                self#insert_moves r1 loc_arg';
+                self#insert (Iop(Itailcall_imm lbl)) loc_arg' [||]
+              end else begin
+                let rd = self#regs_for ty in
+                let loc_res = Proc.loc_results rd in
+                self#insert_move_args r1 loc_arg stack_ofs;
+                self#insert_debug (Iop(Icall_imm lbl)) dbg loc_arg loc_res;
+                self#insert(Iop(Istackoffset(-stack_ofs))) [||] [||];
+                self#insert Ireturn loc_res [||]
+              end
+          | _ -> fatal_error "Selection.emit_tail"

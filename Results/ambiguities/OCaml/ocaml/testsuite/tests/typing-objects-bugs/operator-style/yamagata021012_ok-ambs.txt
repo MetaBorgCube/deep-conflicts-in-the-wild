@@ -1,0 +1,14 @@
+Ambiguity 1: 
+loop count a =
+        if count >= self#len then a else
+        let a' = f cur#get count a in
+        cur#incr (); loop (count + 1) a'
+
+Ambiguity 2: 
+init_buf buf pos init =
+  if init#len = 0 then () else
+  let cur = init#first in
+  for i = 0 to init#len - 2 do
+    set_buf buf (pos + i lsl 2) (cur#get); cur#incr ()
+  done;
+  set_buf buf (pos + (init#len - 1) lsl 2) (cur#get)

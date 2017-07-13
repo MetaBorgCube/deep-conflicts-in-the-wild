@@ -1,0 +1,8 @@
+Ambiguity 1: 
+Clsl | Clsr | Casr as op, [arg2; Cconst_int n]
+
+Ambiguity 2: 
+Clsl | Clsr | Casr as op, [arg1; Cconst_int n]
+
+Ambiguity 3: 
+Clsl | Clsr | Casr as op, [arg1; Cconst_int n]

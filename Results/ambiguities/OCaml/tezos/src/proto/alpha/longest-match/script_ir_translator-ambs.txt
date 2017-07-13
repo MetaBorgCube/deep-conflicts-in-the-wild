@@ -1,0 +1,46 @@
+Ambiguity 1: 
+| String (loc, _ ) -> Invalid_kind (loc, Prim_kind :: exp_kinds, String_kind)
+  | Seq (loc, _ ) -> Invalid_kind (loc, Prim_kind :: exp_kinds, Seq_kind)
+  | Prim (loc, name, _) ->
+      match namespace name, exp_ns with
+      | None, _ ->
+          Invalid_case (loc, name)
+      | Some Type_namespace, Type_namespace
+      | Some Instr_namespace, Instr_namespace
+      | Some Constant_namespace, Constant_namespace ->
+          Invalid_primitive (loc, exp_prims, name)
+      | Some ns, _ ->
+          Invalid_namespace (loc, name, exp_ns, ns)
+
+Ambiguity 2: 
+| Typed ({ aft = middle } as ihd) ->
+              parse_instr ?storage_type ctxt (Seq (loc, tl)) middle >>=? function
+              | Failed { descr } ->
+                  let descr ret =
+                    { loc ; instr = Seq (ihd, descr ret) ;
+                      bef = stack ; aft = ret } in
+                  return (Failed { descr })
+              | Typed itl ->
+                  return (typed loc (Seq (ihd, itl), itl.aft))
+
+Ambiguity 3: 
+| true ->
+        trace
+          (Invalid_contract (loc, contract)) @@
+        Contract.get_script ctxt contract >>=? function
+        | None ->
+            Lwt.return
+              (ty_eq arg Unit_t >>? fun (Eq _) ->
+               ty_eq ret Unit_t >>? fun (Eq _) ->
+               let contract : (arg, ret) typed_contract =
+                 (arg, ret, contract) in
+               ok contract)
+        | Some { code = { arg_type; ret_type} } ->
+            Lwt.return
+              (parse_ty arg_type >>? fun (Ex_ty targ) ->
+               parse_ty ret_type >>? fun (Ex_ty tret) ->
+               ty_eq targ arg >>? fun (Eq _) ->
+               ty_eq tret ret >>? fun (Eq _) ->
+               let contract : (arg, ret) typed_contract =
+                 (arg, ret, contract) in
+               ok contract)

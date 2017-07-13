@@ -1,0 +1,32 @@
+Ambiguity 1: 
+| None ->
+        let mhpred =
+          match typ.Typ.desc with
+          | Typ.Tptr (typ', _) ->
+              let sexp = Sil.Estruct ([], Sil.inst_none) in
+              let texp = Exp.Sizeof {typ=typ'; nbytes=None;
+                                     dynamic_length=None; subtype=Subtype.subtypes} in
+              let hpred = Prop.mk_ptsto tenv n_lexp sexp texp in
+              Some hpred
+          | Typ.Tarray _ ->
+              let len = Exp.Var (Ident.create_fresh Ident.kfootprint) in
+              let sexp = mk_empty_array len in
+              let texp = Exp.Sizeof {typ; nbytes=None;
+                                     dynamic_length=None; subtype=Subtype.subtypes} in
+              let hpred = Prop.mk_ptsto tenv n_lexp sexp texp in
+              Some hpred
+          | _ -> None in
+        match mhpred with
+        | Some hpred ->
+            let sigma = prop.Prop.sigma in
+            let sigma_fp = prop.Prop.sigma_fp in
+            let prop'= Prop.set prop ~sigma:(hpred:: sigma) in
+            let prop''=
+              let has_normal_variables =
+                Sil.fav_exists (Sil.exp_fav n_lexp) Ident.is_normal in
+              if (is_undefined_opt tenv prop n_lexp) || has_normal_variables
+              then prop'
+              else Prop.set prop' ~sigma_fp:(hpred:: sigma_fp) in
+            let prop''= Prop.normalize tenv prop'' in
+            prop''
+        | None -> prop

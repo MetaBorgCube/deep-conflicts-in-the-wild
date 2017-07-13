@@ -1,0 +1,6 @@
+Ambiguity 1: 
+| None ->
+	let ctx,t' = Reductionops.splay_prod_assum env sigma ctype in (* Search for underlying eq *)
+	match find_rel (it_mkProd_or_LetIn t' ctx) with
+	| Some c -> Some c
+	| None -> None

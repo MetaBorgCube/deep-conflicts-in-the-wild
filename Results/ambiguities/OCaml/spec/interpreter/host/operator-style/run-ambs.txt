@@ -1,0 +1,6 @@
+Ambiguity 1: 
+loop i =
+    if i = len then i else
+    let ch = input_char stdin in
+    Bytes.set buf i ch;
+    if ch = '\n' then i + 1 else loop (i + 1)

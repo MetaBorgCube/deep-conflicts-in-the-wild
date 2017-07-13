@@ -1,0 +1,22 @@
+Ambiguity 1: 
+| Node (node, child, pos, ctx) ->
+      let () = assert (String.equal tag node) in
+      let annotation = {
+        annotation = Some tag;
+        startpos = pos;
+        endpos = context.offset;
+      } in
+      let xml = Element (node, annotation, List.rev child) in
+      match ctx with
+      | Leaf ->
+        (** Final node: we keep the result in a dummy context *)
+        context.stack <- Node ("", [xml], 0, Leaf)
+      | Node (node, child, pos, ctx) ->
+        context.stack <- Node (node, xml :: child, pos, ctx)
+
+Ambiguity 2: 
+| Element (_, annotation, cs) ->
+    let cs = List.concat (List.map drop cs) in
+    match annotation.annotation with
+    | None -> cs
+    | Some s -> [Element (s, [], cs)]

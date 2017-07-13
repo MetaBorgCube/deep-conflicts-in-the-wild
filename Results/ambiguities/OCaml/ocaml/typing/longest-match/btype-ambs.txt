@@ -1,0 +1,5 @@
+Ambiguity 1: 
+| [] ->
+        match repr row.row_more with
+        | {desc=Tvariant row'} -> row_field tag row'
+        | _ -> Rabsent

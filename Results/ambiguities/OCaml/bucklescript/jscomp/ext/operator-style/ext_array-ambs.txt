@@ -1,0 +1,8 @@
+Ambiguity 1: 
+let b_len = Array.length a in
+  if b_len = 0 then [||] else  
+  let b = Array.copy a in  
+  for i = 0 to  b_len - 1 do
+      Array.unsafe_set b i (Array.unsafe_get a (b_len - 1 -i )) 
+  done;
+  b

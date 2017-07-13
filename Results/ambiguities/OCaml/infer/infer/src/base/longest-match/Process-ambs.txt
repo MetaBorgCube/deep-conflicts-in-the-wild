@@ -1,0 +1,19 @@
+Ambiguity 1: 
+| `In_the_parent producer_pid ->
+      match Unix.fork () with
+      | `In_the_child ->
+          (* redirect consumer's stdin to pipe_in *)
+          Unix.dup2 ~src:pipe_in ~dst:Unix.stdin ;
+          (* close consumer's copy of pipe ends *)
+          Unix.close pipe_out ;
+          Unix.close pipe_in ;
+          (* exec consumer *)
+          never_returns (Unix.exec ~prog:consumer_prog ~args:consumer_args ())
+      | `In_the_parent consumer_pid ->
+          (* close parent's copy of pipe ends *)
+          Unix.close pipe_out ;
+          Unix.close pipe_in ;
+          (* wait for children *)
+          let producer_status = Unix.waitpid producer_pid in
+          let consumer_status = Unix.waitpid consumer_pid in
+          (producer_status, consumer_status)

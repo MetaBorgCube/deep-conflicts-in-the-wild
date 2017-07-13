@@ -1,0 +1,22 @@
+Ambiguity 1: 
+| None ->
+        if !Flags.compilation_mode = Flags.BuildVo then
+          record_aux env Id.Set.empty Id.Set.empty "";
+        [], def (* Empty section context: no need to check *)
+    | Some declared ->
+        (* We use the declared set and chain a check of correctness *)
+        sort env declared,
+        match def with
+        | Undef _ as x -> x (* nothing to check *)
+        | Def cs as x ->
+            let ids_typ = global_vars_set_constant_type env typ in
+            let ids_def = global_vars_set env (Mod_subst.force_constr cs) in
+            let inferred = keep_hyps env (Idset.union ids_typ ids_def) in
+            check declared inferred;
+            x
+        | OpaqueDef lc -> (* In this case we can postpone the check *)
+            OpaqueDef (Opaqueproof.iter_direct_opaque (fun c ->
+              let ids_typ = global_vars_set_constant_type env typ in
+              let ids_def = global_vars_set env c in
+              let inferred = keep_hyps env (Idset.union ids_typ ids_def) in
+              check declared inferred) lc)

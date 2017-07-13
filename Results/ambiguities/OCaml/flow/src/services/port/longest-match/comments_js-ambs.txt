@@ -1,0 +1,17 @@
+Ambiguity 1: 
+| None ->
+              let cmap, annos = mk_comment cmap nloc in
+              cmap, match annos with
+                | [TypeD (cloc, ctype)] ->
+                    [skip cloc; insert_after nloc ctype]
+                | _ ->
+                    []
+
+Ambiguity 2: 
+| None ->
+        let cmap, annos = mk_comment cmap bloc in
+        cmap, match annos with
+          | [TypeD (cloc, ctype)] ->
+              [skip cloc; insert_after cloc ctype]
+          | _ ->
+              []

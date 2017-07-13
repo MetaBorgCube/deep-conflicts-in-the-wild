@@ -1,0 +1,27 @@
+Ambiguity 1: 
+| Left lf ->
+	match lf with
+	    Lfalse                 -> 999
+	  | Land _                 ->  90
+	  | Lor _                  ->  40
+	  | Lforall (_,_,_)        -> -30
+	  | Lexists _              ->  60
+	  | LA(_,lap) ->
+	      match lap with
+		  LLatom           ->   0
+		| LLfalse (_,_)    -> 100
+		| LLand (_,_)      ->  80
+		| LLor (_,_)       ->  70
+		| LLforall _       -> -20
+		| LLexists (_,_)   ->  50
+		| LLarrow  (_,_,_) -> -10
+
+Ambiguity 2: 
+| Right t->
+	match side with
+	    Concl ->
+	      {seq with gl=t;glatom=Some t}
+	  | _ ->
+	      {seq with
+		 context=cm_add sigma t nam seq.context;
+		 latoms=t::seq.latoms}

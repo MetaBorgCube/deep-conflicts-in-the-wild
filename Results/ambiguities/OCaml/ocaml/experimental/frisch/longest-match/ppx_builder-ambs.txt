@@ -1,0 +1,5 @@
+Ambiguity 1: 
+| Some e ->
+          match get_lid e with
+          | Some s -> s
+          | None -> fatal e.pexp_loc "'label' attribute must be a string literal"

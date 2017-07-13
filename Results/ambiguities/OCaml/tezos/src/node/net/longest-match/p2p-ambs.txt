@@ -1,0 +1,32 @@
+Ambiguity 1: 
+| Some conn ->
+        P2p_connection_pool.read conn >>= function
+        | Ok msg ->
+            lwt_debug "message read from %a"
+              Connection_info.pp
+              (P2p_connection_pool.Connection.info conn) >>= fun () ->
+            Lwt.return (conn, msg)
+        | Error _ ->
+            lwt_debug "error reading message from %a"
+              Connection_info.pp
+              (P2p_connection_pool.Connection.info conn) >>= fun () ->
+            Lwt_unix.yield () >>= fun () ->
+            recv_any net ()
+
+Ambiguity 2: 
+| Some pool ->
+          match P2p_connection_pool.Connection.find_by_peer_id pool peer_id with
+          | None -> Lwt.return_unit
+          | Some conn -> P2p_connection_pool.disconnect ~wait conn
+
+Ambiguity 3: 
+| Some pool ->
+          match P2p_connection_pool.Points.info pool point with
+          | None -> raise Not_found
+          | Some pi -> P2p_connection_pool_types.Point_info.watch pi
+
+Ambiguity 4: 
+| Some pool ->
+          match P2p_connection_pool.Peer_ids.info pool peer_id with
+          | None -> raise Not_found
+          | Some gi -> P2p_connection_pool_types.Peer_info.watch gi

@@ -1,0 +1,8 @@
+Ambiguity 1: 
+| Some code ->
+	 match Cemitcodes.force code with
+	 | BCdefined(code,pl,fv) ->
+           let v = eval_to_patch env (code,pl,fv) in
+           set_global v
+	 | BCalias kn' -> slot_for_getglobal env kn'
+	 | BCconstant -> set_global (val_of_constant kn)

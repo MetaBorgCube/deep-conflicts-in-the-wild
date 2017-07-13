@@ -1,0 +1,82 @@
+Ambiguity 1: 
+let mk_goal hyps concl =
+    Goal.V82.mk_goal sigma hyps concl (Goal.V82.extra sigma goal)
+  in
+    if (not !check) && not (occur_meta sigma (EConstr.of_constr trm)) then
+      let t'ty = Retyping.get_type_of env sigma (EConstr.of_constr trm) in
+      let t'ty = EConstr.Unsafe.to_constr t'ty in
+      let sigma = check_conv_leq_goal env sigma trm t'ty conclty in
+        (goalacc,t'ty,sigma,trm)
+    else
+      match kind_of_term trm with
+      | Meta _ ->
+	let conclty = nf_betaiota sigma (EConstr.of_constr conclty) in
+	  if !check && occur_meta sigma conclty then
+	    raise (RefinerError (MetaInType conclty));
+	  let (gl,ev,sigma) = mk_goal hyps conclty in
+	  let ev = EConstr.Unsafe.to_constr ev in
+	  let conclty = EConstr.Unsafe.to_constr conclty in
+	  gl::goalacc, conclty, sigma, ev
+
+      | Cast (t,k, ty) ->
+	check_typability env sigma ty;
+        let sigma = check_conv_leq_goal env sigma trm ty conclty in
+	let res = mk_refgoals sigma goal goalacc ty t in
+	(** we keep the casts (in particular VMcast and NATIVEcast) except
+	    when they are annotating metas *)
+	if isMeta t then begin
+	  assert (k != VMcast && k != NATIVEcast);
+	  res
+	end else
+	  let (gls,cty,sigma,ans) = res in
+          let ans = if ans == t then trm else mkCast(ans,k,ty) in
+	  (gls,cty,sigma,ans)
+
+      | App (f,l) ->
+	let (acc',hdty,sigma,applicand) =
+	  if is_template_polymorphic env sigma (EConstr.of_constr f) then
+	    let ty = 
+	      (* Template polymorphism of definitions and inductive types *)
+	      let firstmeta = Array.findi (fun i x -> occur_meta sigma (EConstr.of_constr x)) l in
+	      let args, _ = Option.cata (fun i -> CArray.chop i l) (l, [||]) firstmeta in
+	        type_of_global_reference_knowing_parameters env sigma (EConstr.of_constr f) (Array.map EConstr.of_constr args)
+	    in
+	    let ty = EConstr.Unsafe.to_constr ty in
+	      goalacc, ty, sigma, f
+	  else
+	    mk_hdgoals sigma goal goalacc f
+	in
+	let ((acc'',conclty',sigma), args) = mk_arggoals sigma goal acc' hdty l in
+        let sigma = check_conv_leq_goal env sigma trm conclty' conclty in
+        let ans = if applicand == f && args == l then trm else Term.mkApp (applicand, args) in
+        (acc'',conclty',sigma, ans)
+
+      | Proj (p,c) ->
+	let (acc',cty,sigma,c') = mk_hdgoals sigma goal goalacc c in
+	let c = mkProj (p, c') in
+	let ty = get_type_of env sigma (EConstr.of_constr c) in
+	let ty = EConstr.Unsafe.to_constr ty in
+	  (acc',ty,sigma,c)
+
+      | Case (ci,p,c,lf) ->
+	let (acc',lbrty,conclty',sigma,p',c') = mk_casegoals sigma goal goalacc p c in
+	let sigma = check_conv_leq_goal env sigma trm conclty' conclty in
+	let (acc'',sigma, rbranches) =
+	  Array.fold_left2
+            (fun (lacc,sigma,bacc) ty fi ->
+	       let (r,_,s,b') = mk_refgoals sigma goal lacc ty fi in r,s,(b'::bacc))
+            (acc',sigma,[]) lbrty lf
+	in
+        let lf' = Array.rev_of_list rbranches in
+        let ans =
+          if p' == p && c' == c && Array.equal (==) lf' lf then trm
+          else Term.mkCase (ci,p',c',lf')
+        in
+	(acc'',conclty',sigma, ans)
+
+      | _ ->
+	if occur_meta sigma (EConstr.of_constr trm) then
+	  anomaly (Pp.str "refiner called with a meta in non app/case subterm");
+	let (sigma, t'ty) = goal_type_of env sigma trm in
+	let sigma = check_conv_leq_goal env sigma trm t'ty conclty in
+          (goalacc,t'ty,sigma, trm)

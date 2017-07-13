@@ -1,0 +1,9 @@
+Ambiguity 1: 
+let h = handle () in
+    if not h.alive then false
+    else
+      try unsafe_handle_input h feedback_processor state conds ~read_all; true
+      with e ->
+        Minilib.log ("Coqtop reader failed, resetting: "^print_exception e);
+        respawner ();
+        false

@@ -1,0 +1,38 @@
+Ambiguity 1: 
+classify_files_by_root var files (inc_ml,inc_i,inc_r) =
+  if List.exists (fun (pdir,_,_) -> pdir = ".") inc_r ||
+     List.exists (fun (pdir,_,_) -> pdir = ".") inc_i
+  then ()
+  else
+    let absdir_of_files =List.rev_map
+	(fun x -> CUnix.canonical_path_name (Filename.dirname x))
+	files
+    in
+    (* files in scope of a -I option (assuming they are no overlapping) *)
+    if List.exists (fun (_,a) -> List.mem a absdir_of_files) inc_ml then
+      begin
+	printf "%sINC=" var;
+	List.iter (fun (pdir,absdir) ->
+		   if List.mem absdir absdir_of_files
+		   then printf "$(filter $(wildcard %s/*),$(%s)) " pdir var)
+		  inc_ml;
+	printf "\n";
+      end;
+    (* Files in the scope of a -R option (assuming they are disjoint) *)
+    List.iteri (fun i (pdir,_,abspdir) ->
+		if List.exists (is_prefix abspdir) absdir_of_files then
+		  printf "%s%d=$(patsubst %s/%%,%%,$(filter %s/%%,$(%s)))\n"
+			 var i pdir pdir var)
+	       (inc_i@inc_r)
+
+Ambiguity 2: 
+let pr_subdir s =
+    print s; print ":\n\t+cd \""; print s; print "\" && $(MAKE) all\n\n"
+  in
+  if sds <> [] then
+    let () =
+      Format.eprintf "@[Warning: Targets for subdirectories are very fragile.@ " in
+    let () =
+      Format.eprintf "For example,@ nothing is done to handle dependencies@ with them.@]@." in
+      section "Subdirectories.";
+    List.iter pr_subdir sds

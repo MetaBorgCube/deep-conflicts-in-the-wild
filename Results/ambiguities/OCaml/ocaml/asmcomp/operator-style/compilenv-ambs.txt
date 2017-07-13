@@ -1,0 +1,21 @@
+Ambiguity 1: 
+let {strcst_shared; strcst_all} = !structured_constants in
+  if shared then
+    try
+      CstMap.find cst strcst_shared
+    with Not_found ->
+      let lbl = new_const_symbol() in
+      structured_constants :=
+        {
+          strcst_shared = CstMap.add cst lbl strcst_shared;
+          strcst_all = (lbl, cst) :: strcst_all;
+        };
+      lbl
+  else
+    let lbl = new_const_symbol() in
+    structured_constants :=
+      {
+        strcst_shared;
+        strcst_all = (lbl, cst) :: strcst_all;
+      };
+    lbl

@@ -1,0 +1,23 @@
+Ambiguity 1: 
+| (len, Some d) ->
+          (* we must not have a simple comment or a blank line before. *)
+          match retrieve_info_simple file (String.sub s 0 len) with
+            (_, None) ->
+              (
+               try
+                 (* if the special comment is the stop comment (**/**),
+                    then we must not associate it. *)
+                 let pos = Str.search_forward (Str.regexp_string "(**") s 0 in
+                 if blank_line (String.sub s 0 pos) ||
+                   d.Odoc_types.i_desc = Some [Odoc_types.Raw "/*"]
+                 then
+                   (0, None)
+                 else
+                   (len, Some d)
+               with
+                 Not_found ->
+                   (* should not occur *)
+                   (0, None)
+              )
+          | (len2, Some d2) ->
+              (0, None)

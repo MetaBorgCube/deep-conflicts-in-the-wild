@@ -1,0 +1,12 @@
+Ambiguity 1: 
+Roll.mining_rights_owner c level ~priority >>=? fun delegate ->
+  check_timestamp c priority pred_timestamp >>=? fun () ->
+  return delegate
+
+Ambiguity 2: 
+fail_unless Compare.Int.(0 <= slot && slot <= Constants.max_signing_slot c)
+    (Invalid_endorsement_slot (Constants.max_signing_slot c, slot)) >>=? fun () ->
+  let level = Level.current c in
+  Roll.endorsement_rights_owner c level ~slot >>=? fun owning_delegate ->
+  fail_unless (Ed25519.Public_key_hash.equal owning_delegate delegate)
+    (Wrong_delegate (owning_delegate, delegate))

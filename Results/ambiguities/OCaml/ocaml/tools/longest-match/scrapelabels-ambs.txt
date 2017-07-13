@@ -1,0 +1,19 @@
+Ambiguity 1: 
+and process_paren (token, s, e) =
+    try match token with
+      LPAREN | LBRACKET | LBRACKETBAR | LBRACKETLESS | BEGIN ->
+        may_start (next_token ())
+    | LBRACE | LBRACELESS | STRUCT | SIG | OBJECT ->
+        search_start (next_token ())
+    | _ ->
+        assert false
+    with Closing last ->
+      match token, last with
+        LPAREN, RPAREN
+      | (LBRACKET|LBRACKETBAR|LBRACKETLESS),
+        (RBRACKET|BARRBRACKET|GREATERRBRACKET)
+      | (BEGIN|STRUCT|SIG|OBJECT), END
+      | LBRACE, RBRACE
+      | LBRACELESS, GREATERRBRACE -> ()
+      | _ -> raise (Closing last)
+  

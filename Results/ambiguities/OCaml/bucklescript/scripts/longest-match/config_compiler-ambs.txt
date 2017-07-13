@@ -1,0 +1,14 @@
+Ambiguity 1: 
+| ("LIBDIR", false) ->
+        let origin_path = Path.join [|jscomp_dir; ".."; "lib"; "ocaml"|] in
+        Js.Json.stringify (Js.Json.string origin_path)
+      | _ ->
+        match Js.Dict.get (dictOfObj map) match_ with
+          | Some map_val -> (
+            match Js.Dict.get config_map map_val with
+              | Some a -> a
+              | None ->
+                Js.log ("No value found from ocamlopt.opt -config for \"" ^ map_val ^ "\"");
+                ""
+          )
+          | None -> assert false

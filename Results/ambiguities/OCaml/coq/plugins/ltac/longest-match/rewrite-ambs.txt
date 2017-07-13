@@ -1,0 +1,112 @@
+Ambiguity 1: 
+| None ->
+	let ctx,t' = Reductionops.splay_prod env sigma ctype in (* Search for underlying eq *)
+	match find_rel (it_mkProd_or_LetIn t' (List.map (fun (n,t) -> LocalAssum (n, t)) ctx)) with
+	| Some c -> c
+	| None -> error "Cannot find an homogeneous relation to rewrite."
+
+Ambiguity 2: 
+| Fail | Identity ->
+	    if Array.for_all (Int.equal 0) ci.ci_cstr_ndecls then
+	      let evars', eqty = app_poly_sort prop env evars coq_eq [| ty |] in
+	      let cstr = Some eqty in
+	      let state, found, brs' = Array.fold_left 
+		(fun (state, found, acc) br ->
+		  if not (Option.is_empty found) then 
+		    (state, found, fun x -> lift 1 br :: acc x)
+		  else
+		    let state, res = s.strategy { state ; env ; unfresh ;
+						  term1 = br ; ty1 = ty ;
+						  cstr = (prop,cstr) ; evars } in
+		      match res with
+		      | Success r -> (state, Some r, fun x -> mkRel 1 :: acc x)
+		      | Fail | Identity -> (state, None, fun x -> lift 1 br :: acc x))
+		(state, None, fun x -> []) brs
+	      in
+		match found with
+		| Some r ->
+		  let ctxc = mkCase (ci, lift 1 p, lift 1 c, Array.of_list (List.rev (brs' c'))) in
+		    state, Success (make_leibniz_proof env ctxc ty r)
+		| None -> state, c'
+	    else
+	      match try Some (fold_match env (goalevars evars) t) with Not_found -> None with
+	      | None -> state, c'
+	      | Some (cst, _, t', eff (*FIXME*)) ->
+		 let state, res = aux { state ; env ; unfresh ;
+					term1 = t' ; ty1 = ty ;
+					cstr = (prop,cstr) ; evars } in
+		let res = 
+		  match res with
+		  | Success prf -> 
+		    Success { prf with
+		      rew_from = t; 
+		      rew_to = unfold_match env (goalevars evars) cst prf.rew_to }
+		  | x' -> c'
+		in state, res
+
+Ambiguity 3: 
+| Identity -> Success res
+    | Success res' ->
+      match res.rew_prf with
+      | RewCast c -> Success { res' with rew_from = res.rew_from }
+      | RewPrf (rew_rel, rew_prf) ->
+	match res'.rew_prf with
+	| RewCast _ -> Success { res with rew_to = res'.rew_to }
+	| RewPrf (res'_rel, res'_prf) ->
+	  let trans = 
+	    if prop then PropGlobal.transitive_type 
+	    else TypeGlobal.transitive_type
+	  in
+	  let evars, prfty = 
+	    app_poly_sort prop env res'.rew_evars trans [| res.rew_car; rew_rel |] 
+	  in
+	  let evars, prf = new_cstr_evar evars env prfty in
+	  let prf = mkApp (prf, [|res.rew_from; res'.rew_from; res'.rew_to;
+				  rew_prf; res'_prf |])
+	  in Success { res' with rew_from = res.rew_from; 
+	    rew_evars = evars; rew_prf = RewPrf (res'_rel, prf) }
+
+Ambiguity 4: 
+| Some None -> if progress then newfail 0 (str"Failed to progress")
+		   else Proofview.tclUNIT ()
+    | Some (Some res) ->
+        let (undef, prf, newt) = res in
+        let fold ev _ accu = if Evd.mem sigma ev then accu else ev :: accu in
+        let gls = List.rev (Evd.fold_undefined fold undef []) in
+	match clause, prf with
+	| Some id, Some p ->
+            let tac = tclTHENLIST [
+              Refine.refine ~unsafe:false { run = fun h -> Sigma.here p h };
+              Proofview.Unsafe.tclNEWGOALS gls;
+            ] in
+            Proofview.Unsafe.tclEVARS undef <*>
+	    tclTHENFIRST (assert_replacing id newt tac) (beta_hyp id)
+	| Some id, None ->
+            Proofview.Unsafe.tclEVARS undef <*>
+            convert_hyp_no_check (LocalAssum (id, newt)) <*>
+            beta_hyp id
+	| None, Some p ->
+            Proofview.Unsafe.tclEVARS undef <*>
+            Proofview.Goal.enter { enter = begin fun gl ->
+            let env = Proofview.Goal.env gl in
+            let make = { run = begin fun sigma ->
+              let Sigma (ev, sigma, q) = Evarutil.new_evar env sigma newt in
+              Sigma (mkApp (p, [| ev |]), sigma, q)
+            end } in
+            Refine.refine ~unsafe:false make <*> Proofview.Unsafe.tclNEWGOALS gls
+            end }
+	| None, None ->
+            Proofview.Unsafe.tclEVARS undef <*>
+            convert_concl_no_check newt DEFAULTcast
+
+Ambiguity 5: 
+begin function (e', info) -> match e' with
+                | Hipattern.NoEquationFound ->
+	            begin match e with
+	            | (Not_found, _) ->
+	                let rel, _, _ = decompose_app_rel env sigma concl in
+		        not_declared env sigma ty rel
+	            | (e, info) -> Proofview.tclZERO ~info e
+                    end
+                | e' -> Proofview.tclZERO ~info e'
+              end

@@ -1,0 +1,50 @@
+Ambiguity 1: 
+let { reduced_graph; sig_hash; _ } = quotient in
+      if (IMap.mem id reduced_graph)
+      then
+        let stable_id = IMap.find_unsafe id stable_tvar_ids in
+        let sig_hash = SigHash.add stable_id sig_hash in
+        { quotient with sig_hash }
+      else
+        let t = lowers_of_tvar cx id r in
+        let node = Root { rank = 0; constraints = Resolved t } in
+        let reduced_graph = IMap.add id node reduced_graph in
+        let stable_id = self#fresh_stable_id in
+        stable_tvar_ids <- IMap.add id stable_id stable_tvar_ids;
+        self#type_ cx { quotient with reduced_graph } t
+
+Ambiguity 2: 
+let { reduced_property_maps; sig_hash; _ } = quotient in
+      if (Properties.Map.mem id reduced_property_maps)
+      then
+        let stable_id = Properties.Map.find_unsafe id stable_propmap_ids in
+        let sig_hash = SigHash.add stable_id sig_hash in
+        { quotient with sig_hash }
+      else
+        let pmap = Context.find_props cx id in
+        let sig_hash = SigHash.add_props_map pmap sig_hash in
+        let reduced_property_maps =
+          Properties.Map.add id pmap reduced_property_maps in
+        let stable_id = self#fresh_stable_id in
+        stable_propmap_ids <- Properties.Map.add id stable_id stable_propmap_ids;
+        super#props cx { quotient with reduced_property_maps; sig_hash } id
+
+Ambiguity 3: 
+let { reduced_evaluated; sig_hash; _ } = quotient in
+      if IMap.mem id reduced_evaluated
+      then
+        let stable_id = IMap.find_unsafe id stable_eval_ids in
+        let sig_hash = SigHash.add stable_id sig_hash in
+        { quotient with sig_hash }
+      else
+        let stable_id = self#fresh_stable_id in
+        stable_eval_ids <- IMap.add id stable_id stable_eval_ids;
+        match IMap.get id (Context.evaluated cx) with
+        | None -> quotient
+        | Some t ->
+          let t = match t with
+          | OpenT (r, id) -> lowers_of_tvar cx id r
+          | t -> t
+          in
+          let reduced_evaluated = IMap.add id t reduced_evaluated in
+          super#eval_id cx { quotient with reduced_evaluated } id

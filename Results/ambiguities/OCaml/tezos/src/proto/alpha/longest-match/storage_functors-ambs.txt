@@ -1,0 +1,7 @@
+Ambiguity 1: 
+| Ok acc ->
+              match unserial data with
+              | Error _ as err -> Lwt.return err
+              | Ok data ->
+                  f data acc >>= fun acc ->
+                  return acc

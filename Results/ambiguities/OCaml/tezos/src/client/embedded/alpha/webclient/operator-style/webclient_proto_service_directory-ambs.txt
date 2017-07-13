@@ -1,0 +1,10 @@
+Ambiguity 1: 
+RPC.register RPC.empty Services.contracts @@ fun _block () ->
+    Client_proto_contracts.RawContractAlias.load cctxt >>= fun list ->
+    let (names, _) = List.split list in
+    RPC.Answer.return names
+
+Ambiguity 2: 
+RPC.register root Services.hash @@ fun block () ->
+    Client_node_rpcs.(call_service1 cctxt Node_rpc_services.Blocks.hash block ()) >>= fun res ->
+    RPC.Answer.return (Hash.Block_hash.to_b58check res)

@@ -1,0 +1,7 @@
+Ambiguity 1: 
+group t i action = 
+  if i = 0 then action ()
+  else 
+    let old = t.indent_level in
+    t.indent_level <- t.indent_level + i;
+    Ext_pervasives.finally () (fun _ -> t.indent_level <- old) action

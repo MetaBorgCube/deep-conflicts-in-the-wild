@@ -1,0 +1,39 @@
+Ambiguity 1: 
+cctxt.Client_commands.message "Calling the 'echo' RPC." >>= fun () ->
+  let msg = "test" in
+  Client_proto_rpcs.echo cctxt.rpc_config block msg >>=? fun reply ->
+  fail_unless (reply = msg) (Unclassified "...") >>=? fun () ->
+  begin
+    cctxt.message "Calling the 'failing' RPC." >>= fun () ->
+    Client_proto_rpcs.failing cctxt.rpc_config block 3 >>= function
+    | Error [Ecoproto_error [Error.Demo_error 3]] ->
+        return ()
+    | _ -> failwith "..."
+  end >>=? fun () ->
+  cctxt.message "Direct call to `demo_error`." >>= fun () ->
+  begin Error.demo_error 101010 >|= wrap_error >>= function
+    | Error [Ecoproto_error [Error.Demo_error 101010]] ->
+        return ()
+    | _ -> failwith "...."
+  end >>=? fun () ->
+  cctxt.answer "All good!" >>= fun () ->
+  return ()
+
+Ambiguity 2: 
+Client_node_rpcs.Blocks.info cctxt.rpc_config block >>=? fun bi ->
+  let fitness =
+    match bi.fitness with
+    | [ v ; b ] ->
+        let f = MBytes.get_int64 b 0 in
+        MBytes.set_int64 b 0 (Int64.succ f) ;
+        [ v ; b ]
+    | _ ->
+        Lwt.ignore_result
+          (cctxt.message "Cannot parse fitness: %a" Fitness.pp bi.fitness);
+        exit 2 in
+  Client_node_rpcs.forge_block cctxt.rpc_config
+    ~net_id:bi.net_id ~predecessor:bi.hash
+    fitness Operation_list_list_hash.empty (MBytes.create 0) >>=? fun bytes ->
+  Client_node_rpcs.inject_block cctxt.rpc_config bytes [] >>=? fun hash ->
+  cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
+  return ()

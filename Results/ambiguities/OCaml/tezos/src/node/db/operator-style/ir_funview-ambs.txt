@@ -1,0 +1,131 @@
+Ambiguity 1: 
+f key data =
+          f key data >>= function
+          | None   -> return_unit
+          | Some v -> l3 := (key, v) :: !l3; return_unit
+
+Ambiguity 2: 
+| Key (db, k as key) ->
+        P.Contents.read (P.Repo.contents_t db) k >>= function
+        | None   -> Lwt.return_none
+        | Some c ->
+          t := Both (key, c);
+          Lwt.return (Some c)
+
+Ambiguity 3: 
+| { key = Some (db, k) ; _ } ->
+        P.Node.read (P.Repo.node_t db) k >>= function
+        | None   -> Lwt.return_none
+        | Some n ->
+          let n = import db n in
+          t.node <- Some n;
+          Lwt.return (Some n)
+
+Ambiguity 4: 
+steps t =
+      read t >>= function
+      | None    -> Lwt.return_nil
+      | Some  n ->
+        let steps = ref StepSet.empty in
+        List.iter
+          (fun (l, _) -> steps := StepSet.add l !steps)
+          (Lazy.force n.alist);
+        Lwt.return (StepSet.to_list !steps)
+
+Ambiguity 5: 
+sub t path >>= function
+    | None   -> Lwt.return []
+    | Some n ->
+      Node.steps n >>= fun steps ->
+      let paths =
+        List.fold_left (fun set p ->
+            PathSet.add (Path.rcons path p) set
+          ) PathSet.empty steps
+      in
+      Lwt.return (PathSet.to_list paths)
+
+Ambiguity 6: 
+list t path >>= fun childs ->
+        let todo = childs @ tl in
+        mem t path >>= fun exists ->
+        begin
+          if not exists then Lwt.return_unit
+          else fn path (fun () -> read_exn t path)
+        end >>= fun () ->
+        aux todo
+
+Ambiguity 7: 
+Node.read view >>= function
+          | None ->
+            if v = None then Lwt.return_none
+            else err_not_found "update_contents" k (* XXX ?*)
+          | Some n ->
+            match Node.read_succ n h with
+            | Some child -> begin
+              aux child p >>= function
+              | None -> Lwt.return_none
+              | Some child -> begin
+                  if v = None then
+                    (* remove empty dirs *)
+                    Node.is_empty child >>= function
+                    | true  -> Lwt.return_none
+                    | false -> Lwt.return (Some child)
+                  else
+                    Lwt.return (Some child)
+                end >>= fun child ->
+                Node.with_succ view h child
+              end
+            | None ->
+              if v = None then
+                Lwt.return_none
+              else
+                aux (Node.empty ()) p >>= function
+                | None -> assert false
+                | Some _ as child -> Node.with_succ view h child
+
+Ambiguity 8: 
+aux n path >>= function
+      | None -> Lwt.return t
+      | Some node ->
+        Node.is_empty node >>= function
+        | true  -> Lwt.return `Empty
+        | false -> Lwt.return (`Node node)
+
+Ambiguity 9: 
+Node.read view >>= function
+              | None   -> Lwt.return_none
+              | Some n ->
+                match Node.read_succ n h with
+                | None       ->
+                      Lwt.return_none
+                | Some child ->
+                    aux child p >>= function
+                    | None -> Lwt.return_none
+                    | Some child -> begin
+                        (* remove empty dirs *)
+                        Node.is_empty child >>= function
+                        | true  -> Lwt.return_none
+                        | false -> Lwt.return (Some child)
+                      end >>= fun child ->
+                        Node.with_succ view h child
+
+Ambiguity 10: 
+aux n k >>= function
+      | None -> Lwt.return t
+      | Some node ->
+        Node.is_empty node >>= function
+        | true  -> Lwt.return `Empty
+        | false -> Lwt.return (`Node node)
+
+Ambiguity 11: 
+() ->
+            node x >>= fun k ->
+            n.Node.key <- Some (repo, k);
+            n.Node.node <- None; (* Clear cache ?? *)
+            Lwt.return_unit
+
+Ambiguity 12: 
+() ->
+                    P.Contents.add (P.Repo.contents_t repo) x >>= fun k ->
+                    c := Contents.Key (repo, k);
+                    Lwt.return_unit

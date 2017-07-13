@@ -1,0 +1,20 @@
+Ambiguity 1: 
+let rec mrewrite1 rules m =
+  try
+    mreduce rules m
+  with Failure _ ->
+    match m with
+      Var n -> failwith "mrewrite1"
+    | Term(f, sons) -> Term(f, mrewrite1_sons rules sons)
+
+and mrewrite1_sons rules = function
+    [] -> failwith "mrewrite1"
+  | son::rest ->
+      try
+        mrewrite1 rules son :: rest
+      with Failure _ ->
+        son :: mrewrite1_sons rules rest
+
+
+(* Iterating rewrite1. Returns a normal form. May loop forever *)
+

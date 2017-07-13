@@ -1,0 +1,69 @@
+Ambiguity 1: 
+re_init ?prior_clockspec
+    { init_timeout; subscribe_mode; sync_directory; root } =
+    with_crash_record_opt root "init" @@ fun () ->
+    let root_s = Path.to_string root in
+    let sockname = get_sockname init_timeout in
+    assert_sync_dir_exists (Filename.concat root_s sync_directory);
+    let (tic, oc) = Timeout.open_connection (Unix.ADDR_UNIX sockname) in
+    let reader = Buffered_line_reader.create
+      @@ Timeout.descr_of_in_channel @@ tic in
+    let capabilities = exec (reader, oc)
+      (capability_check ~optional:[ flush_subscriptions_cmd ]
+      ["relative_root"]) in
+    assert_no_error capabilities;
+    let supports_flush = has_capability flush_subscriptions_cmd capabilities in
+    (** Disable subscribe if Watchman flush feature isn't supported. *)
+    let subscribe_mode = if supports_flush then subscribe_mode else None in
+    let response = exec (reader, oc) (watch_project root_s) in
+    let watch_root = J.get_string_val "watch" response in
+    let relative_path = J.get_string_val "relative_path" ~default:""
+      response in
+
+    let clockspec = match prior_clockspec with
+      | Some s -> s
+      | None -> exec (reader, oc) (clock watch_root) |> J.get_string_val "clock"
+    in
+    let env = {
+      settings = {
+        init_timeout;
+        subscribe_mode;
+        sync_directory;
+        root;
+      };
+      socket = (reader, oc);
+      watch_root;
+      relative_path;
+      clockspec;
+    } in
+    match subscribe_mode with
+    | None -> env
+    | Some subscribe_mode ->
+      (ignore @@ exec env.socket (subscribe subscribe_mode env));
+      env
+
+Ambiguity 2: 
+try with_crash_record_exn env.settings.root "get_all_files"  @@ fun () ->
+      let response = exec env.socket (all_query env) in
+      env.clockspec <- J.get_string_val "clock" response;
+      extract_file_names env response with
+      | _ ->
+        Exit_status.(exit Watchman_failed)
+
+  
+
+Ambiguity 3: 
+let timeout = Option.map deadline ~f:(fun deadline ->
+      let timeout = deadline -. (Unix.time ()) in
+      max timeout 0.0
+    ) in
+    call_on_instance instance "get_changes" @@ fun env ->
+      if env.settings.subscribe_mode <> None
+      then
+        let env, result = transform_asynchronous_get_changes_response
+          env (poll_for_updates ?timeout env) in
+        env, Watchman_pushed result
+      else
+        let env, result = transform_synchronous_get_changes_response
+          env (exec ?timeout env.socket (since_query env)) in
+        env, Watchman_synchronous result

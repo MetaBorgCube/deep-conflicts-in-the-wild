@@ -1,0 +1,7 @@
+Ambiguity 1: 
+| Ok json ->
+        match Data_encoding.Json.destruct encoding json with
+        | exception _ -> (* TODO print_error *)
+            cctxt.Client_commands.error "didn't understand the nonces file"
+        | list ->
+            Lwt.return list

@@ -1,0 +1,112 @@
+Ambiguity 1: 
+| Inr a ->
+            match bal with
+            | Less -> Inl (Node (Same, a, y, b))
+            | Same -> Inr (Node (More, a, y, b))
+            | More -> rotr a y b
+
+Ambiguity 2: 
+| Inr b ->
+            match bal with
+            | More -> Inl (Node (Same, a, y, b) : n avl)
+            | Same -> Inr (Node (Less, a, y, b) : n succ avl)
+            | Less -> rotl a y b
+
+Ambiguity 3: 
+| Node (Same, Leaf, x, r) -> (x, Inl r)
+  | Node (bal, (Node _ as l) , x, r) ->
+      match del_min l with
+      | y, Inr l -> (y, Inr (Node (bal, l, x, r)))
+      | y, Inl l ->
+          (y, match bal with
+          | Same -> Inr (Node (Less, l, x, r))
+          | More -> Inl (Node (Same, l, x, r))
+          | Less -> rotl l x r)
+
+Ambiguity 4: 
+| Same, (z, Inl r) -> Dsame (Node (More, l, z, r))
+            | Less, (z, Inl r) -> Ddecr (Eq, Node (Same, l, z, r))
+            | More, (z, Inl r) ->
+                match rotr l z r with
+                | Inl t -> Ddecr (Eq, t)
+                | Inr t -> Dsame t
+
+Ambiguity 5: 
+| More -> Ddecr (Eq, Node (Same, l, x, r))
+            | Less ->
+                match rotl l x r with
+                | Inl t -> Ddecr (Eq, t)
+                | Inr t -> Dsame t
+
+Ambiguity 6: 
+| Less -> Ddecr (Eq, Node (Same, l, x, r))
+            | More ->
+                match rotr l x r with
+                | Inl t -> Ddecr (Eq, t)
+                | Inr t -> Dsame t
+
+Ambiguity 7: 
+| CBlk (e, LeftD, sib, c) -> fill c (Bnode (sib, e, t))
+  | CBlk (e, RightD, sib, c) -> fill c (Bnode (t, e, sib))
+  | CRed (e, dir, sib, CBlk (e', dir', uncle, ct)) ->
+      match color uncle with
+      | Red -> repair (recolor dir e sib dir' e' (blacken uncle) t) ct
+      | Black -> fill ct (rotate dir e sib dir' e' uncle t)
+
+Ambiguity 8: 
+| Some Eq -> match rep_equal a2 b2 with
+        | None -> None
+        | Some Eq -> Some Eq
+
+Ambiguity 9: 
+| Some Eq -> match rep_equal a2 b2 with
+        | None -> None
+        | Some Eq -> Some Eq
+
+Ambiguity 10: 
+| Inr Eq -> match compare y t with
+        | Inl _ as e -> e
+        | Inr Eq as e -> e
+
+Ambiguity 11: 
+| Ccons (l,s,t,rs) ->
+      if s = name then Cok (Var l,t) else
+      match lookup name rs with
+      | Cerror m -> Cerror m
+      | Cok (v, t) -> Cok (Shift v, t)
+
+Ambiguity 12: 
+| Cok (f', ft) -> match tc n ctx x with
+        | Cerror _ as e -> e
+        | Cok (x', xt) ->
+            match ft with
+            | Ar (a, b) ->
+                begin match compare a xt with
+                | Inl s -> Cerror s
+                | Inr Eq -> Cok (App (f',x'), b)
+                end
+            | _ -> Cerror "Non fun in Ap"
+
+Ambiguity 13: 
+begin
+        match subst body (Bind (x, v, Id)) with Ex term ->
+        match mode term with
+        | Pexp -> Inl term
+        | Pval -> Inr term
+      end
+
+Ambiguity 14: 
+| Const (r, v)  -> Inr (Const (r, v))
+  | App (e1, e2) ->
+      match mode e1, mode e2 with
+      | Pexp, _->
+          begin match onestep e1 with
+          | Inl e -> Inl(App(e,e2))
+          | Inr v -> Inl(App(v,e2))
+          end
+      | Pval, Pexp ->
+          begin match onestep e2 with
+          | Inl e -> Inl(App(e1,e))
+          | Inr v -> Inl(App(e1,v))
+          end
+      | Pval, Pval -> rule e1 e2

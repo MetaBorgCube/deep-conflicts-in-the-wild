@@ -1,0 +1,7 @@
+Ambiguity 1: 
+| a::l ->
+        f a >>= function
+        | None -> map_filter f l
+        | Some b ->
+          map_filter f l >>= fun filtered ->
+          return (b::filtered)

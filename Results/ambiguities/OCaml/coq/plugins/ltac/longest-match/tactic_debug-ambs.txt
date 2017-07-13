@@ -1,0 +1,11 @@
+Ambiguity 1: 
+begin function (e, info) -> match e with
+        | End_of_file -> exit
+        | e -> raise ~info e
+      end
+
+Ambiguity 2: 
+begin function (e, info) -> match e with
+            | Failure _ | Invalid_argument _ -> prompt level
+            | e -> raise ~info e
+          end

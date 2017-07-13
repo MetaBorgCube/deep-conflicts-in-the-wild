@@ -1,0 +1,17 @@
+Ambiguity 1: 
+FailedToKill err ->
+          if not quiet then match err with
+          | Some err -> prerr_endline err
+          | None -> ();
+          let msg = spf "Failed to kill server nicely for %s" root_s in
+          FlowExitStatus.(exit ~msg Kill_error)
+        
+
+Ambiguity 2: 
+FailedToKill err ->
+          if not quiet then match err with
+          | Some err -> prerr_endline err
+          | None -> ();
+          let msg = spf "Failed to kill server meanly for %s" root_s in
+          FlowExitStatus.(exit ~msg Kill_error)
+        

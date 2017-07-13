@@ -1,0 +1,31 @@
+Ambiguity 1: 
+revive key =
+  if mem key
+  then
+    let new_key = Key.new_from_old key in
+    let new_key = Key.md5 new_key in
+    let old_key = Key.md5_old key in
+    if Raw.mem new_key
+    then Raw.remove new_key;
+    Raw.move old_key new_key
+
+Ambiguity 2: 
+collect() =
+    if !size < 2 * Config.capacity then () else
+    let l = ref [] in
+    Hashtbl.iter begin fun key (freq, v) ->
+      l := (key, !freq, v) :: !l
+    end cache;
+    Hashtbl.clear cache;
+    l := List.sort (fun (_, x, _) (_, y, _) -> y - x) !l;
+    let i = ref 0 in
+    while !i < Config.capacity do
+      match !l with
+      | [] -> i := Config.capacity
+      | (k, freq, v) :: rl ->
+          Hashtbl.replace cache k (ref 0, v);
+          l := rl;
+          incr i;
+    done;
+    size := Config.capacity;
+    ()

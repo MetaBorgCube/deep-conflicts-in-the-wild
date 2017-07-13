@@ -1,0 +1,12 @@
+Ambiguity 1: 
+begin function (e, info) -> match e with
+      | PatternMatchingFailure -> Tacticals.New.tclZEROMSG (Pp.str"Unexpected conclusion!")
+      | e -> Proofview.tclZERO ~info e
+    end
+
+Ambiguity 2: 
+begin function (e, info) -> match e with
+      | PatternMatchingFailure ->
+          Tacticals.New.tclZEROMSG (Pp.str"The goal must be of the form {x<>y}+{x=y} or {x=y}+{x<>y}.")
+      | e -> Proofview.tclZERO ~info e
+    end

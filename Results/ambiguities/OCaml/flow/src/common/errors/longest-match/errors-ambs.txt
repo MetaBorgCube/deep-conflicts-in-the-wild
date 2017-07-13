@@ -1,0 +1,11 @@
+Ambiguity 1: 
+| CommentM str ->
+      match acc with
+      | (loc, strs) :: tail -> (loc, str :: strs) :: tail
+      | [] -> [Loc.none, [str]]
+
+Ambiguity 2: 
+| CommentM s ->
+        match messages with
+        | x :: xs -> append_comment x s :: xs
+        | _ -> failwith "can't append comment to nonexistent blame"

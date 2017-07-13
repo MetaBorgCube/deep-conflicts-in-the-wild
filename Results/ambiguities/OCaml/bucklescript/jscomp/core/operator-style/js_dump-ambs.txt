@@ -1,0 +1,301 @@
+Ambiguity 1: 
+handle lexical = 
+        if  Ident_set.is_empty lexical  
+        then
+          begin 
+            if return then 
+              begin 
+                P.string f L.return ;
+                P.space f
+              end ;
+
+            begin match name with 
+              | No_name -> 
+                P.string f L.function_;
+                P.space f ;
+                param_body ();
+                (* semi f ; *)
+              | Name_non_top x  -> 
+                P.string f L.var ;
+                P.space f ; 
+                ignore @@ ident inner_cxt f x ; 
+                P.space f ;
+                P.string f L.eq ;
+                P.space f ; 
+                P.string f L.function_;
+                P.space f ;
+                param_body ();
+                semi f ;
+              | Name_top x  -> 
+                P.string f L.function_;
+                P.space f ;
+                ignore (ident inner_cxt f x);
+                param_body ();
+            end;
+          end
+        else
+          (* print as 
+             {[(function(x,y){...} (x,y))]}           
+          *)
+          let lexical = Ident_set.elements lexical in
+          (if return then
+             begin 
+               P.string f L.return ; 
+               P.space f
+             end
+           else 
+             begin match name with
+               | No_name -> ()
+               | Name_non_top name | Name_top name->
+                 P.string f L.var;
+                 P.space f;
+                 ignore @@ ident inner_cxt f name ;
+                 P.space f ;
+                 P.string f L.eq;
+                 P.space f ;
+             end
+          )   
+          ;
+          P.string f L.lparen;
+          P.string f L.function_; 
+          P.string f L.lparen;
+          ignore @@ comma_idents inner_cxt f lexical;
+          P.string f L.rparen;
+          P.brace_vgroup f 0  (fun _ -> 
+              begin 
+                P.string f L.return ;
+                P.space f;
+                P.string f L.function_;
+                P.space f ;
+                (match name with 
+                 | No_name  -> () 
+                 | Name_non_top x | Name_top x -> ignore (ident inner_cxt f x));
+                param_body ()
+              end);
+          P.string f L.lparen;
+          ignore @@ comma_idents inner_cxt f lexical;
+          P.string f L.rparen;
+          P.string f L.rparen;
+          begin match name with 
+            | No_name -> () (* expression *)
+            | _ -> semi f (* has binding, a statement *)
+          end
+
+Ambiguity 2: 
+cxt = 
+      P.group f 1 @@ fun _ -> 
+      P.group f 1 @@ (fun _ -> 
+          P.string f L.case;
+          P.space f ;
+          pp_cond  f e; (* could be integer or string*)
+          P.space f ;
+          P.string f L.colon  );
+
+      P.space f;
+      P.group f 1 @@ fun _ ->
+      let cxt =
+        match sl with 
+        | [] -> cxt 
+        | _ ->
+          P.newline f ;
+          statement_list false cxt  f sl
+      in
+      (if break then 
+         begin
+           P.newline f ;
+           P.string f L.break;
+           semi f;
+         end) ;
+      cxt
+
+Ambiguity 3: 
+action () = 
+      P.group f 0 @@ fun _ -> 
+      P.string f "+" ;
+      expression 13 cxt f e
+
+Ambiguity 4: 
+action () = 
+      P.group f 1 @@ fun _ -> 
+      P.string f L.new_;
+      P.space f;
+      let cxt = expression 16 cxt f e in
+      P.paren_group f 1 @@ fun _ -> 
+      match el with 
+      | Some el  -> arguments cxt f el  
+      | None -> cxt
+
+Ambiguity 5: 
+action () = 
+      P.group f 1 @@ fun _ -> 
+      P.string f L.new_;
+      P.space f;
+      P.string f L.array;
+      P.paren_group f 1 @@ fun _ -> expression 0 cxt f e
+
+Ambiguity 6: 
+cxt = P.group f 0 @@ fun _ -> 
+        (* The only place that [semi] may have semantics here *)
+        P.string f "for";
+        P.paren_group f 1 @@ fun _ -> 
+        let cxt, new_id = 
+          (match for_ident_expression, finish.expression_desc with 
+           | Some ident_expression , (Number _ | Var _ ) -> 
+             P.string f L.var;
+             P.space f;
+             let cxt  =  ident cxt f id in
+             P.space f; 
+             P.string f L.eq;
+             P.space f;
+             expression 0 cxt f ident_expression, None
+           | Some ident_expression, _ -> 
+             P.string f L.var;
+             P.space f;
+             let cxt  =  ident cxt f id in
+             P.space f;
+             P.string f L.eq;
+             P.space f; 
+             let cxt = expression 1 cxt f ident_expression in
+             P.space f ; 
+             P.string f L.comma;
+             let id = Ext_ident.create (Ident.name id ^ "_finish") in
+             let cxt = ident cxt f id in
+             P.space f ; 
+             P.string f L.eq;
+             P.space f;
+             expression 1 cxt f finish, Some id
+           | None, (Number _ | Var _) -> 
+             cxt, None 
+           | None , _ -> 
+             P.string f L.var;
+             P.space f ;
+             let id = Ext_ident.create (Ident.name id ^ "_finish") in
+             let cxt = ident cxt f id in
+             P.space f ; 
+             P.string f L.eq ; 
+             P.space f ; 
+             expression 15 cxt f finish, Some id
+          ) in
+
+        semi f ; 
+        P.space f;
+        let cxt = ident cxt f id in
+        P.space f;
+        let right_prec  = 
+
+          match direction with 
+          | Upto -> 
+            let (_,_,right) = op_prec Le  in
+            P.string f L.le;
+            right
+          | Downto -> 
+            let (_,_,right) = op_prec Ge in
+            P.string f L.ge ;
+            right
+        in
+        P.space f ; 
+        let cxt  = 
+          match new_id with 
+          | Some i -> expression   right_prec cxt  f (E.var i)
+          | None -> expression  right_prec cxt  f finish
+        in
+        semi f; 
+        P.space f;
+        let ()  = 
+          match direction with 
+          | Upto -> P.string f L.plus_plus
+          | Downto -> P.string f L.minus_minus in
+        ident cxt f id
+
+Ambiguity 7: 
+P.space f ;
+
+        (* P.string f "return ";(\* ASI -- when there is a comment*\) *)
+        P.group f return_indent @@ fun _ -> 
+        let cxt =  expression 0 cxt f e in
+        semi f;
+        cxt
+
+Ambiguity 8: 
+| Some def ->
+       P.group f 1 @@ fun _ -> 
+       P.string f L.default;
+       P.string f L.colon;
+       P.newline f;
+       statement_list  false cxt  f def
+
+Ambiguity 9: 
+| Some def ->
+       P.group f 1 @@ fun _ -> 
+       P.string f L.default;
+       P.string f L.colon;
+       P.newline f;
+       statement_list  false cxt  f def
+
+Ambiguity 10: 
+P.group f throw_indent @@ fun _ -> 
+
+    let cxt = expression 0 cxt f e in
+    semi f ; cxt
+
+Ambiguity 11: 
+| Try (b, ctch, fin) ->
+    P.vgroup f 0 @@ fun _-> 
+    P.string f "try";
+    P.space f ; 
+    let cxt = block cxt f b in
+    let cxt = 
+      match ctch with
+      | None ->
+        cxt
+      | Some (i, b) ->
+        P.newline f;
+        P.string f "catch (";
+        let cxt = ident cxt f i in
+        P.string f ")";
+        block cxt f b
+    in 
+    begin match fin with
+      | None -> cxt
+      | Some b ->
+        P.group f 1 @@ fun _ -> 
+        P.string f "finally";
+        P.space f;
+        block cxt f b 
+    end
+
+Ambiguity 12: 
+let cxt = Ext_pp_scope.empty in
+  P.vgroup f 1 @@ fun _ -> 
+  P.string f L.define;
+  P.string f "([";
+  P.string f (Printf.sprintf "%S" L.exports);
+
+  List.iter (fun x ->
+      let s = Js_program_loader.string_of_module_id ~output_prefix kind x in
+      P.string f L.comma ;
+      P.space f; 
+      pp_string f  s;
+    ) x.modules ;
+  P.string f "]";
+  P.string f L.comma;
+  P.newline f;
+  P.string f L.function_;
+  P.string f "(";
+  P.string f L.exports;
+
+  let cxt = 
+    List.fold_left (fun cxt x ->         
+        let id = Lam_module_ident.id x in
+        P.string f L.comma;
+        P.space f ; 
+        ident cxt f id
+      ) cxt x.modules     
+  in
+  P.string f ")";
+  let v = P.brace_vgroup f 1 @@ (fun _ -> 
+      let () = P.string f L.strict_directive in 
+      program f cxt x.program
+    ) in
+  P.string f ")";
+  v

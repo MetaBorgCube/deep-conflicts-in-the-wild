@@ -1,0 +1,8 @@
+Ambiguity 1: 
+| _:: { state_id = None } :: _ -> assert false
+  | [] -> raise Not_found
+  | [_] ->
+      match rest with
+      | { state_id = Some id } :: _ -> id, true
+      | { state_id = None } :: _ -> assert false
+      | [] -> raise Not_found

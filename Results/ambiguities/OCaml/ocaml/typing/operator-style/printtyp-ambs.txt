@@ -1,0 +1,129 @@
+Ambiguity 1: 
+best_type_path p =
+  if !Clflags.real_paths || !printing_env == Env.empty
+  then (p, Id)
+  else
+    let (p', s) = normalize_type_path !printing_env p in
+    let get_path () = get_best_path (PathMap.find  p' !printing_map) in
+    while !printing_cont <> [] &&
+      try ignore (get_path ()); false with Not_found -> true
+    do
+      printing_cont := List.map snd (Env.run_iter_cont !printing_cont);
+      incr printing_depth;
+    done;
+    let p'' = try get_path () with Not_found -> p' in
+    (* Format.eprintf "%a = %a -> %a@." path p path p' path p''; *)
+    (p'', s)
+
+Ambiguity 2: 
+let px = proxy ty in
+  if List.mem_assq px !names && not (List.memq px !delayed) then
+   let mark = is_non_gen sch ty in
+   Otyp_var (mark, name_of_type px) else
+
+  let pr_typ () =
+    match ty.desc with
+    | Tvar _ ->
+        Otyp_var (is_non_gen sch ty, name_of_type ty)
+    | Tarrow(l, ty1, ty2, _) ->
+        let pr_arrow l ty1 ty2 =
+          let lab =
+            if !print_labels && l <> "" || is_optional l then l else ""
+          in
+          let t1 =
+            if is_optional l then
+              match (repr ty1).desc with
+              | Tconstr(path, [ty], _)
+                when Path.same path Predef.path_option ->
+                  tree_of_typexp sch ty
+              | _ -> Otyp_stuff "<hidden>"
+            else tree_of_typexp sch ty1 in
+          Otyp_arrow (lab, t1, tree_of_typexp sch ty2) in
+        pr_arrow l ty1 ty2
+    | Ttuple tyl ->
+        Otyp_tuple (tree_of_typlist sch tyl)
+    | Tconstr(p, tyl, abbrev) ->
+        let p', s = best_type_path p in
+        let tyl' = apply_subst s tyl in
+        if is_nth s then tree_of_typexp sch (List.hd tyl') else
+        Otyp_constr (tree_of_path p', tree_of_typlist sch tyl')
+    | Tvariant row ->
+        let row = row_repr row in
+        let fields =
+          if row.row_closed then
+            List.filter (fun (_, f) -> row_field_repr f <> Rabsent)
+              row.row_fields
+          else row.row_fields in
+        let present =
+          List.filter
+            (fun (_, f) ->
+               match row_field_repr f with
+               | Rpresent _ -> true
+               | _ -> false)
+            fields in
+        let all_present = List.length present = List.length fields in
+        begin match row.row_name with
+        | Some(p, tyl) when namable_row row ->
+            let (p', s) = best_type_path p in
+            let id = tree_of_path p' in
+            let args = tree_of_typlist sch (apply_subst s tyl) in
+            if row.row_closed && all_present then
+              if is_nth s then List.hd args else Otyp_constr (id, args)
+            else
+              let non_gen = is_non_gen sch px in
+              let tags =
+                if all_present then None else Some (List.map fst present) in
+              let inh =
+                match args with
+                  [Otyp_constr (i, a)] when is_nth s -> Ovar_name (i, a)
+                | _ ->
+                    (* fallback case, should change outcometree... *)
+                    Ovar_name (tree_of_path p, tree_of_typlist sch tyl)
+              in
+              Otyp_variant (non_gen, inh, row.row_closed, tags)
+        | _ ->
+            let non_gen =
+              not (row.row_closed && all_present) && is_non_gen sch px in
+            let fields = List.map (tree_of_row_field sch) fields in
+            let tags =
+              if all_present then None else Some (List.map fst present) in
+            Otyp_variant (non_gen, Ovar_fields fields, row.row_closed, tags)
+        end
+    | Tobject (fi, nm) ->
+        tree_of_typobject sch fi !nm
+    | Tnil | Tfield _ ->
+        tree_of_typobject sch ty None
+    | Tsubst ty ->
+        tree_of_typexp sch ty
+    | Tlink _ ->
+        fatal_error "Printtyp.tree_of_typexp"
+    | Tpoly (ty, []) ->
+        tree_of_typexp sch ty
+    | Tpoly (ty, tyl) ->
+        (*let print_names () =
+          List.iter (fun (_, name) -> prerr_string (name ^ " ")) !names;
+          prerr_string "; " in *)
+        let tyl = List.map repr tyl in
+        if tyl = [] then tree_of_typexp sch ty else begin
+          let old_delayed = !delayed in
+          (* Make the names delayed, so that the real type is
+             printed once when used as proxy *)
+          List.iter add_delayed tyl;
+          let tl = List.map name_of_type tyl in
+          let tr = Otyp_poly (tl, tree_of_typexp sch ty) in
+          (* Forget names when we leave scope *)
+          remove_names tyl;
+          delayed := old_delayed; tr
+        end
+    | Tunivar _ ->
+        Otyp_var (false, name_of_type ty)
+    | Tpackage (p, n, tyl) ->
+        let n =
+          List.map (fun li -> String.concat "." (Longident.flatten li)) n in
+        Otyp_module (Path.name p, n, tree_of_typlist sch tyl)
+  in
+  if List.memq px !delayed then delayed := List.filter ((!=) px) !delayed;
+  if is_aliased px && aliasable ty then begin
+    check_name_of_type px;
+    Otyp_alias (pr_typ (), name_of_type px) end
+  else pr_typ ()

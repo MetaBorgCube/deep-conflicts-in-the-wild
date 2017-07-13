@@ -1,0 +1,37 @@
+Ambiguity 1: 
+| Some (ArgT.Any arg) ->
+        let wit = ExtraArg arg in
+        match val_tag (Topwit wit) with
+        | Val.Base t ->
+          begin match Val.eq t tag with
+          | None -> default
+          | Some Refl -> Genprint.generic_top_print (in_gen (Topwit wit) x)
+          end
+        | _ -> default
+
+Ambiguity 2: 
+let get_list : type l. l generic_argument -> l generic_argument list option =
+  function (GenArg (wit, arg)) -> match wit with
+  | Rawwit (ListArg wit) -> Some (List.map (in_gen (rawwit wit)) arg)
+  | Glbwit (ListArg wit) -> Some (List.map (in_gen (glbwit wit)) arg)
+  | _ -> None
+
+  
+
+Ambiguity 3: 
+let get_opt : type l. l generic_argument -> l generic_argument option option =
+  function (GenArg (wit, arg)) -> match wit with
+  | Rawwit (OptArg wit) -> Some (Option.map (in_gen (rawwit wit)) arg)
+  | Glbwit (OptArg wit) -> Some (Option.map (in_gen (glbwit wit)) arg)
+  | _ -> None
+
+  
+
+Ambiguity 4: 
+| Extend.Uentryl (_, l) -> prtac (l, Any) arg
+  | _ ->
+    match arg with
+    | TacGeneric arg ->
+      let pr l arg = prtac l (TacGeneric arg) in
+      pr_any_arg pr symb arg
+    | _ -> str "ltac:(" ++ prtac (1, Any) arg ++ str ")"

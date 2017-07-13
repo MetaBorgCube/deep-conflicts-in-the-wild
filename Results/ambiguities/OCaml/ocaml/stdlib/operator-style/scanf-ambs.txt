@@ -1,0 +1,6 @@
+Ambiguity 1: 
+next () =
+      if !i >= len then raise End_of_file else
+      let c = s.[!i] in
+      incr i;
+      c

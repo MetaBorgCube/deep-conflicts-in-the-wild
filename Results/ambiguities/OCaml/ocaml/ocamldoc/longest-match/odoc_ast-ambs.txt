@@ -1,0 +1,326 @@
+Ambiguity 1: 
+| {c_lhs=pattern_param} :: second_ele :: q ->
+          (* implicit pattern matching -> anonymous parameter and no more parameter *)
+          (* A VOIR : le label ? *)
+          let parameter = Odoc_parameter.Tuple ([], Odoc_env.subst_type env pattern_param.pat_type) in
+          [ parameter ]
+
+      | {c_lhs=pattern_param; c_rhs=func_body} :: [] ->
+          let parameter =
+            tt_param_info_from_pattern
+              env
+              (Odoc_parameter.desc_from_info_opt current_comment_opt)
+              pattern_param
+
+          in
+         (* For optional parameters with a default value, a special treatment is required *)
+         (* we look if the name of the parameter we just add is "*opt*", which means
+            that there is a let param_name = ... in ... just right now *)
+          let (p, next_exp) =
+            match parameter with
+              Simple_name { sn_name = "*opt*" } ->
+                (
+                 (
+                  match func_body.exp_desc with
+                    Typedtree.Texp_let (_, {vb_pat={pat_desc = Typedtree.Tpat_var (id, _) };
+                                            vb_expr=exp} :: _, func_body2) ->
+                      let name = Name.from_ident id in
+                      let new_param = Simple_name
+                          { sn_name = name ;
+                            sn_text = Odoc_parameter.desc_from_info_opt current_comment_opt name ;
+                            sn_type = Odoc_env.subst_type env exp.exp_type
+                          }
+                      in
+                      (new_param, func_body2)
+                  | _ ->
+                      print_DEBUG3 "Pas le bon filtre pour le parametre optionnel avec valeur par defaut.";
+                      (parameter, func_body)
+                 )
+                )
+            | _ ->
+                (parameter, func_body)
+          in
+         (* continue if the body is still a function *)
+          match next_exp.exp_desc with
+            Texp_function (_, pat_exp_list, _) ->
+              p :: (tt_analyse_function_parameters env current_comment_opt pat_exp_list)
+          | _ ->
+              (* something else ; no more parameter *)
+              [ p ]
+
+Ambiguity 2: 
+| l ->
+               match l with
+                 [] ->
+                   (* cas impossible, on l'a filtre avant *)
+                   assert false
+               | {c_lhs=pattern_param} :: second_ele :: q ->
+                   (* implicit pattern matching -> anonymous parameter *)
+                   (* Note : We can't match this pattern if it is the first call to the function. *)
+                   let new_param = Simple_name
+                       { sn_name = "??" ; sn_text =  None;
+                         sn_type = Odoc_env.subst_type env pattern_param.Typedtree.pat_type }
+                   in
+                   [ new_param ]
+
+               | {c_lhs=pattern_param; c_rhs=body} :: [] ->
+                   (* if this is the first call to the function, this is the first parameter and we skip it *)
+                   if not first then
+                     (
+                      let parameter =
+                        tt_param_info_from_pattern
+                          env
+                          (Odoc_parameter.desc_from_info_opt comment_opt)
+                          pattern_param
+                      in
+                      (* For optional parameters with a default value, a special treatment is required. *)
+                      (* We look if the name of the parameter we just add is "*opt*", which means
+                         that there is a let param_name = ... in ... just right now. *)
+                      let (current_param, next_exp) =
+                        match parameter with
+                          Simple_name { sn_name = "*opt*"} ->
+                            (
+                             (
+                              match body.exp_desc with
+                                Typedtree.Texp_let (_, {vb_pat={pat_desc = Typedtree.Tpat_var (id, _) };
+                                                        vb_expr=exp} :: _, body2) ->
+                                  let name = Name.from_ident id in
+                                  let new_param = Simple_name
+                                      { sn_name = name ;
+                                        sn_text = Odoc_parameter.desc_from_info_opt comment_opt name ;
+                                        sn_type = Odoc_env.subst_type env exp.Typedtree.exp_type ;
+                                      }
+                                  in
+                                  (new_param, body2)
+                              | _ ->
+                                  print_DEBUG3 "Pas le bon filtre pour le parametre optionnel avec valeur par defaut.";
+                                  (parameter, body)
+                             )
+                            )
+                        | _ ->
+                            (* no *opt* parameter, we add the parameter then continue *)
+                            (parameter, body)
+                      in
+                      current_param :: (tt_analyse_method_expression env current_method_name comment_opt ~first: false next_exp)
+                     )
+                   else
+                     tt_analyse_method_expression env current_method_name comment_opt ~first: false body
+
+Ambiguity 3: 
+| item :: q ->
+              let loc = item.Parsetree.pcf_loc in
+              match item.Parsetree.pcf_desc with
+        | (Parsetree.Pcf_inherit (_, p_clexp, _))  ->
+            let tt_clexp =
+              let n = List.length acc_inher in
+              try Typedtree_search.get_nth_inherit_class_expr tt_cls n
+              with Not_found ->
+                raise (Failure (
+                       Odoc_messages.inherit_classexp_not_found_in_typedtree n))
+            in
+            let (info_opt, ele_comments) =
+              get_comments_in_class last_pos
+                p_clexp.Parsetree.pcl_loc.Location.loc_start.Lexing.pos_cnum
+            in
+            let text_opt =
+              match info_opt with None -> None
+              | Some i -> i.Odoc_types.i_desc in
+            let name = tt_name_of_class_expr tt_clexp in
+            let inher =
+              {
+                ic_name = Odoc_env.full_class_or_class_type_name env name ;
+                ic_class = None ;
+                ic_text = text_opt ;
+              }
+            in
+            iter (acc_inher @ [ inher ]) (acc_fields @ ele_comments)
+              p_clexp.Parsetree.pcl_loc.Location.loc_end.Lexing.pos_cnum
+              q
+
+      | Parsetree.Pcf_val ({ txt = label }, mutable_flag, k) ->
+            let virt = match k with Parsetree.Cfk_virtual _ -> true | Parsetree.Cfk_concrete _ -> false in
+            let complete_name = Name.concat current_class_name label in
+            let (info_opt, ele_comments) = get_comments_in_class last_pos loc.Location.loc_start.Lexing.pos_cnum in
+            let type_exp =
+              try Typedtree_search.search_attribute_type tt_cls label
+              with Not_found ->
+                raise (Failure (Odoc_messages.attribute_not_found_in_typedtree complete_name))
+          in
+          let code =
+            if !Odoc_global.keep_code then
+              Some (get_string_of_file loc.Location.loc_start.Lexing.pos_cnum
+                    loc.Location.loc_end.Lexing.pos_cnum)
+            else
+              None
+          in
+          let att =
+            {
+              att_value = { val_name = complete_name ;
+                val_info = info_opt ;
+                val_type = Odoc_env.subst_type env type_exp ;
+                val_recursive = false ;
+                val_parameters = [] ;
+                val_code = code ;
+                val_loc = { loc_impl = Some loc ; loc_inter = None } ;
+              } ;
+              att_mutable = mutable_flag = Asttypes.Mutable ;
+              att_virtual = virt ;
+            }
+          in
+          iter acc_inher (acc_fields @ ele_comments @ [ Class_attribute att ]) loc.Location.loc_end.Lexing.pos_cnum q
+
+        | (Parsetree.Pcf_method  ({ txt = label }, private_flag, Parsetree.Cfk_virtual _)) ->
+            let complete_name = Name.concat current_class_name label in
+            let (info_opt, ele_comments) = get_comments_in_class last_pos loc.Location.loc_start.Lexing.pos_cnum in
+            let met_type =
+              try Odoc_sig.Signature_search.search_method_type label tt_class_sig
+              with Not_found -> raise (Failure (Odoc_messages.method_type_not_found current_class_name label))
+            in
+            let real_type =
+              match met_type.Types.desc with
+              Tarrow (_, _, t, _) ->
+                t
+            |  _ ->
+                (* ?!? : not an arrow type ! return the original type *)
+                met_type
+          in
+          let code =
+            if !Odoc_global.keep_code then
+              Some (get_string_of_file loc.Location.loc_start.Lexing.pos_cnum
+               loc.Location.loc_end.Lexing.pos_cnum)
+            else
+              None
+          in
+          let met =
+            {
+              met_value = {
+                val_name = complete_name ;
+                val_info = info_opt ;
+                val_type = Odoc_env.subst_type env real_type ;
+                val_recursive = false ;
+                val_parameters = [] ;
+                val_code = code ;
+                val_loc = { loc_impl = Some loc ; loc_inter = None } ;
+              } ;
+              met_private = private_flag = Asttypes.Private ;
+              met_virtual = true ;
+            }
+          in
+          (* update the parameter description *)
+          Odoc_value.update_value_parameters_text met.met_value;
+
+          iter acc_inher (acc_fields @ ele_comments @ [ Class_method met ]) loc.Location.loc_end.Lexing.pos_cnum q
+
+        | (Parsetree.Pcf_method ({ txt = label }, private_flag, Parsetree.Cfk_concrete _)) ->
+            let complete_name = Name.concat current_class_name label in
+            let (info_opt, ele_comments) = get_comments_in_class last_pos loc.Location.loc_start.Lexing.pos_cnum in
+            let exp =
+              try Typedtree_search.search_method_expression tt_cls label
+            with Not_found -> raise (Failure (Odoc_messages.method_not_found_in_typedtree complete_name))
+          in
+          let real_type =
+            match exp.exp_type.desc with
+              Tarrow (_, _, t,_) ->
+                t
+            |  _ ->
+                (* ?!? : not an arrow type ! return the original type *)
+                exp.Typedtree.exp_type
+          in
+          let code =
+            if !Odoc_global.keep_code then
+                Some (get_string_of_file loc.Location.loc_start.Lexing.pos_cnum
+               loc.Location.loc_end.Lexing.pos_cnum)
+            else
+              None
+          in
+          let met =
+            {
+              met_value = { val_name = complete_name ;
+                val_info = info_opt ;
+                val_type = Odoc_env.subst_type env real_type ;
+                val_recursive = false ;
+                val_parameters = tt_analyse_method_expression env complete_name info_opt exp ;
+                val_code = code ;
+                val_loc = { loc_impl = Some loc ; loc_inter = None } ;
+              } ;
+              met_private = private_flag = Asttypes.Private ;
+              met_virtual = false ;
+              }
+          in
+          (* update the parameter description *)
+          Odoc_value.update_value_parameters_text met.met_value;
+
+          iter acc_inher (acc_fields @ ele_comments @ [ Class_method met ]) loc.Location.loc_end.Lexing.pos_cnum q
+
+        | Parsetree.Pcf_constraint (_, _) ->
+            (* don't give a $*%@ ! *)
+            iter acc_inher acc_fields loc.Location.loc_end.Lexing.pos_cnum q
+
+        | (Parsetree.Pcf_initializer exp) ->
+            iter acc_inher acc_fields exp.Parsetree.pexp_loc.Location.loc_end.Lexing.pos_cnum q
+
+        | Parsetree.Pcf_attribute _ ->
+            iter acc_inher acc_fields loc.Location.loc_end.Lexing.pos_cnum q
+
+        | Parsetree.Pcf_extension _ -> assert false
+
+Ambiguity 4: 
+| _ ->
+                (* A VOIR : dommage qu'on n'ait pas un Tclass_ident :-( meme quand on a class tutu = toto *)
+                match p_class_expr2.Parsetree.pcl_desc with
+                  Parsetree.Pcl_constr (lid, _) ->
+                    (* we try to get the name from the environment. *)
+                    Name.from_longident lid.txt
+                |  _ ->
+                    Odoc_messages.object_end
+
+Ambiguity 5: 
+| {Parsetree.pvb_pat=pat; pvb_expr=exp} :: q ->
+                let value_name_opt = iter_pat pat.Parsetree.ppat_desc in
+                let new_last_pos = exp.Parsetree.pexp_loc.Location.loc_end.Lexing.pos_cnum in
+                match value_name_opt with
+                  None ->
+                    iter new_last_pos acc_env acc q
+                | Some name ->
+                    try
+                      let pat_exp = Typedtree_search.search_value table_values name.txt in
+                      let (info_opt, ele_comments) =
+                        (* we already have the optional comment for the first value. *)
+                        if first then
+                          (comment_opt, [])
+                        else
+                          get_comments_in_module
+                            last_pos
+                            pat.Parsetree.ppat_loc.Location.loc_start.Lexing.pos_cnum
+                      in
+                      let l_values = tt_analyse_value
+                          env
+                          current_module_name
+                          info_opt
+                          loc
+                          pat_exp
+                          rec_flag
+                      in
+                      let new_env = List.fold_left
+                          (fun e -> fun v ->
+                            Odoc_env.add_value e v.val_name
+                          )
+                          acc_env
+                          l_values
+                      in
+                      let l_ele = List.map (fun v -> Element_value v) l_values in
+                      iter
+                        new_last_pos
+                        new_env
+                        (acc @ ele_comments @ l_ele)
+                        q
+                    with
+                      Not_found ->
+                        iter new_last_pos acc_env acc q
+          
+
+Ambiguity 6: 
+| Some i ->
+              match i.i_desc with
+                None -> []
+              | Some t -> [Element_module_comment t]

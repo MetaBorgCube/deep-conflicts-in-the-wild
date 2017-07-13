@@ -1,0 +1,214 @@
+Ambiguity 1: 
+Node.RPC.block_info node b >>= fun bi ->
+      Node.RPC.predecessors node len bi.hash >>= fun hashes ->
+      RPC.Answer.return hashes
+
+Ambiguity 2: 
+lwt_debug "WWW worker_loop" >>= fun () ->
+      let time = Time.(add (now ()) (Int64.of_int ~-delay)) in
+      let migration_delay =
+        match next_future_block () with
+        | None -> never_ending
+        | Some bi ->
+            let delay = Time.diff bi.timestamp time in
+            if delay <= 0L then
+              Lwt.return_unit
+            else
+              Lwt_unix.sleep (Int64.to_float delay) in
+      Lwt.choose [(migration_delay >|= fun () -> `Migrate) ;
+                  (Lwt_stream.get bi_stream >|= fun x -> `Block x) ]
+      >>= function
+      | `Block None ->
+          lwt_debug "WWW worker_loop None" >>= fun () ->
+          Lwt.return_unit
+      | `Block (Some (bi : Services.Blocks.block_info)) ->
+          lwt_debug "WWW worker_loop Some" >>= fun () ->
+          begin
+            if not filtering
+            || Block_hash.Set.mem bi.predecessor !current_blocks
+            || is_futur_block bi.predecessor
+            then begin
+              let time = Time.(add (now ()) (Int64.of_int ~-delay)) in
+              if Time.(time < bi.timestamp) then begin
+                insert_future_block bi ;
+                Lwt.return_unit
+              end else begin
+                current_blocks :=
+                  Block_hash.Set.remove bi.predecessor !current_blocks
+                  |> Block_hash.Set.add bi.hash ;
+                push (Some [[filter_bi include_ops bi]]) ;
+                Lwt.return_unit
+              end
+            end else begin
+              Lwt.return_unit
+            end
+          end >>= fun () ->
+          worker_loop ()
+      | `Migrate ->
+          lwt_debug "WWW worker_loop Migrate" >>= fun () ->
+          let time = Time.(add (now ()) (Int64.of_int ~-delay)) in
+          let rec migrate_future_blocks () =
+            match pop_future_block time with
+            | Some bi ->
+                push (Some [[filter_bi include_ops bi]]) ;
+                migrate_future_blocks ()
+            | None -> Lwt.return_unit in
+          migrate_future_blocks () >>= fun () ->
+          worker_loop ()
+
+Ambiguity 3: 
+begin
+    match heads with
+    | None ->
+        Node.RPC.heads node >>= fun heads ->
+        let heads = List.map snd (Block_hash.Map.bindings heads) in
+        let heads =
+          match min_date with
+          | None -> heads
+          | Some date ->
+              let min_heads =
+                match min_heads with
+                | None -> 0
+                | Some min_heads -> min_heads in
+              snd @@
+              List.fold_left (fun (min_heads, acc) (bi : Node.RPC.block_info) ->
+                  min_heads - 1,
+                  if Time.(>) bi.timestamp date || min_heads > 0 then bi :: acc
+                  else acc)
+                (min_heads, []) heads in
+        begin
+          match time with
+          | None -> Lwt.return heads
+          | Some time ->
+              let rec current_predecessor (bi: Node.RPC.block_info)  =
+                if Time.compare bi.timestamp time <= 0
+                   || bi.hash = bi.predecessor then
+                  Lwt.return bi
+                else
+                  Node.RPC.raw_block_info node bi.predecessor >>=
+                  current_predecessor in
+              Lwt_list.map_p current_predecessor heads
+        end >|= fun heads_info ->
+        let sorted_infos =
+          List.sort
+            (fun
+              (bi1: Services.Blocks.block_info)
+              (bi2: Services.Blocks.block_info) ->
+               ~- (Fitness.compare bi1.fitness bi2.fitness))
+            heads_info in
+        List.map
+          (fun ({ hash } : Services.Blocks.block_info) -> hash)
+          sorted_infos
+    | Some heads ->
+        let known_block h =
+          try ignore (Node.RPC.raw_block_info node h) ; true
+          with Not_found -> false in
+        Lwt.return (List.filter known_block heads)
+  end >>= fun requested_heads ->
+  Node.RPC.list node len requested_heads >>= fun requested_blocks ->
+  if not monitor then
+    let infos =
+      List.map
+        (List.map (filter_bi include_ops))
+        requested_blocks in
+    RPC.Answer.return infos
+  else begin
+    let (bi_stream, stopper) = Node.RPC.valid_block_watcher node in
+    let stream =
+      match delay with
+      | None ->
+          Lwt_stream.map (fun bi -> [[filter_bi include_ops bi]]) bi_stream
+      | Some delay ->
+          let filtering = heads <> None in
+          create_delayed_stream
+            ~filtering ~include_ops requested_heads bi_stream delay in
+    let shutdown () = Watcher.shutdown stopper in
+    let first_request = ref true in
+    let next () =
+      if not !first_request then begin
+        Lwt_stream.get stream
+      end else begin
+        first_request := false ;
+        let infos =
+          List.map (List.map (filter_bi include_ops)) requested_blocks in
+        Lwt.return (Some infos)
+      end in
+    RPC.Answer.return_stream { next ; shutdown }
+  end
+
+Ambiguity 4: 
+Node.RPC.operations node `Prevalidation >>= fun operationss ->
+  let fetch_operations_content operations =
+    if include_ops then
+      Lwt_list.map_s
+        (fun h ->
+           Node.RPC.operation_content node h >>= fun content ->
+           Lwt.return (h, content))
+        operations
+    else
+      Lwt.return @@ ListLabels.map operations ~f:(fun h -> h, None) in
+  Lwt_list.map_p fetch_operations_content operationss >>= fun operations ->
+  if not monitor then
+    RPC.Answer.return operations
+  else
+    let stream, stopper = Node.RPC.operation_watcher node in
+    let shutdown () = Watcher.shutdown stopper in
+    let first_request = ref true in
+    let next () =
+      if not !first_request then
+        Lwt_stream.get stream >>= function
+        | None -> Lwt.return_none
+        | Some (h, op) when include_ops -> Lwt.return (Some [[h, Some op]])
+        | Some (h, _) -> Lwt.return (Some [[h, None]])
+      else begin
+        first_request := false ;
+        Lwt.return (Some operations)
+      end in
+    RPC.Answer.return_stream { next ; shutdown }
+
+Ambiguity 5: 
+Node.RPC.protocols node >>= fun protocols ->
+  Lwt_list.map_p
+    (fun hash ->
+       if include_contents then
+         Node.RPC.protocol_content node hash >>= function
+         | Error _  -> Lwt.return (hash, None)
+         | Ok bytes -> Lwt.return (hash, Some bytes)
+       else
+         Lwt.return (hash, None))
+    protocols >>= fun protocols ->
+  if not monitor then
+    RPC.Answer.return protocols
+  else
+    let stream, stopper = Node.RPC.protocol_watcher node in
+    let shutdown () = Watcher.shutdown stopper in
+    let first_request = ref true in
+    let next () =
+      if not !first_request then
+        Lwt_stream.get stream >>= function
+        | None -> Lwt.return_none
+        | Some (h, op) when include_contents -> Lwt.return (Some [h, Some op])
+        | Some (h, _) -> Lwt.return (Some [h, None])
+      else begin
+        first_request := false ;
+        Lwt.return (Some protocols)
+      end in
+    RPC.Answer.return_stream { next ; shutdown }
+
+Ambiguity 6: 
+Node.RPC.inject_block
+          node ~force
+          raw operations >>=? fun (hash, wait) ->
+        (if blocking then wait else return ()) >>=? fun () -> return hash
+
+Ambiguity 7: 
+Node.RPC.inject_operation node ?force contents >>= fun (hash, wait) ->
+      begin
+        (if blocking then wait else return ()) >>=? fun () -> return hash
+      end >>= RPC.Answer.return
+
+Ambiguity 8: 
+Node.RPC.inject_protocol ?force node proto >>= fun (hash, wait) ->
+      begin
+        (if blocking then wait else return ()) >>=? fun () -> return hash
+      end >>= RPC.Answer.return

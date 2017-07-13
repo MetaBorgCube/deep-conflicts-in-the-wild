@@ -1,0 +1,297 @@
+Ambiguity 1: 
+| Some args ->
+    let n = List.length args in
+      match find_unification_pattern_args env evd (args @ l) t with
+      | Some l -> Some (List.skipn n l)
+      | _ -> None
+
+Ambiguity 2: 
+| (c,cc,id)::l ->
+      if is_alias sigma c y then id
+      else
+        match l with
+        | _ :: _ -> assoc_up_to_alias sigma aliases y yc l
+        | [] ->
+          (* Last chance, we reason up to alias conversion *)
+          match (normalize_alias_opt sigma aliases c) with
+          | Some cc when eq_alias yc cc -> id
+          | _ -> if is_alias sigma c yc then id else raise Not_found
+
+Ambiguity 3: 
+and aux' k t =
+    try project_with_effects aliases evd effects t subst_in_env_extended_with_k_binders
+    with Not_found ->
+      match expand_alias_once evd aliases t with
+      | None -> raise Not_found
+      | Some c -> aux k c 
+
+Ambiguity 4: 
+| Some l ->
+      let l' =
+        List.map_filter
+          (fun c -> filter_compatible_candidates conv_algo env evd evi argsv rhs (EConstr.of_constr c)) l in
+      match l' with
+      | [] -> raise IncompatibleCandidates
+      | [c,evd] ->
+          (* solve_candidates might have been called recursively in the mean *)
+          (* time and the evar been solved by the filtering process *)
+         if Evd.is_undefined evd evk then
+	   let evd' = Evd.define evk (EConstr.Unsafe.to_constr c) evd in
+	     check_evar_instance evd' evk c conv_algo
+	 else evd
+      | l when List.length l < List.length l' ->
+          let candidates = List.map fst l in
+          restrict_evar evd evk None (UpdateWith candidates)
+      | l -> evd
+
+Ambiguity 5: 
+let rec invert_definition conv_algo choose env evd pbty (evk,argsv as ev) rhs =
+  let aliases = make_alias_map env evd in
+  let evdref = ref evd in
+  let progress = ref false in
+  let evi = Evd.find evd evk in
+  let subst,cstr_subst = make_projectable_subst aliases evd evi argsv in
+
+  (* Projection *)
+  let project_variable t =
+    (* Evar/Var problem: unifiable iff variable projectable from ev subst *)
+    try
+      let sols = find_projectable_vars true aliases !evdref t subst in
+      let c, p = match sols with
+        | [] -> raise Not_found
+        | [id,p] -> (mkVar id, p)
+        | (id,p)::_::_ ->
+            if choose then (mkVar id, p) else raise (NotUniqueInType sols)
+      in
+      let ty = lazy (Retyping.get_type_of env !evdref (of_alias t)) in
+      let evd = do_projection_effects (evar_define conv_algo ~choose) env ty !evdref p in
+      evdref := evd;
+      c
+    with
+      | Not_found -> raise (NotInvertibleUsingOurAlgorithm (of_alias t))
+      | NotUniqueInType sols ->
+          if not !progress then
+            raise (NotEnoughInformationToProgress sols);
+          (* No unique projection but still restrict to where it is possible *)
+          (* materializing is necessary, but is restricting useful? *)
+          let ty = find_solution_type (evar_filtered_env evi) sols in
+          let ty' = instantiate_evar_array evi ty argsv in
+          let (evd,evar,(evk',argsv' as ev')) =
+            materialize_evar (evar_define conv_algo ~choose) env !evdref 0 ev ty' in
+          let ts = expansions_of_var evd aliases t in
+          let test c = isEvar evd c || List.exists (is_alias evd c) ts in
+          let filter = restrict_upon_filter evd evk test argsv' in
+          let filter = closure_of_filter evd evk' filter in
+          let candidates = extract_candidates sols in
+          let evd = match candidates with
+          | NoUpdate ->
+            let evd, ev'' = restrict_applied_evar evd ev' filter NoUpdate in
+            add_conv_oriented_pb ~tail:false (None,env,mkEvar ev'',of_alias t) evd
+          | UpdateWith _ ->
+            restrict_evar evd evk' filter candidates
+          in
+          evdref := evd;
+          evar in
+
+  let rec imitate (env',k as envk) t =
+    match EConstr.kind !evdref t with
+    | Rel i when i>k ->
+        let open Context.Rel.Declaration in
+        (match Environ.lookup_rel (i-k) env' with
+        | LocalAssum _ -> project_variable (RelAlias (i-k))
+        | LocalDef (_,b,_) ->
+          try project_variable (RelAlias (i-k))
+          with NotInvertibleUsingOurAlgorithm _ -> imitate envk (lift i (EConstr.of_constr b)))
+    | Var id ->
+        (match Environ.lookup_named id env' with
+        | LocalAssum _ -> project_variable (VarAlias id)
+        | LocalDef (_,b,_) ->
+          try project_variable (VarAlias id)
+          with NotInvertibleUsingOurAlgorithm _ -> imitate envk (EConstr.of_constr b))
+    | LetIn (na,b,u,c) ->
+        imitate envk (subst1 b c)
+    | Evar (evk',args' as ev') ->
+        if Evar.equal evk evk' then raise (OccurCheckIn (evd,rhs));
+        (* Evar/Evar problem (but left evar is virtual) *)
+        let aliases = lift_aliases k aliases in
+        (try
+          let ev = (evk,Array.map (lift k) argsv) in
+          let evd,body = project_evar_on_evar false conv_algo env' !evdref aliases k None ev' ev in
+          evdref := evd;
+          body
+        with
+        | EvarSolvedOnTheFly (evd,t) -> evdref:=evd; imitate envk t
+        | CannotProject (evd,ev') ->
+          if not !progress then
+            raise (NotEnoughInformationEvarEvar t);
+          (* Make the virtual left evar real *)
+          let ty = get_type_of env' evd t in
+          let (evd,evar'',ev'') =
+             materialize_evar (evar_define conv_algo ~choose) env' evd k ev ty in
+          (* materialize_evar may instantiate ev' by another evar; adjust it *)
+          let (evk',args' as ev') = normalize_evar evd ev' in
+          let evd =
+             (* Try to project (a restriction of) the left evar ... *)
+            try
+              let evd,body = project_evar_on_evar false conv_algo env' evd aliases 0 None ev'' ev' in
+              let evd = Evd.define evk' (EConstr.Unsafe.to_constr body) evd in
+		check_evar_instance evd evk' body conv_algo
+            with
+            | EvarSolvedOnTheFly _ -> assert false (* ev has no candidates *)
+            | CannotProject (evd,ev'') ->
+              (* ... or postpone the problem *)
+              add_conv_oriented_pb (None,env',mkEvar ev'',mkEvar ev') evd in
+          evdref := evd;
+          evar'')
+    | _ ->
+        progress := true;
+        match
+          let c,args = decompose_app_vect !evdref t in
+          match EConstr.kind !evdref c with
+          | Construct (cstr,u) when noccur_between !evdref 1 k t ->
+            (* This is common case when inferring the return clause of match *)
+            (* (currently rudimentary: we do not treat the case of multiple *)
+            (*  possible inversions; we do not treat overlap with a possible *)
+            (*  alternative inversion of the subterms of the constructor, etc)*)
+            (match find_projectable_constructor env evd cstr k args cstr_subst with
+             | _::_ as l -> Some (List.map mkVar l)
+             | _ -> None)
+          | _ -> None
+        with
+        | Some l ->
+            let ty = get_type_of env' !evdref t in
+            let candidates =
+              try
+                let t =
+                  map_constr_with_full_binders !evdref (fun d (env,k) -> push_rel d env, k+1)
+                    imitate envk t in
+                t::l
+              with e when CErrors.noncritical e -> l in
+            (match candidates with
+            | [x] -> x
+            | _ ->
+              let (evd,evar'',ev'') =
+                materialize_evar (evar_define conv_algo ~choose) env' !evdref k ev ty in
+              evdref := restrict_evar evd (fst ev'') None (UpdateWith candidates);
+              evar'')
+        | None ->
+           (* Evar/Rigid problem (or assimilated if not normal): we "imitate" *)
+          map_constr_with_full_binders !evdref (fun d (env,k) -> push_rel d env, k+1)
+					imitate envk t
+  in
+  let rhs = whd_beta evd rhs (* heuristic *) in
+  let fast rhs = 
+    let filter_ctxt = evar_filtered_context evi in
+    let names = ref Idset.empty in
+    let rec is_id_subst ctxt s =
+      match ctxt, s with
+      | (decl :: ctxt'), (c :: s') ->
+        let id = get_id decl in
+        names := Idset.add id !names;
+        isVarId evd id c && is_id_subst ctxt' s'
+      | [], [] -> true
+      | _ -> false 
+    in
+      is_id_subst filter_ctxt (Array.to_list argsv) &&
+      closed0 evd rhs &&
+      Idset.subset (collect_vars evd rhs) !names 
+  in
+  let body =
+    if fast rhs then EConstr.of_constr (EConstr.to_constr evd rhs) (** FIXME? *)
+    else
+      let t' = imitate (env,0) rhs in
+	if !progress then
+	  (recheck_applications conv_algo (evar_env evi) evdref t'; t')
+	else t'
+  in (!evdref,body)
+     
+(* [define] tries to solve the problem "?ev[args] = rhs" when "?ev" is
+ * an (uninstantiated) evar such that "hyps |- ?ev : typ". Otherwise said,
+ * [define] tries to find an instance lhs such that
+ * "lhs [hyps:=args]" unifies to rhs. The term "lhs" must be closed in
+ * context "hyps" and not referring to itself.
+ *)
+
+and evar_define conv_algo ?(choose=false) env evd pbty (evk,argsv as ev) rhs =
+  match EConstr.kind evd rhs with
+  | Evar (evk2,argsv2 as ev2) ->
+      if Evar.equal evk evk2 then
+        solve_refl ~can_drop:choose
+          (test_success conv_algo) env evd pbty evk argsv argsv2
+      else
+        solve_evar_evar ~force:choose
+          (evar_define conv_algo) conv_algo env evd pbty ev ev2
+  | _ ->
+  try solve_candidates conv_algo env evd ev rhs
+  with NoCandidates ->
+  try
+    let (evd',body) = invert_definition conv_algo choose env evd pbty ev rhs in
+    if occur_meta evd' body then raise MetaOccurInBodyInternal;
+    (* invert_definition may have instantiate some evars of rhs with evk *)
+    (* so we recheck acyclicity *)
+    if occur_evar_upto_types evd' evk body then raise (OccurCheckIn (evd',body));
+    (* needed only if an inferred type *)
+    let evd', body = refresh_universes pbty env evd' body in
+(* Cannot strictly type instantiations since the unification algorithm
+ * does not unify applications from left to right.
+ * e.g problem f x == g y yields x==y and f==g (in that order)
+ * Another problem is that type variables are evars of type Type
+   let _ =
+      try
+        let env = evar_filtered_env evi in
+        let ty = evi.evar_concl in
+        Typing.check env evd' body ty
+      with e ->
+        msg_info
+          (str "Ill-typed evar instantiation: " ++ fnl() ++
+           pr_evar_map evd' ++ fnl() ++
+           str "----> " ++ int ev ++ str " := " ++
+           print_constr body);
+        raise e in*)
+    let evd' = check_evar_instance evd' evk body conv_algo in
+    Evd.define evk (EConstr.Unsafe.to_constr body) evd'
+  with
+    | NotEnoughInformationToProgress sols ->
+        postpone_non_unique_projection env evd pbty ev sols rhs
+    | NotEnoughInformationEvarEvar t ->
+        add_conv_oriented_pb (pbty,env,mkEvar ev,t) evd
+    | MorePreciseOccurCheckNeeeded ->
+        add_conv_oriented_pb (pbty,env,mkEvar ev,rhs) evd
+    | NotInvertibleUsingOurAlgorithm _ | MetaOccurInBodyInternal as e ->
+        raise e
+    | OccurCheckIn (evd,rhs) ->
+        (* last chance: rhs actually reduces to ev *)
+        let c = whd_all env evd rhs in
+        match EConstr.kind evd c with
+        | Evar (evk',argsv2) when Evar.equal evk evk' ->
+	    solve_refl (fun env sigma pb c c' -> is_fconv pb env sigma c c')
+              env evd pbty evk argsv argsv2
+        | _ ->
+	    raise (OccurCheckIn (evd,rhs))
+
+(* This code (i.e. solve_pb, etc.) takes a unification
+ * problem, and tries to solve it. If it solves it, then it removes
+ * all the conversion problems, and re-runs conversion on each one, in
+ * the hopes that the new solution will aid in solving them.
+ *
+ * The kinds of problems it knows how to solve are those in which
+ * the usable arguments of an existential var are all themselves
+ * universal variables.
+ * The solution to this problem is to do renaming for the Var's,
+ * to make them match up with the Var's which are found in the
+ * hyps of the existential, to do a "pop" for each Rel which is
+ * not an argument of the existential, and a subst1 for each which
+ * is, again, with the corresponding variable. This is done by
+ * define
+ *
+ * Thus, we take the arguments of the existential which we are about
+ * to assign, and zip them with the identifiers in the hypotheses.
+ * Then, we process all the Var's in the arguments, and sort the
+ * Rel's into ascending order.  Then, we just march up, doing
+ * subst1's and pop's.
+ *
+ * NOTE: We can do this more efficiently for the relative arguments,
+ * by building a long substituend by hand, but this is a pain in the
+ * ass.
+ *)
+

@@ -1,0 +1,8 @@
+Ambiguity 1: 
+| Error reasons as err ->
+      match mty1, mty2 with
+        Mty_alias _, _
+      | _, Mty_alias _ -> raise err
+      | _ ->
+          raise(Error((cxt, env, Module_types(mty1, Subst.modtype subst mty2))
+                      :: reasons))

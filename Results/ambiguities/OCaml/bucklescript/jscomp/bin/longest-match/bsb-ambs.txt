@@ -1,0 +1,140 @@
+Ambiguity 1: 
+| 1, x0 :: l -> Node (Empty, x0, Empty, 1), l
+    | 2, x0 :: x1 :: l -> Node (Node(Empty, x0, Empty, 1), x1, Empty, 2), l
+    | 3, x0 :: x1 :: x2 :: l ->
+      Node (Node(Empty, x0, Empty, 1), x1, Node(Empty, x2, Empty, 1), 2),l
+    | n, l ->
+      let nl = n / 2 in
+      let left, l = sub nl l in
+      match l with
+      | [] -> assert false
+      | mid :: l ->
+        let right, l = sub (n - nl - 1) l in
+        create left mid right, l
+
+Ambiguity 2: 
+| Cons(k1,_,rest1) -> 
+    eq  key k1 ||
+    match rest1 with
+    | Empty -> false 
+    | Cons(k2,_,rest2) -> 
+      eq key k2  || 
+      match rest2 with 
+      | Empty -> false 
+      | Cons(k3,_,rest3) -> 
+        eq key k3  ||
+        small_bucket_mem eq key rest3
+
+Ambiguity 3: 
+| Cons(k1,d1,rest1) -> 
+    if eq  key k1 then Some d1 else 
+      match rest1 with
+      | Empty -> None 
+      | Cons(k2,d2,rest2) -> 
+        if eq key k2 then Some d2 else 
+          match rest2 with 
+          | Empty -> None 
+          | Cons(k3,d3,rest3) -> 
+            if eq key k3  then Some d3 else 
+              small_bucket_opt eq key rest3
+
+Ambiguity 4: 
+| Cons(k1,d1,rest1) -> 
+    if eq  key k1 then Some k1 else 
+      match rest1 with
+      | Empty -> None 
+      | Cons(k2,d2,rest2) -> 
+        if eq key k2 then Some k2 else 
+          match rest2 with 
+          | Empty -> None 
+          | Cons(k3,d3,rest3) -> 
+            if eq key k3  then Some k3 else 
+              small_bucket_key_opt eq key rest3
+
+Ambiguity 5: 
+| Cons(k1,d1,rest1) -> 
+    if eq  key k1 then  d1 else 
+      match rest1 with
+      | Empty -> default 
+      | Cons(k2,d2,rest2) -> 
+        if eq key k2 then  d2 else 
+          match rest2 with 
+          | Empty -> default 
+          | Cons(k3,d3,rest3) -> 
+            if eq key k3  then  d3 else 
+              small_bucket_default eq key default rest3
+
+Ambiguity 6: 
+| Cons(k1, d1, rest1) ->
+    if eq_key key k1 then d1 else
+      match rest1 with
+      | Empty -> raise Not_found
+      | Cons(k2, d2, rest2) ->
+        if eq_key key k2 then d2 else
+          match rest2 with
+          | Empty -> raise Not_found
+          | Cons(k3, d3, rest3) ->
+            if eq_key key k3  then d3 else find_rec key rest3
+
+Ambiguity 7: 
+(function x -> 
+     match x with 
+     | Error error_info -> 
+       Some (Format.asprintf "%a" pp_error error_info)
+
+     | _ -> None
+    )
+
+Ambiguity 8: 
+| a::l -> 
+    match p a with
+    | None -> for_all_opt p l
+    | v -> v
+
+Ambiguity 9: 
+| x :: l -> 
+    match  p x with 
+    | Some _ as v  ->  v
+    | None -> find_opt p l
+
+Ambiguity 10: 
+| key1::rest -> 
+    eq_key key   key1 ||
+    match rest with 
+    | [] -> false 
+    | key2 :: rest -> 
+      eq_key key   key2 ||
+      match rest with 
+      | [] -> false 
+      | key3 :: rest -> 
+        eq_key key   key3 ||
+        small_bucket_mem eq_key key rest
+
+Ambiguity 11: 
+let run_command_execv_unix  cmd =
+  match Unix.fork () with 
+  | 0 -> 
+    log cmd;
+    Unix.chdir cmd.cwd;
+    Unix.execv cmd.cmd cmd.args 
+  | pid -> 
+    match Unix.waitpid [] pid  with 
+    | pid, process_status ->       
+      match process_status with 
+      | Unix.WEXITED eid ->
+        if eid <> 0 then 
+          begin 
+            fail cmd;
+            exit eid    
+          end;
+      | Unix.WSIGNALED _ | Unix.WSTOPPED _ -> 
+        begin 
+          Format.fprintf Format.err_formatter "@{<error>Interrupted:@} %s@." cmd.cmd;
+          exit 2 
+        end        
+
+
+(** TODO: the args are not quoted, here 
+  we are calling a very limited set of `bsb` commands, so that 
+  we are safe
+*)

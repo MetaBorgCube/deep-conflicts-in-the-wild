@@ -1,0 +1,79 @@
+Ambiguity 1: 
+let md5 =
+    if not client then
+      Digest.(to_hex (file Sys.executable_name))
+    else
+      try
+        let environment_cmi =
+          Misc.find_in_path_uncap !Clflags.include_dirs "environment.cmi" in
+        let environment_cmx =
+          Misc.find_in_path_uncap !Clflags.include_dirs "environment.cmx" in
+        Digest.(to_hex (file Sys.executable_name) ^
+                (to_hex (file environment_cmi)) ^
+                (to_hex (file environment_cmx)))
+      with Not_found ->
+        Printf.eprintf "%s: Cannot find 'environment.cmi'.\n%!" Sys.argv.(0);
+        Pervasives.exit 1
+  in
+  let update_needed =
+    not (Sys.file_exists (build_dir // ".tezos_compiler"))
+    || read_md5 (build_dir // ".tezos_compiler") <> md5 in
+
+  if keep_object then
+    create_file (build_dir // ".tezos_compiler") (md5 ^ "\n");
+
+  (* Compile the /ad-hoc/ Error_monad. *)
+  List.iter (dump_cmi sigs_dir) tezos_protocol_env ;
+  at_exit (fun () -> List.iter (unlink_cmi sigs_dir) tezos_protocol_env ) ;
+  let local_environment_unit = "local_environment" in
+  let local_environment_ml = build_dir // local_environment_unit ^ ".ml" in
+  create_file local_environment_ml @@ Printf.sprintf {|
+      module Environment = %s.Make(struct let name = %S end)()
+    |}
+    (if client then "Environment" else "Proto_environment")
+    logname ;
+  if not keep_object then
+    at_exit (fun () ->
+        safe_unlink local_environment_ml) ;
+  let local_environment_object =
+    compile_units
+      ~ctxt
+      ~for_pack:packname
+      ~keep_object
+      ~build_dir ~source_dir:build_dir [local_environment_unit]
+  in
+
+  Compenv.implicit_modules :=
+    [ "Local_environment"; "Environment" ;
+      "Error_monad" ; "Hash" ; "Logging" ];
+
+  (* Compile the protocol *)
+  let objects =
+    compile_units
+      ~ctxt
+      ~update_needed
+      ~keep_object ~for_pack:packname ~build_dir ~source_dir units in
+  pack_objects ~ctxt ~keep_object
+    packed_objects (local_environment_object @ objects) ;
+
+  (* Compiler the 'registering module' *)
+  List.iter (dump_cmi sigs_dir) register_env;
+  at_exit (fun () -> List.iter (unlink_cmi sigs_dir) register_env ) ;
+  let register_unit =
+    if client then
+      Filename.dirname output //
+      "register_" ^
+      Filename.(basename @@ chop_extension output)
+    else
+      build_dir // Format.asprintf "register_%s" packname in
+  let register_file = register_unit ^ ".ml" in
+  create_register_file client register_file hash packname units ;
+  if not keep_object then at_exit (fun () -> safe_unlink register_file) ;
+  if keep_object then
+    Clflags.include_dirs := !Clflags.include_dirs @ [Filename.dirname output] ;
+  let register_object =
+    compile_ml ~keep_object:client (register_unit) register_file in
+
+  (* Create the final [cmxs] *)
+  Clflags.link_everything := true ;
+  link_shared ~static:!static output [packed_objects; register_object]

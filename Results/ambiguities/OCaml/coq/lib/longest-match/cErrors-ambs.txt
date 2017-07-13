@@ -1,0 +1,6 @@
+Ambiguity 1: 
+| h::stk' ->
+    try h e
+    with
+    | Unhandled -> print_gen bottom stk' e
+    | any -> print_gen bottom stk' any

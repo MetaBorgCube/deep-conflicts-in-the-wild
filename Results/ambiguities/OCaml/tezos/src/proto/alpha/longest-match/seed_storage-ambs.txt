@@ -1,0 +1,5 @@
+Ambiguity 1: 
+| Some pprevious_cycle ->
+          match Cycle_repr.pred pprevious_cycle with
+          | None -> fail Precomputed_seed
+          | Some revealed_cycle -> return revealed_cycle

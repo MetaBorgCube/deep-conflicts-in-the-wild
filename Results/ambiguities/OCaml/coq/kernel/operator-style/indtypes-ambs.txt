@@ -1,0 +1,8 @@
+Ambiguity 1: 
+let arity = List.length (dest_subterms recarg).(num) in
+	if Int.equal arity 0 then
+	  let p  = (!nconst, 0) in
+	    incr nconst; p
+	else
+	  let p = (!nblock + 1, arity) in
+	    incr nblock; p

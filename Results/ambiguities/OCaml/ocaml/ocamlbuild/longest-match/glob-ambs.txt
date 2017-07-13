@@ -1,0 +1,27 @@
+Ambiguity 1: 
+| Some(dir) ->
+      match x with
+      | Constant(s) ->
+          Constant(My_std.filename_concat dir s)
+      | Pattern(p) ->
+          Pattern(Concat(Word(My_std.filename_concat dir ""), p))
+
+Ambiguity 2: 
+| Pattern kind ->
+          match !kind with
+          | Brute(count, p) ->
+            begin
+              let do_nfa () =
+                let m = NFA.build p in
+                kind := Machine m;
+                NFA.run m u
+              in
+              if !count >= brute_limit then
+                do_nfa ()
+              else
+                try
+                  Brute.match_pattern count p u
+                with
+                | Brute.Too_hard -> do_nfa ()
+            end
+          | Machine m -> NFA.run m u

@@ -1,0 +1,35 @@
+Ambiguity 1: 
+| true :: lb1 ->  zeroP :: aux lb1 lp
+   | false :: lb1 ->
+     match lp with
+     [] -> assert false
+     | p :: lp1 -> p :: aux lb1 lp1
+
+Ambiguity 2: 
+| p::lp1 ->
+	  let lpol = List.rev lp1 in
+          (* preprocessing :
+             we remove zero polynomials and duplicate that are not handled by in_ideal
+             lb is kept in order to fix the certificate in the post-processing 
+          *)
+	  let lpol, lb  = clean_pol lpol in
+	  let cert = theoremedeszeros metadata nvars lpol p in
+          sinfo "cert ok";
+	  let lc = cert.last_comb::List.rev cert.gb_comb in
+	  match remove_zeros lc with
+	  | [] -> assert false
+	  | (lq::lci) ->
+              (* post-processing : we apply the correction for the last line *)
+              let lq = expand_pol lb lq in
+	      (* lci commence par les nouveaux polynomes *)
+	      let m = nvars in
+	      let c = pol_sparse_to_term m (polconst m cert.coef) in
+	      let r = Pow(Zero,cert.power) in
+	      let lci = List.rev lci in
+              (* post-processing we apply the correction for the other lines *)
+	      let lci = List.map (expand_pol lb) lci in
+	      let lci = List.map (List.map (pol_sparse_to_term m)) lci in
+	      let lq = List.map (pol_sparse_to_term m) lq in
+	      info (fun () -> Printf.sprintf "number of parameters: %i" nparam);
+	      sinfo "term computed";
+	      (c,r,lci,lq)

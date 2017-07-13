@@ -1,0 +1,36 @@
+Ambiguity 1: 
+if len > 0 then
+    let off1 = Bs_string.length s1 - i1 in
+    if len <= off1 then 
+      for i = 0 to len - 1 do 
+        unsafe_set s2 (i2 + i) (String.unsafe_get s1 (i1 + i))
+      done
+    else 
+      begin
+        for i = 0 to off1 - 1 do 
+          unsafe_set s2 (i2 + i) (String.unsafe_get s1 (i1 + i))
+        done;
+        for i = off1 to len - 1 do 
+          unsafe_set s2 (i2 + i) '\000'
+        done
+      end
+
+Ambiguity 2: 
+if len > 0 then
+    if s1 == s2 then
+      copyWithin s1 i1 i2 len 
+    else
+      let off1 = length s1 - i1 in
+      if len <= off1 then 
+        for i = 0 to len - 1 do 
+          unsafe_set s2 (i2 + i) (unsafe_get s1 (i1 + i))
+        done
+      else 
+        begin
+          for i = 0 to off1 - 1 do 
+            unsafe_set s2 (i2 + i) (unsafe_get s1 (i1 + i))
+          done;
+          for i = off1 to len - 1 do 
+            unsafe_set s2 (i2 + i) '\000'
+          done
+        end

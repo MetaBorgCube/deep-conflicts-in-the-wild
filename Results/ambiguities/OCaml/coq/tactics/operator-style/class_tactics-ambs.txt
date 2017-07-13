@@ -1,0 +1,116 @@
+Ambiguity 1: 
+let (onlyc, sign', cached_hints) = !cache in
+    if onlyc == only_classes &&
+         (sign == sign' || Environ.eq_named_context_val sign sign')
+         && Hint_db.transparent_state cached_hints == st
+    then
+      cached_hints
+    else
+      let hints = make_hints g st only_classes (EConstr.named_context_of_val sign)
+      in
+      cache := (only_classes, sign, hints); hints
+
+Ambiguity 2: 
+let eq c1 c2 = EConstr.eq_constr (project g) c1 c2 in
+    if DirPath.equal cwd dir &&
+         (onlyc == only_classes) &&
+           Context.Named.equal eq sign sign' &&
+             Hint_db.transparent_state cached_hints == st
+    then cached_hints
+    else
+      let hints = make_hints {it = Goal.goal (Proofview.Goal.assume g); sigma = project g}
+                             st only_classes sign
+      in
+      autogoal_cache := (cwd, only_classes, sign, hints); hints
+
+Ambiguity 3: 
+foundone := true;
+        Proofview.Unsafe.tclGETGOALS >>= fun gls ->
+        let j = List.length gls in
+        (if !typeclasses_debug > 0 then
+           Feedback.msg_debug
+             (pr_depth (i :: info.search_depth) ++ str": " ++ Lazy.force pp
+              ++ str" on" ++ spc () ++ pr_ev s (Proofview.Goal.goal (Proofview.Goal.assume gl))
+              ++ str", " ++ int j ++ str" subgoal(s)" ++
+                (Option.cata (fun k -> str " in addition to the first " ++ int k)
+                             (mt()) k)));
+        let res =
+          if j = 0 then tclUNIT ()
+          else tclDISPATCH
+                 (List.init j (fun j' -> (tac_of gls i (Option.default 0 k + j))))
+        in
+        let finish nestedshelf sigma =
+          let filter ev =
+            try
+              let evi = Evd.find_undefined sigma ev in
+              if info.search_only_classes then
+                Some (ev, not (is_class_evar sigma evi))
+              else Some (ev, true)
+            with Not_found -> None
+          in
+          let remaining = CList.map_filter filter shelf in
+          (if !typeclasses_debug > 1 then
+             let prunsolved (ev, _) =
+               int (Evar.repr ev) ++ spc () ++ pr_ev sigma ev in
+             let unsolved = prlist_with_sep spc prunsolved remaining in
+             Feedback.msg_debug
+               (pr_depth (i :: info.search_depth) ++
+                  str": after " ++ Lazy.force pp ++ str" finished, " ++
+                  int (List.length remaining) ++
+                  str " goals are shelved and unsolved ( " ++
+                  unsolved ++ str")"));
+          begin
+            (* Some existentials produced by the original tactic were not solved
+               in the subgoals, turn them into subgoals now. *)
+            let shelved, goals = List.partition (fun (ev, s) -> s) remaining in
+            let shelved = List.map fst shelved @ nestedshelf and goals = List.map fst goals in
+            if !typeclasses_debug > 1 && not (List.is_empty shelved && List.is_empty goals) then
+              Feedback.msg_debug
+                (str"Adding shelved subgoals to the search: " ++
+                 prlist_with_sep spc (pr_ev sigma) goals ++
+		 str" while shelving " ++
+		 prlist_with_sep spc (pr_ev sigma) shelved);
+            shelve_goals shelved <*>
+              (if List.is_empty goals then tclUNIT ()
+               else
+	         let sigma' = mark_unresolvables sigma goals in
+	         with_shelf (Unsafe.tclEVARS sigma' <*> Unsafe.tclNEWGOALS goals) >>=
+                      fun s -> result s i (Some (Option.default 0 k + j)))
+          end
+        in with_shelf res >>= fun (sh, ()) ->
+           tclEVARMAP >>= finish sh
+
+Ambiguity 4: 
+(with_shelf (tac <*> filter) >>= fun s ->
+              let i = !idx in incr idx; result s i None)
+
+Ambiguity 5: 
+kont info =
+      Proofview.numgoals >>= fun i ->
+      if !typeclasses_debug > 1 then
+        Feedback.msg_debug
+          (str"calling eauto recursively at depth " ++ int (succ depth)
+           ++ str" on " ++ int i ++ str" subgoals");
+      search_tac hints limit (succ depth) info
+
+Ambiguity 6: 
+Proofview.Unsafe.tclGETGOALS >>= fun gls ->
+      Proofview.tclEVARMAP >>= fun sigma ->
+      let j = List.length gls in
+      (tclDISPATCH (List.init j (fun i -> tac sigma gls i)))
+
+Ambiguity 7: 
+let tac =
+      if unique then
+        Proofview.tclEXACTLY_ONCE Proofview.MoreThanOneSuccess tac
+      else tac
+    in
+    with_shelf numgoals >>= fun (initshelf, i) ->
+    (if !typeclasses_debug > 1 then
+       Feedback.msg_debug (str"Starting resolution with " ++ int i ++
+                             str" goal(s) under focus and " ++
+                             int (List.length initshelf) ++ str " shelved goal(s)" ++
+                             (if only_classes then str " in only_classes mode" else str " in regular mode") ++
+                             match depth with None -> str ", unbounded"
+                                            | Some i -> str ", with depth limit " ++ int i));
+    tac

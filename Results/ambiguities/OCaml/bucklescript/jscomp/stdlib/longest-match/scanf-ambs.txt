@@ -1,0 +1,6 @@
+Ambiguity 1: 
+| Some _ -> loop (Scanning.store_char width ib c)
+      | None ->
+        match c with
+        | ' ' | '\t' | '\n' | '\r' -> width
+        | _ -> loop (Scanning.store_char width ib c)

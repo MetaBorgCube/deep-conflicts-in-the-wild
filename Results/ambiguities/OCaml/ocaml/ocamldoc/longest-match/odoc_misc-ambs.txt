@@ -1,0 +1,15 @@
+Ambiguity 1: 
+| ele :: q ->
+        let s = string_of_ele ele in
+        match s with
+          "" -> f current acc0 acc1 (acc2 @ [ele]) q
+        | _ ->
+            let first = Char.uppercase s.[0] in
+            match first with
+              'A' .. 'Z' ->
+                if current = first then
+                  f current acc0 acc1 (acc2 @ [ele]) q
+                else
+                  f first acc0 (acc1 @ [acc2]) [ele] q
+            | _ ->
+                f current (acc0 @ [ele]) acc1 acc2 q

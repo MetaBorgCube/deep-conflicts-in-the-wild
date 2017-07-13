@@ -1,0 +1,8 @@
+Ambiguity 1: 
+| OpaqueDef lc ->
+	  match Opaqueproof.get_constraints (Environ.opaque_tables env) lc with
+	  | None -> []
+	  | Some fc ->
+            match Future.peek_val fc with
+            | None -> [Later fc]
+            | Some c -> [Now (false, c)]

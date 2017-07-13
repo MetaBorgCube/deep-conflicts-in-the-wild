@@ -1,0 +1,15 @@
+Ambiguity 1: 
+Block_hash.compare b1.shell.predecessor b2.shell.predecessor >> fun () ->
+    compare b1.proto b2.proto >> fun () ->
+    Operation_list_list_hash.compare
+      b1.shell.operations_hash b2.shell.operations_hash >> fun () ->
+    Time.compare b1.shell.timestamp b2.shell.timestamp >> fun () ->
+    list compare b1.shell.fitness b2.shell.fitness
+
+Ambiguity 2: 
+init dir =
+  Raw_store.init dir >>=? fun s ->
+  Block_header.register s ;
+  Operation.register s ;
+  Protocol.register s ;
+  return s

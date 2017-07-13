@@ -1,0 +1,98 @@
+Ambiguity 1: 
+| Some (l,r) ->
+	match vect with
+	  | [] -> if Itv.in_bound (l,r) (Int 0) then Redundant else Contradiction
+	  | (_,n)::_ ->  Cstr(
+	      (if n <>/ Int 1 then List.map (fun (x,nx) -> (x,nx // n)) vect else vect),
+			     let divn x = x // n in
+			       if Int.equal (sign_num n) 1
+			       then{cinfo with bound = (map_option divn l , map_option  divn r) }
+			       else {cinfo with pos = cinfo.neg ; neg = cinfo.pos ; bound = (map_option divn r , map_option divn l)})
+
+Ambiguity 2: 
+| (l1,info) ::rl ->
+            match  l1 with
+            | [] -> xpart rl (([],info)::ltl) n (info.neg+info.pos+z) p
+            | (vr,vl)::rl1 ->
+		if Int.equal v vr
+		then
+		  let cons_bound lst bd =
+		    match  bd with
+		      | None -> lst
+		      | Some bnd -> info.neg+info.pos::lst in
+
+		  let lb,rb = info.bound in
+		    if Int.equal (sign_num vl) 1
+		    then  xpart rl ((rl1,info)::ltl) (cons_bound n lb) z (cons_bound p rb)
+		    else  xpart rl ((rl1,info)::ltl) (cons_bound n rb) z (cons_bound p lb)
+		else
+		  (* the variable is greater *)
+		  xpart rl ((l1,info)::ltl) n (info.neg+info.pos+z) p
+
+Ambiguity 3: 
+| (vect,a,prf,ln)::eqs -> 
+	  match vect with 
+	    | [i,_] -> Some (i,vect,a,prf,ln)
+	    |   _   -> choose_simple_equation eqs
+
+Ambiguity 4: 
+| (vect,a,prf,ln)::l ->
+	    match find_var vect with
+		| None -> find_eq_var l
+		| Some r -> Some (r,vect,a,prf,ln)
+
+Ambiguity 5: 
+| (l,info)::rsys ->
+	    let ln = info.pos + info.neg in
+	    let (b,l) = unroll_until v l in
+	    match b with
+	      | true ->
+		  if itv_point info.bound
+		  then estimate_cost  v ct rsys (acc+ln) ((l,info)::tlsys) (* this is free *)
+		  else estimate_cost v ct rsys (acc+ln+ct) ((l,info)::tlsys)  (* should be more ? *)
+	      | false -> estimate_cost v ct rsys (acc+ln) ((l,info)::tlsys)
+
+Ambiguity 6: 
+| Inl acc ->
+            match norm_cstr cstr 0 with
+              | Redundant -> Inl acc
+              | Contradiction -> Inr (prf,cstr)
+              | Cstr(v,info)  -> Inl ((prf,cstr,v,info)::acc)
+
+Ambiguity 7: 
+| Some(prfl,cstrl,l) , Some(prfr,cstrr,r) ->
+            if l <=/ r
+            then Inl (oleft,oright)
+            else (* There is a contradiction - it should show up by scaling up the vectors - any pivot should do*)
+              match cstrr.coeffs with
+                | [] -> Inr (add (prfl,Int 1) (prfr,Int 1), cstrr) (* this is wrong *)
+                | (v,_)::_ ->
+                    match pivot v (prfl,cstrl) (prfr,cstrr) with
+                      | None -> failwith "merge_proof : pivot is not possible"
+                      | Some x -> Inr x
+
+Ambiguity 8: 
+| Elim(v,prf1,prf2) ->
+          let prfsl = mk_proof prf1
+          and prfsr = mk_proof prf2 in
+            (* I take only the pairs for which the elimination is meaningful *)
+            forall_pairs (pivot v) prfsl prfsr
+      | And(prf1,prf2) ->
+          let prfsl1 = mk_proof prf1
+          and prfsl2 = mk_proof prf2 in
+          (* detect trivial redundancies and contradictions *)
+            match normalise_proofs (prfsl1@prfsl2) with
+              | Inr x -> [x] (* This is a contradiction - this should be the end of the proof *)
+              | Inl l -> (* All the vectors are the same *)
+                  let prfs =
+                    List.fold_left (fun acc e ->
+                      match acc with
+                        | Inr _ -> acc (* I have a contradiction *)
+                        | Inl (oleft,oright) -> merge_proof oleft e oright) (Inl(None,None)) l in
+                    match prfs with
+                      | Inr x -> [x]
+                      | Inl (oleft,oright) ->
+			  match oleft , oright with
+			    | None , None -> []
+			    | None , Some(prf,cstr,_) | Some(prf,cstr,_) , None -> [prf,cstr]
+			    | Some(prf1,cstr1,_) , Some(prf2,cstr2,_) -> [prf1,cstr1;prf2,cstr2]

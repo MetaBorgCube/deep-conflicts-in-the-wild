@@ -1,0 +1,46 @@
+Ambiguity 1: 
+begin match f.fcomp_res with
+          | Mty_alias p ->
+              Mty_alias (Subst.module_path f.fcomp_subst p)
+          | mty ->
+              if alias then mty else
+              try
+                Hashtbl.find f.fcomp_subst_cache p2
+              with Not_found ->
+                let mty =
+                  Subst.modtype
+                    (Subst.add_module f.fcomp_param p2 f.fcomp_subst)
+                    f.fcomp_res in
+                Hashtbl.add f.fcomp_subst_cache p2 mty;
+                mty
+          end
+
+Ambiguity 2: 
+if lax || !Clflags.transparent_modules then path' else
+      let id = Path.head path in
+      if Ident.global id && not (Ident.same id (Path.head path'))
+      then add_required_global id;
+      path'
+
+Ambiguity 3: 
+let key = (name, loc) in
+    if Hashtbl.mem tbl key then ()
+    else let used = ref false in
+    Hashtbl.add tbl key (fun () -> used := true);
+    if not (name = "" || name.[0] = '_' || name.[0] = '#')
+    then
+      !add_delayed_check_forward
+        (fun () -> if not !used then Location.prerr_warning loc (warn name))
+
+Ambiguity 4: 
+let k = (ty, loc, c) in
+        if not (Hashtbl.mem used_constructors k) then
+          let used = constructor_usages () in
+          Hashtbl.add used_constructors k (add_constructor_usage used);
+          if not (ty = "" || ty.[0] = '_')
+          then !add_delayed_check_forward
+              (fun () ->
+                if not (is_in_signature env) && not used.cu_positive then
+                  Location.prerr_warning loc
+                    (Warnings.Unused_constructor
+                       (c, used.cu_pattern, used.cu_privatize)))

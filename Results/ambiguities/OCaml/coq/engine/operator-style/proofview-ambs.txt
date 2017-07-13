@@ -1,0 +1,279 @@
+Ambiguity 1: 
+split t >>= function
+    | Nil (e, info) -> tclZERO ~info e
+    | Cons (x,k) ->
+        Proof.split (k (e, Exninfo.null)) >>= function
+          | Nil _ -> tclUNIT x
+          | _ -> tclZERO MoreThanOneSuccess
+
+Ambiguity 2: 
+Pv.set focused >>
+    t >>= fun result ->
+    Pv.modify (fun next -> unfocus context next) >>
+    return result
+
+Ambiguity 3: 
+Comb.get >>= fun comb ->
+    let n = CList.length comb in
+    (* First, remove empty intervals, and bound the intervals to the number
+       of goals. *)
+    let sanitize (i, j) =
+      if i > j then None
+      else if i > n then None
+      else if j < 1 then None
+      else Some ((max i 1), (min j n))
+    in
+    let l = CList.map_filter sanitize l in
+    match l with
+      | [] -> tclZERO (NoSuchGoals 0)
+      | (mi, _) :: _ ->
+          (* Get the left-most goal to focus. This goal won't move, and we
+             will then place all the other goals to focus to the right. *)
+          let mi = CList.fold_left (fun m (i, _) -> min m i) mi l in
+          (* [CList.goto] returns a zipper, so that
+             [(rev left) @ sub_right = comb]. *)
+          let left, sub_right = CList.goto (mi-1) comb in
+          let p x _ = CList.exists (fun (i, j) -> i <= x + mi && x + mi <= j) l in
+          let sub, right = CList.partitioni p sub_right in
+          let mj = mi - 1 + CList.length sub in
+            Comb.set (CList.rev_append left (sub @ right)) >>
+            tclFOCUS mi mj t
+
+Ambiguity 4: 
+Pv.set focused >>
+        t >>= fun result ->
+      Pv.modify (fun next -> unfocus context next) >>
+        return result
+
+Ambiguity 5: 
+Comb.set [ev] >>
+        t >>= fun result ->
+      Comb.set initial.comb  >>
+        return result
+
+Ambiguity 6: 
+Comb.get >>= fun initial ->
+  Proof.List.fold_left begin fun (subgoals as cur) goal ->
+    Solution.get >>= fun step ->
+    match Evarutil.advance step goal with
+    | None -> return cur
+    | Some goal ->
+        Comb.set [goal] >>
+        i goal >>
+        Proof.map (fun comb -> comb :: subgoals) Comb.get
+  end [] initial >>= fun subgoals ->
+  Solution.get >>= fun evd ->
+  Comb.set CList.(undefined evd (flatten (rev subgoals)))
+
+Ambiguity 7: 
+Comb.get >>= fun initial ->
+  Proof.List.fold_left begin fun (acc, subgoals as cur) goal ->
+    Solution.get >>= fun step ->
+    match Evarutil.advance step goal with
+    | None -> return cur
+    | Some goal ->
+        Comb.set [goal] >>
+        i goal >>= fun res ->
+        Proof.map (fun comb -> comb :: subgoals) Comb.get >>= fun x ->
+        return (res :: acc, x)
+  end ([],[]) initial >>= fun (results_rev, subgoals) ->
+  Solution.get >>= fun evd ->
+  Comb.set CList.(undefined evd (flatten (rev subgoals))) >>
+  return (rev results_rev)
+
+Ambiguity 8: 
+Pv.get >>= fun initial ->
+  let err =
+    return () >>= fun () -> (* Delay the computation of list lengths. *)
+    tclZERO (SizeMismatch (CList.length initial.comb,CList.length l))
+  in 
+  Proof.List.fold_left2 err begin fun ((r,subgoals) as cur) goal a ->
+    Solution.get >>= fun step ->
+    match Evarutil.advance step goal with
+    | None -> return cur
+    | Some goal ->
+        Comb.set [goal] >>
+        i goal a r >>= fun r ->
+        Proof.map (fun comb -> (r, comb :: subgoals)) Comb.get
+  end (s,[]) initial.comb l >>= fun (r,subgoals) ->
+  Solution.get >>= fun evd ->
+  Comb.set CList.(undefined evd (flatten (rev subgoals))) >>
+  return r
+
+Ambiguity 9: 
+Comb.get >>= fun initial ->
+  Comb.set [] >>
+  InfoL.leaf (Info.Tactic (fun () -> Pp.str"shelve")) >>
+  Shelf.modify (fun gls -> gls @ initial)
+
+Ambiguity 10: 
+Comb.get >>= fun initial ->
+  let comb = CList.filter (fun g -> not (CList.mem g l)) initial in
+  Comb.set comb >>
+  InfoL.leaf (Info.Tactic (fun () -> Pp.str"shelve_goals")) >>
+  Shelf.modify (fun gls -> gls @ l)
+
+Ambiguity 11: 
+Pv.get >>= fun initial ->
+  let (u,n) = partition_unifiable initial.solution initial.comb in
+  Comb.set n >>
+  InfoL.leaf (Info.Tactic (fun () -> Pp.str"shelve_unifiable")) >>
+  Shelf.modify (fun gls -> gls @ u)
+
+Ambiguity 12: 
+Pv.get >>= fun pv ->
+  let { shelf; solution } = pv in
+  Pv.set { pv with shelf = []; solution = Evd.reset_future_goals solution } >>
+  tac >>= fun ans ->
+  Pv.get >>= fun npv ->
+  let { shelf = gls; solution = sigma } = npv in
+  let gls' = Evd.future_goals sigma in
+  let fgoals = Evd.future_goals solution in
+  let pgoal = Evd.principal_future_goal solution in
+  let sigma = Evd.restore_future_goals sigma fgoals pgoal in
+  (* Ensure we mark and return only unsolved goals *)
+  let gls' = undefined sigma (CList.rev_append gls' gls) in
+  let sigma = CList.fold_left (mark_in_evm ~goal:false) sigma gls' in
+  let npv = { npv with shelf; solution = sigma } in
+  Pv.set npv >> tclUNIT (gls', ans)
+
+Ambiguity 13: 
+return () >>= fun () -> (* The Global.env should be taken at exec time *)
+  Env.set (Global.env ()) >>
+  Pv.modify (fun initial -> emit_side_effects eff initial)
+
+Ambiguity 14: 
+Comb.get >>= fun initial ->
+  Comb.set [] >>
+  mark_as_unsafe >>
+  InfoL.leaf (Info.Tactic (fun () -> Pp.str"give_up")) >>
+  Giveup.put initial
+
+Ambiguity 15: 
+Pv.get >>= fun initial ->
+  t >>= fun res ->
+  Pv.get >>= fun final ->
+  (* [*_test] test absence of progress. [quick_test] is approximate
+     whereas [exhaustive_test] is complete. *)
+  let quick_test =
+    initial.solution == final.solution && initial.comb == final.comb
+  in
+  let test =
+    quick_test ||
+    Util.List.for_all2eq begin fun i f ->
+      Progress.goal_equal initial.solution i final.solution f
+    end initial.comb final.comb
+  in
+  if not test then
+    tclUNIT res
+  else
+    tclZERO (CErrors.UserError (Some "Proofview.tclPROGRESS" , Pp.str"Failed to progress."))
+
+Ambiguity 16: 
+Proof.get >>= fun initial ->
+  Proof.current >>= fun envvar ->
+  Proof.lift begin
+    Logic_monad.NonLogical.catch
+      begin
+        let open Logic_monad.NonLogical in
+        timeout n (Proof.repr (Proof.run t envvar initial)) >>= fun r ->
+        match r with
+        | Logic_monad.Nil e -> return (Util.Inr e)
+        | Logic_monad.Cons (r, _) -> return (Util.Inl r)
+      end
+      begin let open Logic_monad.NonLogical in function (e, info) ->
+        match e with
+        | Logic_monad.Timeout -> return (Util.Inr (Timeout, info))
+        | Logic_monad.TacticFailure e ->
+          return (Util.Inr (e, info))
+        | e -> Logic_monad.NonLogical.raise ~info e
+      end
+  end >>= function
+    | Util.Inl (res,s,m,i) ->
+        Proof.set s >>
+        Proof.put m >>
+        Proof.update (fun _ -> i) >>
+        return res
+    | Util.Inr (e, info) -> tclZERO ~info e
+
+Ambiguity 17: 
+let open Proof in
+    tclUNIT () >>= fun () ->
+    let tstart = System.get_time() in
+    Proof.split t >>= let open Logic_monad in function
+    | Nil (e, info) ->
+      begin
+        let tend = System.get_time() in
+        pr_time tstart tend n "failure";
+        tclZERO ~info e
+      end
+    | Cons (x,k) ->
+        let tend = System.get_time() in
+        pr_time tstart tend n "success";
+        tclOR (tclUNIT x) (fun e -> aux (n+1) (k e))
+
+Ambiguity 18: 
+tclENV >>= fun env ->
+      tclEVARMAP >>= fun sigma ->
+      try
+        let (gl, sigma) = nf_gmake env sigma goal in
+        tclTHEN (Unsafe.tclEVARS sigma) (InfoL.tag (Info.DBranch) (f.enter gl))
+      with e when catchable_exception e ->
+        let (e, info) = CErrors.push e in
+        tclZERO ~info e
+    
+
+Ambiguity 19: 
+Env.get >>= fun env ->
+    tclEVARMAP >>= fun sigma ->
+    let (gl,sigma) = nf_gmake env sigma self in
+    tclTHEN (Unsafe.tclEVARS sigma) (tclUNIT gl)
+
+Ambiguity 20: 
+Env.get >>= fun env ->
+      tclEVARMAP >>= fun sigma ->
+      try f (gmake env sigma goal)
+      with e when catchable_exception e ->
+        let (e, info) = CErrors.push e in
+        tclZERO ~info e
+    
+
+Ambiguity 21: 
+Env.get >>= fun env ->
+       tclEVARMAP >>= fun sigma ->
+       try f.enter (gmake env sigma goal)
+       with e when catchable_exception e ->
+         let (e, info) = CErrors.push e in
+         tclZERO ~info e
+      
+
+Ambiguity 22: 
+Env.get >>= fun env ->
+      tclEVARMAP >>= fun sigma ->
+      try
+        let gl = gmake env sigma goal in
+        let Sigma (tac, sigma, _) = f.s_enter gl in
+        let sigma = Sigma.to_evar_map sigma in
+        tclTHEN (Unsafe.tclEVARS sigma) (InfoL.tag (Info.DBranch) tac)
+      with e when catchable_exception e ->
+        let (e, info) = CErrors.push e in
+        tclZERO ~info e
+    
+
+Ambiguity 23: 
+Env.get >>= fun env ->
+      tclEVARMAP >>= fun sigma ->
+      try
+        let (gl, sigma) = nf_gmake env sigma goal in
+        let Sigma (tac, sigma, _) = f.s_enter gl in
+        let sigma = Sigma.to_evar_map sigma in
+        tclTHEN (Unsafe.tclEVARS sigma) (InfoL.tag (Info.DBranch) tac)
+      with e when catchable_exception e ->
+        let (e, info) = CErrors.push e in
+        tclZERO ~info e
+    
+
+Ambiguity 24: 
+Env.get >>= fun env ->
+          tclEVARMAP >>= fun sigma ->
+          tclUNIT (gmake env sigma goal)

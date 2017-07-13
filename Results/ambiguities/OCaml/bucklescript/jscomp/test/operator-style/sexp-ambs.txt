@@ -1,0 +1,12 @@
+Ambiguity 1: 
+to_pair e >>= fun (x,y) ->
+    f1 x >>= fun x ->
+    f2 y >>= fun y ->
+    return (x,y)
+
+Ambiguity 2: 
+to_triple e >>= fun (x,y,z) ->
+    f1 x >>= fun x ->
+    f2 y >>= fun y ->
+    f3 z >>= fun z ->
+    return (x,y,z)

@@ -1,0 +1,8 @@
+Ambiguity 1: 
+(function x -> 
+     match x with 
+     | Error error_info -> 
+       Some (Format.asprintf "%a" pp_error error_info)
+
+     | _ -> None
+    )

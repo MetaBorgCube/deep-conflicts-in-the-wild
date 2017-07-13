@@ -1,0 +1,6 @@
+Ambiguity 1: 
+run_command ~prog ~args cleanup =
+  Unix.waitpid (Unix.fork_exec ~prog ~args:(prog :: args) ())
+  |> fun status
+  -> cleanup status
+   ; ok_exn (Unix.Exit_or_signal.or_error status)

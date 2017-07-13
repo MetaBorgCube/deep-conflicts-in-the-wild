@@ -1,0 +1,20 @@
+Ambiguity 1: 
+;
+  | Spec_postcondition _ ->
+      F.fprintf f "\n POST%iL0 [label=\"POST %i \",  style=filled, color= yellow]\n" !dotty_state_count !post_counter;
+      print_stack_info:= true;
+  | Generic_proposition ->
+      if !print_full_prop then
+        F.fprintf f "\n HEAP%iL0 [label=\"HEAP %i \",  style=filled, color= yellow]\n"
+          !dotty_state_count
+          !proposition_counter
+  | Lambda_pred (no, lev, array) ->
+      match array with
+      | false ->
+          F.fprintf f "style=dashed; color=blue \n state%iL%i [label=\"INTERNAL STRUCTURE %i \",  style=filled, color= lightblue]\n" !dotty_state_count !lambda_counter !lambda_counter ;
+          F.fprintf f "state%iL%i -> state%iL%i [color=\"lightblue \"  arrowhead=none] \n" !dotty_state_count !lambda_counter no lev;
+      | true ->
+          F.fprintf f "style=dashed; color=blue \n state%iL%i [label=\"INTERNAL STRUCTURE %i \",  style=filled, color= lightblue]\n" !dotty_state_count !lambda_counter !lambda_counter ;
+          (* F.fprintf f "state%iL%i -> struct%iL%i:%s [color=\"lightblue \"  arrowhead=none] \n" !dotty_state_count !lambda_counter no lev lab;*)
+
+          incr dotty_state_count

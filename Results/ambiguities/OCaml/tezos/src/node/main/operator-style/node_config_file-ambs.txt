@@ -1,0 +1,5 @@
+Ambiguity 1: 
+check_listening_addr config >>= fun () ->
+  check_rpc_listening_addr config >>= fun () ->
+  check_bootstrap_peers config >>= fun () ->
+  Lwt.return_unit

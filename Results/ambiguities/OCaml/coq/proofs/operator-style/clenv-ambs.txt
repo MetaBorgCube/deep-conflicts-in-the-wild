@@ -1,0 +1,16 @@
+Ambiguity 1: 
+clenv_match_args bl clenv =
+  if List.is_empty bl then
+    clenv
+  else
+    let mvs = clenv_independent clenv in
+    check_bindings bl;
+    List.fold_left
+      (fun clenv (loc,b,c) ->
+	let k = meta_of_binder clenv loc mvs b in
+        if meta_defined clenv.evd k then
+          if EConstr.eq_constr clenv.evd (EConstr.of_constr (fst (meta_fvalue clenv.evd k)).rebus) c then clenv
+          else error_already_defined b
+        else
+	  clenv_assign_binding clenv k c)
+      clenv bl

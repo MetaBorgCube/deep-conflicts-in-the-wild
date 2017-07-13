@@ -1,0 +1,95 @@
+Ambiguity 1: 
+Period.of_seconds n >>? fun p ->
+                 Timestamp.(t +? p) >>? fun res ->
+                 Ok (Item (res, rest), qta - 1, ctxt)
+
+Ambiguity 2: 
+Period.of_seconds n >>? fun p ->
+                 Timestamp.(t +? p) >>? fun res ->
+                 Ok (Item (res, rest), qta - 1, ctxt)
+
+Ambiguity 3: 
+Contract.spend_from_script ctxt source amount >>=? fun ctxt ->
+              Lwt.return Tez.(amount -? Constants.origination_burn) >>=? fun amount ->
+              Contract.credit ctxt destination amount >>=? fun ctxt ->
+              Contract.get_script ctxt destination >>=? fun destination_script ->
+              let sto = unparse_data storage_type sto in
+              Contract.update_script_storage_and_fees ctxt source dummy_storage_fee sto >>=? fun ctxt ->
+              begin match destination_script with
+                | None ->
+                    (* we see non scripted contracts as (unit, unit) contract *)
+                    Lwt.return (ty_eq tp Unit_t |>
+                                record_trace (Invalid_contract (loc, destination))) >>=? fun (Eq _) ->
+                    return (ctxt, qta, origination)
+                | Some { code ; storage } ->
+                    let p = unparse_data tp p in
+                    execute origination source destination ctxt storage code amount p qta
+                    >>=? fun (csto, ret, qta, ctxt, origination) ->
+                    Contract.update_script_storage_and_fees ctxt destination dummy_storage_fee csto >>=? fun ctxt ->
+                    trace
+                      (Invalid_contract (loc, destination))
+                      (parse_data ctxt Unit_t ret) >>=? fun () ->
+                    return (ctxt, qta, origination)
+              end >>=? fun (ctxt, qta, origination) ->
+              Contract.get_script ctxt source >>=? (function
+                  | None -> assert false
+                  | Some { storage = { storage } } ->
+                      parse_data ctxt storage_type storage >>=? fun sto ->
+                      logged_return ~origination (Item ((), Item (sto, Empty)), qta - 1, ctxt))
+
+Ambiguity 4: 
+Contract.spend_from_script ctxt source amount >>=? fun ctxt ->
+              Contract.credit ctxt destination amount >>=? fun ctxt ->
+              Contract.get_script ctxt destination >>=? function
+              | None -> fail (Invalid_contract (loc, destination))
+              | Some { code ; storage } ->
+                  let sto = unparse_data storage_type sto in
+                  Contract.update_script_storage_and_fees ctxt source dummy_storage_fee sto >>=? fun ctxt ->
+                  let p = unparse_data tp p in
+                  execute origination source destination ctxt storage code amount p qta
+                  >>=? fun (sto, ret, qta, ctxt, origination) ->
+                  Contract.update_script_storage_and_fees ctxt destination dummy_storage_fee sto >>=? fun ctxt ->
+                  trace
+                    (Invalid_contract (loc, destination))
+                    (parse_data ctxt tr ret) >>=? fun v ->
+                  Contract.get_script ctxt source >>=? (function
+                      | None -> assert false
+                      | Some { storage = { storage } } ->
+                          parse_data ctxt storage_type storage >>=? fun sto ->
+                          logged_return ~origination (Item (v, Item (sto, Empty)), qta - 1, ctxt))
+
+Ambiguity 5: 
+Contract.spend_from_script ctxt source credit >>=? fun ctxt ->
+              Lwt.return Tez.(credit -? Constants.origination_burn) >>=? fun balance ->
+              Contract.originate ctxt
+                origination
+                ~manager ~delegate ~balance
+                ?script:None ~spendable:true ~delegatable >>=? fun (ctxt, contract, origination) ->
+              logged_return ~origination (Item ((Unit_t, Unit_t, contract), rest), qta - 1, ctxt)
+
+Ambiguity 6: 
+Contract.spend_from_script ctxt source credit >>=? fun ctxt ->
+              Lwt.return Tez.(credit -? Constants.origination_burn) >>=? fun balance ->
+              Contract.originate ctxt
+                origination
+                ~manager ~delegate ~balance
+                ~script:({ code ; storage }, (dummy_code_fee, dummy_storage_fee))
+                ~spendable:true ~delegatable
+              >>=? fun (ctxt, contract, origination) ->
+              logged_return ~origination (Item ((p, r, contract), rest), qta - 1, ctxt)
+
+Ambiguity 7: 
+(Lwt.return (parse_ty arg_type)) >>=? fun (Ex_ty arg_type) ->
+  (Lwt.return (parse_ty ret_type)) >>=? fun (Ex_ty ret_type) ->
+  (Lwt.return (parse_ty storage_type)) >>=? fun (Ex_ty storage_type) ->
+  let arg_type_full = Pair_t (Pair_t (Tez_t, arg_type), storage_type) in
+  let ret_type_full = Pair_t (ret_type, storage_type) in
+  parse_lambda ctxt arg_type_full ret_type_full code >>=? fun lambda ->
+  parse_data ctxt arg_type arg >>=? fun arg ->
+  parse_data ctxt storage_type storage >>=? fun storage ->
+  interp ?log origination qta orig source amount ctxt lambda ((amount, arg), storage)
+  >>=? fun (ret, qta, ctxt, origination) ->
+  let ret, storage = ret in
+  return (unparse_data storage_type storage,
+          unparse_data ret_type ret,
+          qta, ctxt, origination)

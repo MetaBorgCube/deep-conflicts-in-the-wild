@@ -1,0 +1,35 @@
+Ambiguity 1: 
+| 1 -> transl cases.(0)
+| _ ->
+    let cases = Array.map transl cases in
+    let store = StoreExp.mk_store () in
+    let index =
+      Array.map
+        (fun j -> store.Switch.act_store cases.(j))
+        index in
+    let n_index = Array.length index in
+    let inters = ref []
+    and this_high = ref (n_index-1)
+    and this_low = ref (n_index-1)
+    and this_act = ref index.(n_index-1) in
+    for i = n_index-2 downto 0 do
+      let act = index.(i) in
+      if act = !this_act then
+        decr this_low
+      else begin
+        inters := (!this_low, !this_high, !this_act) :: !inters ;
+        this_high := i ;
+        this_low := i ;
+        this_act := act
+      end
+    done ;
+    inters := (0, !this_high, !this_act) :: !inters ;
+    match !inters with
+    | [_] -> cases.(0)
+    | inters ->
+        bind "switcher" arg
+          (fun a ->
+            SwitcherBlocks.zyva
+              (0,n_index-1)
+              a
+              (Array.of_list inters) store)

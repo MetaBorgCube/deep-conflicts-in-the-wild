@@ -1,0 +1,8 @@
+Ambiguity 1: 
+let new_size = Int32.add old_size delta in
+  if I32.gt_u old_size new_size then raise SizeOverflow else
+  if not (within_limits new_size mem.max) then raise SizeLimit else
+  let after = create' new_size in
+  let dim = Array1_64.dim mem.content in
+  Array1.blit (Array1_64.sub mem.content 0L dim) (Array1_64.sub after 0L dim);
+  mem.content <- after

@@ -1,0 +1,6 @@
+Ambiguity 1: 
+| OpaqueDef lc ->
+        match Opaqueproof.get_constraints (Global.opaque_tables ()) lc with
+        | Some f when Future.is_val f ->
+	   Global.push_context_set false (Future.force f)
+        | _ -> ()

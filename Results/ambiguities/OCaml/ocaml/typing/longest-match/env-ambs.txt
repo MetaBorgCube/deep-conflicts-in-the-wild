@@ -1,0 +1,8 @@
+Ambiguity 1: 
+let normalize_path oloc env path =
+  try normalize_path (oloc = None) env path
+  with Not_found ->
+    match oloc with None -> assert false
+    | Some loc ->
+        raise (Error(Missing_module(loc, path, normalize_path true env path)))
+

@@ -1,0 +1,18 @@
+Ambiguity 1: 
+begin fun values -> function e -> match e.pcf_desc with
+          | Pcf_val (s, _, _, e) ->
+              add_labels_expr ~text ~classes ~values e;
+              SMap.removes [s.txt] values
+          | Pcf_meth (s, _, _, e) ->
+              begin try
+                let labels = List.assoc s.txt methods in
+                insert_labels ~labels ~text e
+              with Not_found -> ()
+              end;
+              add_labels_expr ~text ~classes ~values e;
+              values
+          | Pcf_init e ->
+              add_labels_expr ~text ~classes ~values e;
+              values
+          | Pcf_inher _ | Pcf_valvirt _ | Pcf_virt _ | Pcf_constr _ -> values
+        end

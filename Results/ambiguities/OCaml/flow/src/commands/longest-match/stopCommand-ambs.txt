@@ -1,0 +1,33 @@
+Ambiguity 1: 
+begin try
+          if not quiet then prerr_endlinef
+            "Attempting to nicely kill server for %s"
+            (Path.to_string root);
+          nice_kill conn ~tmp_dir root;
+          if not quiet then prerr_endlinef
+            "Successfully killed server for %s"
+            (Path.to_string root)
+        with FailedToKill err ->
+          if not quiet then match err with
+          | Some err -> prerr_endline err
+          | None -> ();
+          let msg = spf "Failed to kill server nicely for %s" root_s in
+          FlowExitStatus.(exit ~msg Kill_error)
+        end
+
+Ambiguity 2: 
+begin try
+          if not quiet then prerr_endlinef
+            "Attempting to meanly kill server for %s"
+            (Path.to_string root);
+          mean_kill ~tmp_dir root;
+          if not quiet then prerr_endlinef
+            "Successfully killed server for %s"
+            (Path.to_string root)
+        with FailedToKill err ->
+          if not quiet then match err with
+          | Some err -> prerr_endline err
+          | None -> ();
+          let msg = spf "Failed to kill server meanly for %s" root_s in
+          FlowExitStatus.(exit ~msg Kill_error)
+        end

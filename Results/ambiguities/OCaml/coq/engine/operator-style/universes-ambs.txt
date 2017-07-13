@@ -1,0 +1,26 @@
+Ambiguity 1: 
+eq_sorts s1 s2 = 
+      if Sorts.equal s1 s2 then true
+      else
+	let u1 = Sorts.univ_of_sort s1 and u2 = Sorts.univ_of_sort s2 in
+	match fold (Constraints.singleton (u1, UEq, u2)) !cstrs with
+	| None -> false
+	| Some accu -> cstrs := accu; true
+
+Ambiguity 2: 
+leq_sorts s1 s2 = 
+      if Sorts.equal s1 s2 then true
+      else 
+	let u1 = Sorts.univ_of_sort s1 and u2 = Sorts.univ_of_sort s2 in
+	match fold (Constraints.singleton (u1, ULe, u2)) !cstrs with
+	| None -> false
+	| Some accu -> cstrs := accu; true
+
+Ambiguity 3: 
+eq_sorts s1 s2 = 
+    if Sorts.equal s1 s2 then true
+    else
+      let u1 = Sorts.univ_of_sort s1 and u2 = Sorts.univ_of_sort s2 in
+      match fold (Constraints.singleton (u1, UEq, u2)) !cstrs with
+      | None -> false
+      | Some accu -> cstrs := accu; true

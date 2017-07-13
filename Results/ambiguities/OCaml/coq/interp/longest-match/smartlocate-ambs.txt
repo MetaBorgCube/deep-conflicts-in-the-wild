@@ -1,0 +1,6 @@
+Ambiguity 1: 
+| SynDef kn ->
+  match search_syntactic_definition kn with
+  | [],NRef ref -> ref
+  | [],NApp (NRef ref,[]) -> ref
+  | _ -> raise Not_found

@@ -1,0 +1,52 @@
+Ambiguity 1: 
+flow_addition cx trace reason l r u =
+  if needs_resolution r then rec_flow cx trace (r, AdderT (reason, l, u)) else
+  (* disable ops because the left and right sides should already be
+     repositioned. *)
+  let ops = Ops.clear () in
+  begin match l, r with
+  | DefT (_, StrT _), DefT (_, StrT _)
+  | DefT (_, StrT _), DefT (_, NumT _)
+  | DefT (_, NumT _), DefT (_, StrT _) ->
+    rec_flow_t cx trace (StrT.why reason, u)
+
+  (* unreachable additions are unreachable *)
+  | DefT (_, EmptyT), _
+  | _, DefT (_, EmptyT) ->
+    rec_flow_t cx trace (EmptyT.why reason, u)
+
+  | DefT (reason, MixedT _), _
+  | _, DefT (reason, MixedT _) ->
+    add_output cx ~trace (FlowError.EAdditionMixed reason)
+
+  | DefT (_, (NumT _ | BoolT _ | NullT | VoidT)),
+    DefT (_, (NumT _ | BoolT _ | NullT | VoidT)) ->
+    rec_flow_t cx trace (NumT.why reason, u)
+
+  | DefT (_, StrT _), _ ->
+    rec_flow cx trace (r, UseT (Addition, l));
+    rec_flow cx trace (StrT.why reason, UseT (UnknownUse, u));
+
+  | _, DefT (_, StrT _) ->
+    rec_flow cx trace (l, UseT (Addition, r));
+    rec_flow cx trace (StrT.why reason, UseT (UnknownUse, u));
+
+  | DefT (_, AnyT), _
+  | _, DefT (_, AnyT) ->
+    rec_flow_t cx trace (AnyT.why reason, u)
+
+  | DefT (_, NumT _), _ ->
+    rec_flow cx trace (r, UseT (Addition, l));
+    rec_flow cx trace (NumT.why reason, UseT (UnknownUse, u));
+
+  | _, DefT (_, NumT _) ->
+    rec_flow cx trace (l, UseT (Addition, r));
+    rec_flow cx trace (NumT.why reason, UseT (UnknownUse, u));
+
+  | (_, _) ->
+    let fake_str = StrT.why reason in
+    rec_flow cx trace (l, UseT (Addition, fake_str));
+    rec_flow cx trace (r, UseT (Addition, fake_str));
+    rec_flow cx trace (fake_str, UseT (Addition, u));
+  end;
+  Ops.set ops

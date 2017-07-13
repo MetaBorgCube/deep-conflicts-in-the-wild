@@ -1,0 +1,13 @@
+Ambiguity 1: 
+let ids, def =
+	try
+	  let ids, s = find_type_custom r in
+	  pp_string_parameters ids, str " =" ++ spc () ++ str s
+	with Not_found ->
+	  let ids = pp_parameters l in
+	  match ot with
+	    | None -> ids, mt ()
+	    | Some Taxiom -> ids, str " (* AXIOM TO BE REALIZED *)"
+	    | Some t -> ids, str " =" ++ spc () ++ pp_type false l t
+      in
+      hov 2 (str "type " ++ ids ++ name ++ def)

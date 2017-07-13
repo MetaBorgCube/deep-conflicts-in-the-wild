@@ -1,0 +1,15 @@
+Ambiguity 1: 
+| Error errors ->
+           match classify_errors errors with
+           | `Branch ->
+               let branch_refused =
+                 Operation_hash.Map.add hash errors r.branch_refused in
+               Lwt.return (state, { r with branch_refused })
+           | `Permanent ->
+               let refused =
+                 Operation_hash.Map.add hash errors r.refused in
+               Lwt.return (state, { r with refused })
+           | `Temporary ->
+               let branch_delayed =
+                 Operation_hash.Map.add hash errors r.branch_delayed in
+               Lwt.return (state, { r with branch_delayed })

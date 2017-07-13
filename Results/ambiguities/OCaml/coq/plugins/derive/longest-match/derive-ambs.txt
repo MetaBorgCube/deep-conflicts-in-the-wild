@@ -1,0 +1,8 @@
+Ambiguity 1: 
+| Proved (_,Some _,_) ->
+            CErrors.error"Cannot save a proof of Derive with an explicit name."
+        | Proved (opaque, None, obj) ->
+            match Proof_global.(obj.entries) with
+            | [_;f_def;lemma_def] ->
+                opaque <> Vernacexpr.Transparent , f_def , lemma_def
+            | _ -> assert false

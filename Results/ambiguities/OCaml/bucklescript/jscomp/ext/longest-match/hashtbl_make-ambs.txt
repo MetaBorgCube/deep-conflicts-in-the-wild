@@ -1,0 +1,11 @@
+Ambiguity 1: 
+| Cons(k1, d1, rest1) ->
+    if eq_key key k1 then d1 else
+      match rest1 with
+      | Empty -> raise Not_found
+      | Cons(k2, d2, rest2) ->
+        if eq_key key k2 then d2 else
+          match rest2 with
+          | Empty -> raise Not_found
+          | Cons(k3, d3, rest3) ->
+            if eq_key key k3  then d3 else find_rec key rest3

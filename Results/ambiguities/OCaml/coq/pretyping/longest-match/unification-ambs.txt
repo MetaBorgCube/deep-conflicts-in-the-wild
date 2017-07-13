@@ -1,0 +1,239 @@
+Ambiguity 1: 
+| Some k1 ->
+      match cf2 with
+      | None -> Some true
+      | Some k2 ->
+	match k1, k2 with
+	| IsProj (p, _), IsKey (ConstKey (p',_)) 
+	  when eq_constant (Projection.constant p) p' -> 
+	  Some (not (Projection.unfolded p))
+	| IsKey (ConstKey (p,_)), IsProj (p', _) 
+	  when eq_constant p (Projection.constant p') -> 
+	  Some (Projection.unfolded p')
+	| _ ->
+          Some (Conv_oracle.oracle_order (fun x -> x)
+		  (Environ.oracle env) false (translate_key k1) (translate_key k2))
+
+Ambiguity 2: 
+| Some m ->
+  match subst_defined_metas_evars sigma (metasubst,[]) tyN with
+  | None -> sigma
+  | Some n ->
+    if is_ground_term sigma m && is_ground_term sigma n then
+      let sigma, b = infer_conv ~pb:pbty ~ts:flags.modulo_delta_types env sigma m n in
+	if b then sigma
+	else error_cannot_unify env sigma (m,n)
+    else sigma
+
+Ambiguity 3: 
+ex when precatchable_exception ex ->
+	     match EConstr.kind sigma cN with
+	     | App(f2,l2) when
+		 (isMeta sigma f2 && use_metas_pattern_unification sigma flags nb l2
+		  || use_evars_pattern_unification flags && isAllowedEvar sigma flags f2) ->
+	       unify_app_pattern false curenvnb pb opt substn cM f1 l1 cN f2 l2
+	     | _ -> raise ex
+
+Ambiguity 4: 
+ex when precatchable_exception ex ->
+	     match EConstr.kind sigma cM with
+	     | App(f1,l1) when 
+		 (isMeta sigma f1 && use_metas_pattern_unification sigma flags nb l1
+		  || use_evars_pattern_unification flags && isAllowedEvar sigma flags f1) ->
+	       unify_app_pattern true curenvnb pb opt substn cM f1 l1 cN f2 l2
+	     | _ -> raise ex
+
+Ambiguity 5: 
+| Some convflags ->
+      let subst = ((if flags.use_metas_eagerly_in_conv_on_closed_terms then metasubst else ms), (if flags.use_evars_eagerly_in_conv_on_closed_terms then evarsubst else es)) in
+      match subst_defined_metas_evars sigma subst cM with
+      | None -> (* some undefined Metas in cM *) None
+      | Some m1 ->
+      match subst_defined_metas_evars sigma subst cN with
+      | None -> (* some undefined Metas in cN *) None
+      | Some n1 ->
+         (* No subterm restriction there, too much incompatibilities *)
+	 let sigma =
+	   if opt.with_types then
+	     try (* Ensure we call conversion on terms of the same type *)
+	       let tyM = get_type_of curenv ~lax:true sigma m1 in
+	       let tyN = get_type_of curenv ~lax:true sigma n1 in
+	       check_compatibility curenv CUMUL flags substn tyM tyN
+	     with RetypeError _ ->
+	       (* Renounce, maybe metas/evars prevents typing *) sigma
+	   else sigma
+	 in 
+	 let sigma, b = infer_conv ~pb ~ts:convflags curenv sigma m1 n1 in
+	    if b then Some (sigma, metasubst, evarsubst)
+	    else 
+	      if is_ground_term sigma m1 && is_ground_term sigma n1 then
+		error_cannot_unify curenv sigma (cM,cN)
+	      else None
+
+Ambiguity 6: 
+| None ->
+      let cf1 = key_of curenv sigma opt flags f1 and cf2 = key_of curenv sigma opt flags f2 in
+	match oracle_order curenv cf1 cf2 with
+	| None -> error_cannot_unify curenv sigma (cM,cN)
+	| Some true ->
+	    (match expand_key flags.modulo_delta curenv sigma cf1 with
+	    | Some c ->
+		unirec_rec curenvnb pb opt substn
+                  (whd_betaiotazeta sigma (mkApp(c,l1))) cN
+	    | None ->
+		(match expand_key flags.modulo_delta curenv sigma cf2 with
+		| Some c ->
+		    unirec_rec curenvnb pb opt substn cM
+                      (whd_betaiotazeta sigma (mkApp(c,l2)))
+		| None ->
+		    error_cannot_unify curenv sigma (cM,cN)))
+	| Some false ->
+	    (match expand_key flags.modulo_delta curenv sigma cf2 with
+	    | Some c ->
+		unirec_rec curenvnb pb opt substn cM
+                  (whd_betaiotazeta sigma (mkApp(c,l2)))
+	    | None ->
+		(match expand_key flags.modulo_delta curenv sigma cf1 with
+		| Some c ->
+		    unirec_rec curenvnb pb opt substn
+                      (whd_betaiotazeta sigma (mkApp(c,l1))) cN
+		| None ->
+		    error_cannot_unify curenv sigma (cM,cN)))
+
+Ambiguity 7: 
+| [] ->
+
+    (* Process metas *)
+    match metas with
+    | (mv,c,(status,to_type))::metas ->
+        let ((evd,c),(metas'',evars'')),eqns =
+	  if with_types && to_type != TypeProcessed then
+	    begin match to_type with
+	    | CoerceToType ->
+              (* Some coercion may have to be inserted *)
+	      (w_coerce env evd mv c,([],[])),eqns
+	    | _ ->
+              (* No coercion needed: delay the unification of types *)
+	      ((evd,c),([],[])),(mv,status,c)::eqns
+	    end
+	  else
+	    ((evd,c),([],[])),eqns 
+	in
+	  if meta_defined evd mv then
+	    let {rebus=c'},(status',_) = meta_fvalue evd mv in
+            let (take_left,st,(evd,metas',evars')) =
+	      merge_instances env evd flags status' status (EConstr.of_constr c') c
+	    in
+	    let evd' =
+              if take_left then evd
+              else meta_reassign mv (EConstr.Unsafe.to_constr c,(st,TypeProcessed)) evd
+	    in
+              w_merge_rec evd' (metas'@metas@metas'') (evars'@evars'') eqns
+    	  else
+            let evd' =
+              if occur_meta_evd evd mv c then
+                if isMetaOf evd mv (whd_all env evd c) then evd
+                else error_cannot_unify env evd (mkMeta mv,c)
+              else
+	        meta_assign mv (EConstr.Unsafe.to_constr c,(status,TypeProcessed)) evd in
+	    w_merge_rec evd' (metas''@metas) evars'' eqns
+    | [] ->
+	(* Process type eqns *)
+	let rec process_eqns failures = function
+	  | (mv,status,c)::eqns ->
+              (match (try Inl (unify_type env evd flags mv status c)
+		      with e when CErrors.noncritical e -> Inr e)
+	       with 
+	       | Inr e -> process_eqns (((mv,status,c),e)::failures) eqns
+	       | Inl (evd,metas,evars) ->
+		   w_merge_rec evd metas evars (List.map fst failures @ eqns))
+	  | [] -> 
+	      (match failures with
+	       | [] -> evd
+	       | ((mv,status,c),e)::_ -> raise e)
+	in process_eqns [] eqns
+
+Ambiguity 8: 
+| Some kop ->
+      fun cl ->
+	let kc = Keys.constr_key (fun c -> EConstr.kind evd c) cl in
+	  match kc with
+	  | None -> false
+	  | Some kc -> Keys.equiv_keys kop kc
+
+Ambiguity 9: 
+let w_unify_to_subterm env evd ?(flags=default_unify_flags ()) (op,cl) =
+  let bestexn = ref None in
+  let kop = Keys.constr_key (fun c -> EConstr.kind evd c) op in
+  let rec matchrec cl =
+    let cl = strip_outer_cast evd cl in
+    (try
+       if closed0 evd cl && not (isEvar evd cl) && keyed_unify env evd kop cl then
+       (try
+         if !keyed_unification then
+           let f1, l1 = decompose_app_vect evd op in
+	   let f2, l2 = decompose_app_vect evd cl in
+	   w_typed_unify_array env evd flags f1 l1 f2 l2,cl
+	 else w_typed_unify env evd CONV flags op cl,cl
+       with ex when Pretype_errors.unsatisfiable_exception ex ->
+	    bestexn := Some ex; error "Unsat")
+       else error "Bound 1"
+     with ex when precatchable_exception ex ->
+       (match EConstr.kind evd cl with
+	  | App (f,args) ->
+	      let n = Array.length args in
+	      assert (n>0);
+	      let c1 = mkApp (f,Array.sub args 0 (n-1)) in
+	      let c2 = args.(n-1) in
+	      (try
+		 matchrec c1
+	       with ex when precatchable_exception ex ->
+		 matchrec c2)
+          | Case(_,_,c,lf) -> (* does not search in the predicate *)
+	       (try
+		 matchrec c
+	       with ex when precatchable_exception ex ->
+		 iter_fail matchrec lf)
+	  | LetIn(_,c1,_,c2) ->
+	       (try
+		 matchrec c1
+	       with ex when precatchable_exception ex ->
+		 matchrec c2)
+
+	  | Proj (p,c) -> matchrec c
+
+	  | Fix(_,(_,types,terms)) ->
+	       (try
+		 iter_fail matchrec types
+	       with ex when precatchable_exception ex ->
+		 iter_fail matchrec terms)
+
+	  | CoFix(_,(_,types,terms)) ->
+	       (try
+		 iter_fail matchrec types
+	       with ex when precatchable_exception ex ->
+		 iter_fail matchrec terms)
+
+          | Prod (_,t,c) ->
+	      (try
+		 matchrec t
+	       with ex when precatchable_exception ex ->
+		 matchrec c)
+
+          | Lambda (_,t,c) ->
+	      (try
+		 matchrec t
+	       with ex when precatchable_exception ex ->
+		 matchrec c)
+
+          | _ -> error "Match_subterm"))
+  in
+  try matchrec cl
+  with ex when precatchable_exception ex ->
+    match !bestexn with
+    | None -> raise (PretypeError (env,evd,NoOccurrenceFound (op, None)))
+    | Some e -> raise e
+
+(* Tries to find all instances of term [cl] in term [op].
+   Unifies [cl] to every subterm of [op] and return all the matches.
+   Fails if no match is found *)

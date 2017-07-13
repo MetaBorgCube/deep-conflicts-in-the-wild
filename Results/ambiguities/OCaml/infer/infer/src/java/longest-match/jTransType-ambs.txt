@@ -1,0 +1,35 @@
+Ambiguity 1: 
+| None ->
+      match JClasspath.lookup_node cn program with
+      | None ->
+          Tenv.mk_struct tenv name
+      | Some node ->
+          let create_super_list interface_names =
+            List.iter ~f:(fun cn -> ignore (get_class_struct_typ program tenv cn)) interface_names;
+            List.map ~f:typename_of_classname interface_names in
+          let supers, fields, statics, annots =
+            match node with
+            | Javalib.JInterface jinterface ->
+                let statics, _ = get_all_fields program tenv cn in
+                let sil_interface_list = create_super_list jinterface.Javalib.i_interfaces in
+                let item_annotation = JAnnotation.translate_item jinterface.Javalib.i_annotations in
+                (sil_interface_list, [], statics, item_annotation)
+            | Javalib.JClass jclass ->
+                let statics, nonstatics =
+                  let classpath_static, classpath_nonstatic = get_all_fields program tenv cn in
+                  add_model_fields program (classpath_static, classpath_nonstatic) cn in
+                let item_annotation = JAnnotation.translate_item jclass.Javalib.c_annotations in
+                let interface_list = create_super_list jclass.Javalib.c_interfaces in
+                let super_classname_list =
+                  match jclass.Javalib.c_super_class with
+                  | None -> interface_list (* base case of the recursion *)
+                  | Some super_cn ->
+                      ignore (get_class_struct_typ program tenv super_cn);
+                      let super_classname = typename_of_classname super_cn in
+                      super_classname :: interface_list in
+                (super_classname_list, nonstatics, statics, item_annotation) in
+          let methods =
+            Javalib.m_fold
+              (fun m procnames -> (translate_method_name m) :: procnames)
+              node [] in
+          Tenv.mk_struct tenv ~fields ~statics ~methods ~supers ~annots name

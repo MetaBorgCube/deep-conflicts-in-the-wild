@@ -1,0 +1,64 @@
+Ambiguity 1: 
+| P_variable var ->
+      [var, obj, ty]
+  | _ ->
+    match (Ctype.repr ty).desc with
+      Tvar | Tarrow _ ->
+        error_matching ()
+    | Ttuple(ty_list) ->
+        (match pattern with
+           P_tuple pattern_list ->
+             pattern_matching_list pattern_list obj ty_list
+         | P_nth (n, patt) ->
+             if n >= List.length ty_list then
+               (prerr_endline "Out of range."; raise Toplevel);
+             pattern_matching patt (Debugcom.get_field obj n)
+                              (List.nth ty_list n)
+         | _ ->
+             error_matching ())
+    | Tconstr(cstr, [ty_arg],_) when same_type_constr cstr constr_type_list ->
+        (match pattern with
+           P_list pattern_list ->
+             let (last, list) =
+               it_list
+                 (fun (current, list) pattern ->
+                    if value_tag current = 0 then error_matching ();
+                    (Debugcom.get_field current 1,
+                     (pattern, Debugcom.get_field current 0)::list))
+                 (obj, [])
+                 pattern_list
+             in
+               if value_tag last <> 0 then error_matching ();
+               flat_map
+                 (function (x, y) -> pattern_matching x y ty_arg)
+                 (rev list)
+         | P_nth (n, patt) ->
+             let rec find k current =
+               if value_tag current = 0 then
+                 (prerr_endline "Out of range."; raise Toplevel);
+               if k = 0 then
+                 pattern_matching patt (Debugcom.get_field current 0) ty_arg
+               else
+                 find (k - 1) (Debugcom.get_field current 1)
+             in
+               find n obj
+         | P_concat (pattern1, pattern2) ->
+             if value_tag obj == 0 then error_matching ();
+             (pattern_matching pattern1 (Debugcom.get_field obj 0) ty_arg)
+                @ (pattern_matching pattern2 (Debugcom.get_field obj 1) ty)
+         | _ ->
+             error_matching ())
+    | Tconstr(cstr, [ty_arg]) when same_type_constr cstr constr_type_vect ->
+        (match pattern with
+           P_nth (n, patt) ->
+             if n >= value_size obj then
+               (prerr_endline "Out of range."; raise Toplevel);
+             pattern_matching patt (Debugcom.get_field obj n) ty_arg
+         | _ ->
+             error_matching ())
+    | Tconstr(cstr, ty_list) ->
+        (match cstr.info.ty_abbr with
+           Tabbrev(params, body) ->
+             pattern_matching pattern obj (expand_abbrev params body ty_list)
+         | _ ->
+             match_concrete_type pattern obj cstr ty ty_list)

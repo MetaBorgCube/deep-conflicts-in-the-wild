@@ -1,0 +1,142 @@
+Ambiguity 1: 
+| scope :: scopes ->
+  match scope.kind with
+  | VarScope _ -> scope
+  | _ -> top_var_scope scopes
+
+Ambiguity 2: 
+| scope::scopes ->
+        match Scope.get_entry name scope with
+        | Some _ -> true
+        | None ->
+            match scopes with
+            | [] -> false
+            | _ -> loop scopes
+
+Ambiguity 3: 
+| scope::scopes ->
+      match Scope.get_entry name scope with
+      | Some entry -> scope, entry
+      | None ->
+        (* keep looking until we're at the global scope *)
+        match scopes with
+        | [] -> cache_global cx name ?desc loc scope
+        | _ -> loop scopes
+
+Ambiguity 4: 
+| scope::scopes ->
+        match Scope.get_entry name scope, scope.kind with
+        | Some entry, _ -> scope, Some entry
+        | None, VarScope _ -> scope, None
+        | None, LexScope -> loop scopes
+
+Ambiguity 5: 
+| scope::scopes ->
+        match Scope.get_refi key scope, scope.kind with
+        | Some refi, _ -> Some (scope, refi)
+        | None, VarScope _ -> None
+        | None, LexScope -> loop scopes
+
+Ambiguity 6: 
+| scope::scopes ->
+      match get_entry name scope with
+
+      (* if no entry already exists, this might be our scope *)
+      | None -> Entry.(
+        match scope.Scope.kind, entry with
+        (* lex scopes can only hold let/const bindings *)
+        (* var scope can hold all binding types *)
+        | LexScope, Value { Entry.kind = Let _; _ }
+        | LexScope, Value { Entry.kind = Const _; _ }
+        | VarScope _, _ ->
+          let loc = entry_loc entry in
+          Type_inference_hooks_js.dispatch_ref_hook cx loc loc;
+          add_entry name entry scope
+        (* otherwise, keep looking for our scope *)
+        | _ -> loop scopes)
+
+      (* some rebindings are allowed, but usually an error *)
+      | Some prev ->
+        match scope.kind with
+
+        (* specifically a var scope allows some shadowing *)
+        | VarScope _ -> Entry.(
+          let can_shadow = function
+            (* funcs/vars can shadow other funcs/vars -- only in var scope *)
+            | (Var | Let FunctionBinding),
+              (Var | Let FunctionBinding) -> true
+            (* vars can shadow function params *)
+            | Var, Let ParamBinding -> true
+            | Var, Const ConstParamBinding -> true
+            | _ -> false
+          in
+          match entry, prev with
+          (* good shadowing leaves existing entry, unifies with new *)
+          | Value e, Value p
+              when can_shadow (Entry.kind_of_value e, Entry.kind_of_value p) ->
+            (* TODO currently we don't step on specific. shouldn't we? *)
+            Flow_js.unify cx
+              (Entry.general_of_value p) (Entry.general_of_value e)
+          (* bad shadowing is a binding error *)
+          | _ -> already_bound_error cx name prev loc)
+
+        (* shadowing in a lex scope is always an error *)
+        | LexScope -> already_bound_error cx name prev loc
+
+Ambiguity 7: 
+| scope :: _ when scope.id = target.id ->
+    (* target is nearer than (or actually is) nearest VarScope *)
+    true
+  | scope :: scopes ->
+    match scope.kind with
+    | VarScope _ ->
+      (* found var scope before target *)
+      false
+    | LexScope ->
+      (* still in inner lex scopes, keep looking *)
+      loop target scopes
+
+Ambiguity 8: 
+| Type t ->
+    t._type
+
+  | Value v ->
+    match v with
+    | { Entry.kind; value_state = State.Undeclared; value_declare_loc; _ }
+      when lookup_mode = ForValue && not (allow_forward_ref kind)
+      && same_activation scope ->
+      tdz_error cx name loc v;
+      AnyT.at value_declare_loc
+    | _ ->
+      Changeset.change_var (scope.id, name, Changeset.Read);
+      let s, g = value_entry_types ~lookup_mode scope v in
+      if specific then s else g
+
+Ambiguity 9: 
+| scope :: scopes ->
+  match f scope with
+  | Some x -> Some x
+  | None -> seek_env f scopes
+
+Ambiguity 10: 
+| scope::scopes ->
+      match Scope.get_entry name scope with
+      | Some _ -> Scope.is_global scope
+      | None -> loop scopes
+
+Ambiguity 11: 
+| scope :: scopes ->
+      match get_entry name scope with
+      | Some entry ->
+        let entry = Entry.havoc name entry in
+        add_entry name entry scope
+      | None ->
+        loop scopes
+
+Ambiguity 12: 
+| scope :: scopes ->
+      match get_refi key scope with
+      | Some _ ->
+        remove_refi key scope
+      | None ->
+        loop scopes

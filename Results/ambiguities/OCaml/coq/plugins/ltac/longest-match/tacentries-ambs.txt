@@ -1,0 +1,9 @@
+Ambiguity 1: 
+| TacNonTerm (_, symb, _) ->
+      let EntryName (typ, e) = prod_item_of_symbol 0 symb in
+      let Genarg.Rawwit wit = typ in
+      let inj x = TacArg (Loc.ghost, TacGeneric (Genarg.in_gen typ x)) in
+      let default = epsilon_value inj e in
+      match default with
+      | None -> raise NonEmptyArgument
+      | Some def -> Tacintern.intern_tactic_or_tacarg Tacintern.fully_empty_glob_sign def

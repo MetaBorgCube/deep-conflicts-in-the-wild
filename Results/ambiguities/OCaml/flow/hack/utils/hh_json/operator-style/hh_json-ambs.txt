@@ -1,0 +1,28 @@
+Ambiguity 1: 
+(match peek env with
+  | '"' -> env.pos <- env.pos + 1
+  | _ ->  syntax_error env "expected '\"' character");
+  if peek env = '"' then
+    begin eat env '"'; JSON_String("") end
+  else
+    let res = loop env in
+    eat env '"';
+    res
+
+Ambiguity 2: 
+eat env '{';
+  if peek env = '}' then
+    begin eat env '}'; JSON_Object([]) end
+  else
+    let res = loop [] in
+    eat env '}';
+    res
+
+Ambiguity 3: 
+json_to_string ?(pretty=false) (json:json): string =
+  if pretty
+  then json_to_multiline json
+  else
+    let buf = Buffer.create 1024 in (* need a better estimate! *)
+    add_json_to_buffer buf json;
+    Buffer.contents buf

@@ -1,0 +1,12 @@
+Ambiguity 1: 
+pr_polymorphic cb.const_polymorphic ++
+    match val_0 with
+    | None ->
+	str"*** [ " ++
+	print_basename sp ++ print_instance sigma cb ++ str " : " ++ cut () ++ pr_ltype typ ++
+	str" ]" ++
+	Printer.pr_universe_ctx sigma univs
+    | _ ->
+	print_basename sp ++ print_instance sigma cb ++ str sep ++ cut () ++
+	(if with_values then print_typed_body env sigma (val_0,typ) else pr_ltype typ)++
+        Printer.pr_universe_ctx sigma univs

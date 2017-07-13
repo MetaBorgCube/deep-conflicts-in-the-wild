@@ -1,0 +1,49 @@
+Ambiguity 1: 
+let rec find_oldest_pac uf i pac=
+  try PacMap.find pac (get_constructors uf i) with
+    Not_found -> 
+      match uf.map.(i).clas with 
+	Eqto (j,_) -> find_oldest_pac uf j pac
+      | Rep _ -> raise Not_found
+     
+
+
+
+Ambiguity 2: 
+| (patt,cl)::remains ->
+	  let uf=state.uf in
+	    match patt with
+		PVar i ->
+		  if mp.mp_subst.(pred i)<0 then
+		    begin
+		      mp.mp_subst.(pred i)<- cl; (* no aliasing problem here *)
+		      Stack.push {mp with mp_stack=remains} pb_stack
+		    end
+		  else
+		    if Int.equal mp.mp_subst.(pred i) cl then
+		      Stack.push {mp with mp_stack=remains} pb_stack
+		    else (* mismatch for non-linear variable in pattern *) ()
+	      | PApp (f,[]) ->
+		  begin
+		    try let j=Termhash.find uf.syms f in
+		      if Int.equal (find uf j) cl then
+			Stack.push {mp with mp_stack=remains} pb_stack
+		    with Not_found -> ()
+		  end
+	      | PApp(f, ((last_arg::rem_args) as args)) ->
+		  try
+		    let j=Termhash.find uf.syms f in
+		    let paf={fsym=j;fnargs=List.length args} in
+		    let rep=get_representative uf cl in
+		    let good_terms = PafMap.find paf rep.functions in
+		    let aux i =
+		      let (s,t) = signature state.uf i in
+			Stack.push
+			  {mp with
+			     mp_subst=Array.copy mp.mp_subst;
+			     mp_stack=
+			      (PApp(f,rem_args),s) ::
+				(last_arg,t) :: remains} pb_stack in
+		      Int.Set.iter aux good_terms
+		  with Not_found -> ()
+

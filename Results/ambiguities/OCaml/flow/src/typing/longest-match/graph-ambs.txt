@@ -1,0 +1,20 @@
+Ambiguity 1: 
+| _ ->
+    match get_t t ts with
+    | Some id -> id, (ts, nodes, edges)
+    | None ->
+      let id = Reason.mk_id () in
+      let ts = put_t t id ts in
+      let nodes = format_node id (t_label cx t) :: nodes in
+      id, add_parts cx id (parts_of_t cx t) (ts, nodes, edges)
+
+Ambiguity 2: 
+| false ->
+    match c with
+    | Goto gid ->
+      let label = spf "[%d] Goto: %d" id gid in
+      let node = format_tvar ~kids:tvar_ports id label in
+      let edge = format_contain_edge id gid in
+      put_id id ts, node :: nodes, edge :: edges
+    | Root { rank; constraints } ->
+      add_root cx id rank constraints (ts, nodes, edges)

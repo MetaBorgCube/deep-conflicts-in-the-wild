@@ -1,0 +1,16 @@
+Ambiguity 1: 
+init_loop len f p i =
+  if Int.equal i len then ()
+  else
+    let c = { head = f i; tail = [] } in
+    p.tail <- cast c;
+    init_loop len f c (succ i)
+
+Ambiguity 2: 
+init len f =
+  if len < 0 then invalid_arg "List.init"
+  else if Int.equal len 0 then []
+  else
+    let c = { head = f 0; tail = [] } in
+    init_loop len f c 1;
+    cast c

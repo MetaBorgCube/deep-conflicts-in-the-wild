@@ -1,0 +1,63 @@
+Ambiguity 1: 
+| TOP, _ | _, TOP 	   -> TOP
+            | Val (r1, o1), Val (r2, o2) ->
+              match r1, r2 with
+              | Global, r | r, Global -> Val (r, V.join o1 o2)
+              | r1, r2 ->
+                if r1 = r2 then Val (r1, V.join o1 o2)
+                else BOT
+
+Ambiguity 2: 
+| TOP, _ | _, TOP		   -> TOP
+            | Val (r1, o1), Val (r2, o2) ->
+              match r1, r2 with
+              | Global, r | r, Global ->
+                Val (r, V.widen o1 o2)
+              | r1, r2 ->
+                if r1 = r2 then Val (r1, V.widen o1 o2)
+                else BOT
+
+Ambiguity 3: 
+| BOT, p | p, BOT 	   -> p
+            | Val (r1, o1), Val (r2, o2) ->
+              match r1, r2 with
+              | Global, r | r, Global ->
+                Val (r, V.meet o1 o2)
+              | r1, r2 ->
+                 if r1 = r2 then
+		   try Val (r1, V.meet o1 o2)
+		   with _ -> BOT
+                else BOT
+
+Ambiguity 4: 
+| TOP, _ | _, TOP 	   -> TOP
+            | Val (r1, o1), Val (r2, o2) ->
+              match r1, r2 with
+              | Global, r | r, Global ->
+                begin
+                    try Val (r, V.binary op o1 o2)
+                    with
+		    | Exceptions.Error _ as e -> raise e 
+		    | _ -> BOT
+                end
+              | r1, r2                ->
+                try
+                    if r1 = r2 then Val (r1, V.binary op o1 o2)
+                    else BOT
+                with Exceptions.Enum_failure -> TOP
+
+
+        
+
+Ambiguity 5: 
+| [v] -> L.debug (fun p -> p "concat single : %s" (to_string v)); v
+            | v::l' ->
+              let v' = concat l' in
+              L.debug (fun p -> p "concat : %s %s" (to_string v) (to_string v'));
+              match v, v' with
+              | BOT, _ | _, BOT -> BOT
+              | TOP, _ | _, TOP -> TOP
+              | Val (r1, o1), Val (r2, o2 ) ->
+                if r1 = r2 then
+                    Val (r1, V.concat o1 o2)
+                else BOT

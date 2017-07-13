@@ -1,0 +1,13 @@
+Ambiguity 1: 
+;
+    | exception (Failure x) ->
+      collect x;
+      match 
+        begin
+          collect "four";
+          failwith "five"
+        end
+      with
+        () -> collect "failure three"
+      | exception (Failure x) ->
+        collect x

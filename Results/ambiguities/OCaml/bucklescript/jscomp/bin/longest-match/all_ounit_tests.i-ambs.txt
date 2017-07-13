@@ -1,0 +1,185 @@
+Ambiguity 1: 
+| 1, x0 :: l -> (* 0 *) Node (Empty, x0, Empty, 1), l
+    | 2, x0 :: x1 :: l -> (* 23 *) Node (Node(Empty, x0, Empty, 1), x1, Empty, 2), l
+    | 3, x0 :: x1 :: x2 :: l ->
+      (* 233 *) Node (Node(Empty, x0, Empty, 1), x1, Node(Empty, x2, Empty, 1), 2),l
+    | n, l ->
+      (* 255 *) let nl = n / 2 in
+      let left, l = sub nl l in
+      match l with
+      | [] -> (* 0 *) assert false
+      | mid :: l ->
+        (* 255 *) let right, l = sub (n - nl - 1) l in
+        create left mid right, l
+
+Ambiguity 2: 
+| key1::rest -> 
+    (* 24171 *) eq_key key   key1 ||
+    match rest with 
+    | [] -> (* 1965 *) false 
+    | key2 :: rest -> 
+      (* 7398 *) eq_key key   key2 ||
+      match rest with 
+      | [] -> (* 1329 *) false 
+      | key3 :: rest -> 
+        (* 3197 *) eq_key key   key3 ||
+        small_bucket_mem eq_key key rest
+
+Ambiguity 3: 
+| Cons(key1,_, rest) -> 
+    (* 3318223 *) equal_key key key1 ||
+    match rest with 
+    | Empty -> (* 644881 *) false 
+    | Cons(key2 , _, rest) -> 
+      (* 1496647 *) equal_key key  key2 ||
+      match rest with 
+      | Empty -> (* 333954 *) false 
+      | Cons(key3,_,  rest) -> 
+        (* 578375 *) equal_key key  key3 ||
+        small_bucket_mem key rest
+
+Ambiguity 4: 
+| Cons(key1,i,rest) -> 
+    (* 2122497 *) if equal_key key key1 then (* 1176296 *) i 
+    else (* 946201 *) match rest with 
+      | Empty -> (* 0 *) -1 
+      | Cons(key2,i2,  rest) -> 
+        (* 946201 *) if equal_key key  key2 then (* 584225 *) i2 else
+          (* 361976 *) match rest with 
+          | Empty -> (* 0 *) -1 
+          | Cons(key3,i3, rest) -> 
+            (* 361976 *) if equal_key key  key3 then (* 239479 *) i3 else
+              (* 122497 *) small_bucket_rank key rest
+
+Ambiguity 5: 
+| Cons(key1,i,rest) -> 
+    (* 1068 *) if equal_key key key1 then (* 429 *) i, rest  
+    else (* 639 *) match rest with 
+      | Empty -> (* 0 *) raise old_key_not_exist
+      | Cons(key2,i2,  rest) -> 
+        (* 639 *) if equal_key key  key2 then (* 397 *) i2, (Cons (key1,i,rest)) else
+          (* 242 *) match rest with 
+          | Empty -> (* 0 *) raise old_key_not_exist
+          | Cons(key3,i3, rest) -> 
+            (* 242 *) if equal_key key  key3 then (* 174 *) i3, (Cons (key1,i,Cons(key2,i2,rest))) else
+              (* 68 *) let (rank, rest ) = small_bucket_rank_and_delete key rest in 
+              rank, Cons (key1,i, 
+                    Cons (key2,i2, 
+                          Cons(key3,i3,rest)))
+
+Ambiguity 6: 
+| Cons(k1,_,rest1) -> 
+    (* 0 *) eq  key k1 ||
+    match rest1 with
+    | Empty -> (* 0 *) false 
+    | Cons(k2,_,rest2) -> 
+      (* 0 *) eq key k2  || 
+      match rest2 with 
+      | Empty -> (* 0 *) false 
+      | Cons(k3,_,rest3) -> 
+        (* 0 *) eq key k3  ||
+        small_bucket_mem eq key rest3
+
+Ambiguity 7: 
+| Cons(k1,d1,rest1) -> 
+    (* 0 *) if eq  key k1 then (* 0 *) Some d1 else 
+      (* 0 *) match rest1 with
+      | Empty -> (* 0 *) None 
+      | Cons(k2,d2,rest2) -> 
+        (* 0 *) if eq key k2 then (* 0 *) Some d2 else 
+          (* 0 *) match rest2 with 
+          | Empty -> (* 0 *) None 
+          | Cons(k3,d3,rest3) -> 
+            (* 0 *) if eq key k3  then (* 0 *) Some d3 else 
+              (* 0 *) small_bucket_opt eq key rest3
+
+Ambiguity 8: 
+| Cons(k1,d1,rest1) -> 
+    (* 0 *) if eq  key k1 then (* 0 *) Some k1 else 
+      (* 0 *) match rest1 with
+      | Empty -> (* 0 *) None 
+      | Cons(k2,d2,rest2) -> 
+        (* 0 *) if eq key k2 then (* 0 *) Some k2 else 
+          (* 0 *) match rest2 with 
+          | Empty -> (* 0 *) None 
+          | Cons(k3,d3,rest3) -> 
+            (* 0 *) if eq key k3  then (* 0 *) Some k3 else 
+              (* 0 *) small_bucket_key_opt eq key rest3
+
+Ambiguity 9: 
+| Cons(k1,d1,rest1) -> 
+    (* 0 *) if eq  key k1 then  (* 0 *) d1 else 
+      (* 0 *) match rest1 with
+      | Empty -> (* 0 *) default 
+      | Cons(k2,d2,rest2) -> 
+        (* 0 *) if eq key k2 then  (* 0 *) d2 else 
+          (* 0 *) match rest2 with 
+          | Empty -> (* 0 *) default 
+          | Cons(k3,d3,rest3) -> 
+            (* 0 *) if eq key k3  then  (* 0 *) d3 else 
+              (* 0 *) small_bucket_default eq key default rest3
+
+Ambiguity 10: 
+| Cons(k1, d1, rest1) ->
+    (* 89 *) if eq_key key k1 then (* 87 *) d1 else
+      (* 2 *) match rest1 with
+      | Empty -> (* 0 *) raise Not_found
+      | Cons(k2, d2, rest2) ->
+        (* 2 *) if eq_key key k2 then (* 2 *) d2 else
+          (* 0 *) match rest2 with
+          | Empty -> (* 0 *) raise Not_found
+          | Cons(k3, d3, rest3) ->
+            (* 0 *) if eq_key key k3  then (* 0 *) d3 else (* 0 *) find_rec key rest3
+
+Ambiguity 11: 
+| {ident = key1 }::rest -> 
+    (* 861 *) Ext_ident.equal key   key1 ||
+    match rest with 
+    | [] -> (* 402 *) false 
+    | {ident = key2} :: rest -> 
+      (* 458 *) Ext_ident.equal key   key2 ||
+      match rest with 
+      | [] -> (* 261 *) false 
+      | {ident = key3; _} :: rest -> 
+        (* 197 *) Ext_ident.equal key   key3 ||
+        small_bucket_mem key rest
+
+Ambiguity 12: 
+| key1::rest -> 
+    (* 4462 *) if Ext_ident.equal key   key1.ident  then 
+      (* 2054 *) if key1.mask then (* 1024 *) false else (* 1030 *) (key1.mask <- true ; true) 
+    else 
+      (* 2408 *) match rest with 
+      | [] -> (* 0 *) false
+      | key2 :: rest -> 
+        (* 2408 *) if Ext_ident.equal key key2.ident  then 
+          (* 1296 *) if key2.mask then (* 648 *) false else (* 648 *) (key2.mask <- true ; true)
+        else 
+          (* 1112 *) match rest with 
+          | [] -> (* 0 *) false
+          | key3 :: rest -> 
+            (* 1112 *) if Ext_ident.equal key key3.ident then 
+              (* 652 *) if key3.mask then (* 326 *) false else (* 326 *) (key3.mask <- true ; true)
+            else 
+              (* 460 *) small_bucket_mask  key rest
+
+Ambiguity 13: 
+(function x -> 
+     (* 2 *) match x with 
+     | Error error_info -> 
+       (* 0 *) Some (Format.asprintf "%a" pp_error error_info)
+
+     | _ -> (* 2 *) None
+    )
+
+Ambiguity 14: 
+| a::l -> 
+    (* 0 *) match p a with
+    | None -> (* 0 *) for_all_opt p l
+    | v -> (* 0 *) v
+
+Ambiguity 15: 
+| x :: l -> 
+    (* 0 *) match  p x with 
+    | Some _ as v  ->  (* 0 *) v
+    | None -> (* 0 *) find_opt p l

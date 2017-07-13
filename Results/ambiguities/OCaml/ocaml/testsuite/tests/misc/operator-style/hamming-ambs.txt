@@ -1,0 +1,7 @@
+Ambiguity 1: 
+let rec iter_interval f l (start, stop) =
+  if stop = 0 then ()
+  else match force l with
+       | Cons (x, ll)
+          -> if start <= 0 then f x;
+             iter_interval f ll (start-1, stop-1)

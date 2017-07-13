@@ -1,0 +1,9 @@
+Ambiguity 1: 
+tac >>= fun () ->
+    Proofview.tclEVARMAP >>= fun sigma ->
+    (* Already solved goals are not to be counted as shelved. Nor are
+      they to be marked as unresolvable. *)
+    let retrieved = undef sigma (List.rev (Evd.future_goals sigma)) in
+    let sigma = List.fold_left Proofview.Unsafe.mark_as_goal sigma retrieved in
+    Proofview.Unsafe.tclEVARS sigma >>= fun () ->
+    Proofview.tclUNIT retrieved

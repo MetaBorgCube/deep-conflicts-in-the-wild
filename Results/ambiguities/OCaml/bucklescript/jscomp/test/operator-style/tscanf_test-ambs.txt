@@ -1,0 +1,7 @@
+Ambiguity 1: 
+let len = String.length s in
+  if len = 0 then raise End_of_file else
+  let c = s.[0] in
+  Buffer.clear ob;
+  Buffer.add_string ob (String.sub s 1 (len - 1));
+  c

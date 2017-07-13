@@ -1,0 +1,15 @@
+Ambiguity 1: 
+let ((indi,u),mibi,mipi,dep,kind) = List.nth listdepkind p in
+
+      if (mis_is_recursive_subset
+	(List.map (fun ((indi,u),_,_,_,_) -> snd indi) listdepkind)
+	mipi.mind_recargs)
+      then
+	let env' = push_rel_context lnamesparrec env in
+	  it_mkLambda_or_LetIn_name env (put_arity env' 0 listdepkind)
+	    lnamesparrec
+      else
+        let sigma = Sigma.Unsafe.of_evar_map !evdref in
+        let Sigma (c, sigma, _) = mis_make_case_com dep env sigma (indi,u) (mibi,mipi) kind in
+        let evd' = Sigma.to_evar_map sigma in
+	  evdref := evd'; c

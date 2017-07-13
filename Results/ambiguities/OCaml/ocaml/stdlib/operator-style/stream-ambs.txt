@@ -1,0 +1,5 @@
+Ambiguity 1: 
+if b.len == 0 then Sempty else
+       let r = Obj.magic (Bytes.unsafe_get b.buff b.ind) in
+       (* Warning: anyone using g thinks that an item has been read *)
+       b.ind <- succ b.ind; Scons(r, d)

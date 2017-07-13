@@ -1,0 +1,229 @@
+Ambiguity 1: 
+| [] ->
+  match v.pat_desc with
+  | Tpat_any -> fprintf ppf "_"
+  | Tpat_var (x,_) -> Ident.print ppf x
+  | Tpat_constant c -> fprintf ppf "%s" (pretty_const c)
+  | Tpat_tuple vs ->
+      fprintf ppf "@[(%a)@]" (pretty_vals ",") vs
+  | Tpat_construct (_, cstr, []) ->
+      fprintf ppf "%s" cstr.cstr_name
+  | Tpat_construct (_, cstr, [w]) ->
+      fprintf ppf "@[<2>%s@ %a@]" cstr.cstr_name pretty_arg w
+  | Tpat_construct (_, cstr, vs) ->
+      let name = cstr.cstr_name in
+      begin match (name, vs) with
+        ("::", [v1;v2]) ->
+          fprintf ppf "@[%a::@,%a@]" pretty_car v1 pretty_cdr v2
+      |  _ ->
+          fprintf ppf "@[<2>%s@ @[(%a)@]@]" name (pretty_vals ",") vs
+      end
+  | Tpat_variant (l, None, _) ->
+      fprintf ppf "`%s" l
+  | Tpat_variant (l, Some w, _) ->
+      fprintf ppf "@[<2>`%s@ %a@]" l pretty_arg w
+  | Tpat_record (lvs,_) ->
+      fprintf ppf "@[{%a}@]"
+        pretty_lvals
+        (List.filter
+           (function
+             | (_,_,{pat_desc=Tpat_any}) -> false (* do not show lbl=_ *)
+             | _ -> true) lvs)
+  | Tpat_array vs ->
+      fprintf ppf "@[[| %a |]@]" (pretty_vals " ;") vs
+  | Tpat_lazy v ->
+      fprintf ppf "@[<2>lazy@ %a@]" pretty_arg v
+  | Tpat_alias (v, x,_) ->
+      fprintf ppf "@[(%a@ as %a)@]" pretty_val v Ident.print x
+  | Tpat_or (v,w,_)    ->
+      fprintf ppf "@[(%a|@,%a)@]" pretty_or v pretty_or w
+
+Ambiguity 2: 
+| Some ext -> match env with
+  | ({pat_desc =
+      Tpat_construct(_, {cstr_tag=(Cstr_constant _|Cstr_block _)},_)}
+     as p, _) :: _ ->
+      let path = get_type_path p.pat_type p.pat_env in
+      Path.same path ext
+  | _ -> false
+
+Ambiguity 3: 
+| x :: xs ->
+        match f x with
+        | None -> map_filter f xs
+        | Some y -> y :: map_filter f xs
+
+Ambiguity 4: 
+| _  ->
+    match qs with
+    | [] -> false
+    | {pat_desc = Tpat_or(q1,q2,_)}::qs ->
+        satisfiable pss (q1::qs) || satisfiable pss (q2::qs)
+    | {pat_desc = Tpat_alias(q,_,_)}::qs ->
+          satisfiable pss (q::qs)
+    | {pat_desc = (Tpat_any | Tpat_var(_))}::qs ->
+        let q0 = discr_pat omega pss in
+        begin match filter_all q0 pss with
+          (* first column of pss is made of variables only *)
+        | [] -> satisfiable (filter_extra pss) qs
+        | constrs  ->
+            if full_match false false constrs then
+              List.exists
+                (fun (p,pss) ->
+                  not (is_absent_pat p) &&
+                  satisfiable pss (simple_match_args p omega @ qs))
+                constrs
+            else
+              satisfiable (filter_extra pss) qs
+        end
+    | {pat_desc=Tpat_variant (l,_,r)}::_ when is_absent l r -> false
+    | q::qs ->
+        let q0 = discr_pat q pss in
+        satisfiable (filter_one q0 pss) (simple_match_args q0 q @ qs)
+
+Ambiguity 5: 
+| (p,pss)::rest ->
+      match f (p,pss) with
+      | Rnone -> try_many  f rest
+      | r -> r
+
+Ambiguity 6: 
+| constrs ->
+        let try_non_omega (p,pss) =
+          if is_absent_pat p then
+            Rnone
+          else
+            match
+              exhaust
+                ext pss (List.length (simple_match_args p omega) + n - 1)
+            with
+            | Rsome r -> Rsome (set_args p r)
+            | r       -> r in
+        if
+          full_match true false constrs && not (should_extend ext constrs)
+        then
+          try_many try_non_omega constrs
+        else
+          (*
+             D = filter_extra pss is the default matrix
+             as it is included in pss, one can avoid
+             recursive calls on specialized matrices,
+             Essentially :
+             * D exhaustive => pss exhaustive
+             * D non-exhaustive => we have a non-filtered value
+          *)
+          let r =  exhaust ext (filter_extra pss) (n-1) in
+          match r with
+          | Rnone -> Rnone
+          | Rsome r ->
+              try
+                Rsome (build_other ext constrs::r)
+              with
+      (* cannot occur, since constructors don't make a full signature *)
+              | Empty -> fatal_error "Parmatch.exhaust"
+    
+
+Ambiguity 7: 
+| constrs ->
+        let try_non_omega (p,pss) =
+          if is_absent_pat p then
+            Rnone
+          else
+            match
+              exhaust_gadt
+                ext pss (List.length (simple_match_args p omega) + n - 1)
+            with
+            | Rsome r -> Rsome (List.map (fun row ->  (set_args p row)) r)
+            | r       -> r in
+        let before = try_many_gadt try_non_omega constrs in
+        if
+          full_match_gadt constrs && not (should_extend ext constrs)
+        then
+          before
+        else
+          (*
+            D = filter_extra pss is the default matrix
+            as it is included in pss, one can avoid
+            recursive calls on specialized matrices,
+            Essentially :
+           * D exhaustive => pss exhaustive
+           * D non-exhaustive => we have a non-filtered value
+           *)
+          let r =  exhaust_gadt ext (filter_extra pss) (n-1) in
+          match r with
+          | Rnone -> before
+          | Rsome r ->
+              try
+                let missing_trailing = build_other_gadt ext constrs in
+                let dug =
+                  combinations
+                    (fun head tail -> head :: tail)
+                    missing_trailing
+                    r
+                in
+                match before with
+                | Rnone -> Rsome dug
+                | Rsome x -> Rsome (x @ dug)
+              with
+      (* cannot occur, since constructors don't make a full signature *)
+              | Empty -> fatal_error "Parmatch.exhaust"
+    
+
+Ambiguity 8: 
+| r::rem ->
+      match r.active with
+      | [] -> assert false
+      | {pat_desc = Tpat_alias(p,_,_)}::ps ->
+          filter_rec ({r with active = p::ps}::rem)
+      | {pat_desc = Tpat_or(p1,p2,_)}::ps ->
+          filter_rec
+            ({r with active = p1::ps}::
+             {r with active = p2::ps}::
+             rem)
+      | p::ps ->
+          if simple_match q p then
+            {r with active=simple_match_args q p @ ps} :: filter_rec rem
+          else
+            filter_rec rem
+
+Ambiguity 9: 
+| _ ->
+              match qs.active with
+              | [q] ->
+                  let q1,q2 = or_args q in
+                  let r_loc = every_both pss qs q1 q2 in
+                  union_res r r_loc
+              | _   -> assert false
+
+Ambiguity 10: 
+| q::qs -> match q with
+  | {pat_desc = Tpat_or (q1,q2,_)} ->
+      begin match do_match pss (q1::qs) with
+      | None -> do_match pss (q2::qs)
+      | r -> r
+      end
+  | {pat_desc = Tpat_any} ->
+      do_match (do_filter_var pss) qs
+  | _ ->
+      let q0 = normalize_pat q in
+      do_match (do_filter_one q0 pss) (simple_match_args q0 q @ qs)
+
+Ambiguity 11: 
+| x :: xs ->
+          match f x with
+          | None -> get_first f xs
+          | x -> x
+
+Ambiguity 12: 
+| _ -> match pss with
+    | [] -> ()
+    | ps::_ ->
+        List.iter
+          (fun ext ->
+            match exhaust (Some ext) pss (List.length ps) with
+            | Rnone ->
+                Location.prerr_warning
+                  loc
+                  (Warnings.Fragile_match (Path.name ext))
+            | Rsome _ -> ())
+          exts

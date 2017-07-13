@@ -1,0 +1,84 @@
+Ambiguity 1: 
+string_of_Pcut p =
+  if (!nsP)<=0
+  then "..."
+  else
+  match p with
+  |Pint a-> nsP:=(!nsP)-1;
+      if C.le coef0 a
+      then C.to_string a
+      else "("^(C.to_string a)^")"
+  |Prec (x,t)->
+      let v=string_of_var x
+      and s=ref ""
+      and sp=ref "" in
+    let st0 = string_of_Pcut t.(0) in
+      if not (String.equal st0 "0")
+      then s:=st0;
+    let fin = ref false in
+    for i=(Array.length t)-1 downto 1 do
+      if (!nsP)<0
+      then (sp:="...";
+	    if not (!fin) then s:=(!s)^"+"^(!sp);
+	    fin:=true)
+      else (
+	let si=string_of_Pcut  t.(i) in
+	sp:="";
+	if Int.equal i 1
+	then (
+	  if not (String.equal si "0")
+	  then (nsP:=(!nsP)-1;
+		if String.equal si "1"
+		then sp:=v
+		else
+		  (if (String.contains si '+')
+		  then sp:="("^si^")*"^v
+		  else sp:=si^"*"^v)))
+	else (
+	  if not (String.equal si "0")
+	  then (nsP:=(!nsP)-1;
+		if String.equal si "1"
+		then sp:=v^"^"^(string_of_int i)
+		else (if (String.contains si '+')
+		then sp:="("^si^")*"^v^"^"^(string_of_int i)
+		else  sp:=si^"*"^v^"^"^(string_of_int i))));
+	if not (String.is_empty !sp) && not (!fin)
+	then (nsP:=(!nsP)-1;
+	      if String.is_empty !s
+	      then s:=!sp
+	      else s:=(!s)^"+"^(!sp)));
+    done;
+    if String.is_empty !s then (nsP:=(!nsP)-1;
+		   (s:="0"));
+    !s
+
+Ambiguity 2: 
+quo_rem_pol p q x =
+  if Int.equal x 0
+  then (match (p,q) with
+          |(Pint a, Pint b) ->
+	     if C.equal (C.modulo a b) coef0
+             then (Pint (C.div a b), cf0)
+             else failwith "div_pol1"
+	  |_ -> assert false)
+  else
+    let m = deg x q in
+    let b = coefDom x q in
+    let q1 = remP x q in (* q = b*x^m+q1 *)
+    let r = ref p in
+    let s = ref cf0 in
+    let continue =ref true in
+      while (!continue) && (not (equal !r cf0)) do
+	let n = deg x !r in
+	  if n<m
+	  then continue:=false
+	  else (
+            let a = coefDom x !r in
+            let p1 = remP x !r in  (* r = a*x^n+p1 *)
+            let c = div_pol a b (x-1) in  (* a = c*b *)
+	    let s1 = c @@ ((monome x (n-m))) in
+              s:= plusP (!s) s1;
+              r:= p1 -- (s1 @@ q1);
+          )
+      done;
+      (!s,!r)

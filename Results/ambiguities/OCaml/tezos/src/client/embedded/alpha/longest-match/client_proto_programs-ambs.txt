@@ -1,0 +1,9 @@
+Ambiguity 1: 
+| (first, _) ->
+              match locations loc with
+              | None ->
+                  Format.fprintf ppf "{} /* %a */"
+                    print_stack first
+              | Some _ as l ->
+                  Format.fprintf ppf "{%a %a }"
+                    print_location_mark l print_stack first

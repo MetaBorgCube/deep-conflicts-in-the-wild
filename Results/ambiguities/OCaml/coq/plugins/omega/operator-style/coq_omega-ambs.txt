@@ -1,0 +1,31 @@
+Ambiguity 1: 
+Proofview.tclEVARMAP >>= fun sigma ->
+      let prop () = Proofview.tclUNIT (destructurate_prop sigma t) in
+      Proofview.V82.wrap_exceptions prop >>= fun prop ->
+      match prop with
+      | Kapp(Not,[t]) ->
+          (tclTHEN
+	     (tclTHEN (unfold sp_not) intro)
+	     destructure_hyps)
+      | Kimp(a,b) -> (tclTHEN intro (loop b))
+      | Kapp(False,[]) -> destructure_hyps
+      | _ ->
+	  let goal_tac =
+	    try
+	      let dec = decidability t in
+	      tclTHEN
+                (Proofview.Goal.nf_enter { enter = begin fun gl ->
+		                         refine_app gl (mkApp (Lazy.force coq_dec_not_not, [| t; dec |]))
+		                         end })
+	        intro
+	    with Undecidable -> Tactics.elim_type (Lazy.force coq_False)
+	    | e when Proofview.V82.catchable_exception e -> Proofview.tclZERO e
+	  in
+	  tclTHEN goal_tac destructure_hyps
+
+Ambiguity 2: 
+omega_solver =
+  Proofview.tclUNIT () >>= fun () -> (* delay for [check_required_library] *)
+  Coqlib.check_required_library ["Coq";"omega";"Omega"];
+  reset_all ();
+  destructure_goal

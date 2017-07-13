@@ -1,0 +1,16 @@
+Ambiguity 1: 
+| MLglobal (Gcase (_,i)) ->
+	    (try 
+	      let params,body = get_case gdef i in
+	      let s, id, arg = subst_case params args s in
+	      if can_subst arg then optimize (add_subst id arg s) body
+	      else MLlet(id, arg, optimize s body)
+	    with Not_found ->  MLapp(optimize s f, args))
+	| _ -> 
+            let f = optimize s f in
+            match f with
+            | MLmatch (annot,a,accu,bs) ->
+              if all_lam (Array.length args) bs then  
+                commutative_cut annot a accu bs args 
+              else MLapp(f, args)
+            | _ -> MLapp(f, args)

@@ -1,0 +1,75 @@
+Ambiguity 1: 
+Cohttp_lwt_unix.Client.call meth ~body uri >>= fun (code, ansbody) ->
+    log_request uri json >>= fun reqid ->
+    return (reqid, code.Cohttp.Response.status, ansbody)
+
+Ambiguity 2: 
+make_request config logger.log_request
+    meth service json >>=? fun (reqid, code, ansbody) ->
+  match code with
+  | #Cohttp.Code.success_status ->
+      let ansbody = Cohttp_lwt_body.to_stream ansbody in
+      let json_st = Data_encoding_ezjsonm.from_stream ansbody in
+      let parsed_st, push = Lwt_stream.create () in
+      let rec loop () =
+        Lwt_stream.get json_st >>= function
+        | Some (Ok json) as v ->
+            push v ;
+            logger.log_success reqid code json >>= fun () ->
+            loop ()
+        | None ->
+            push None ;
+            Lwt.return_unit
+        | Some (Error msg) ->
+            let error =
+              RPC_error (config, Malformed_json (service, "", msg)) in
+            push (Some (Error [error])) ;
+            push None ;
+            Lwt.return_unit
+      in
+      Lwt.async loop ;
+      return parsed_st
+  | err ->
+      Cohttp_lwt_body.to_string ansbody >>= fun ansbody ->
+      logger.log_error reqid code ansbody >>= fun () ->
+      fail config (Request_failed (service, err))
+
+Ambiguity 3: 
+make_request config logger.log_request
+    meth service json >>=? fun (reqid, code, ansbody) ->
+  Cohttp_lwt_body.to_string ansbody >>= fun ansbody ->
+  match code with
+  | #Cohttp.Code.success_status -> begin
+      if ansbody = "" then
+        return `Null
+      else
+        match Data_encoding_ezjsonm.from_string ansbody with
+        | Error msg ->
+            logger.log_error reqid code ansbody >>= fun () ->
+            fail config (Malformed_json (service, ansbody, msg))
+        | Ok json ->
+            logger.log_success reqid code json >>= fun () ->
+            return json
+    end
+  | err ->
+      logger.log_error reqid code ansbody >>= fun () ->
+      fail config (Request_failed (service, err))
+
+Ambiguity 4: 
+let meth, path, arg = RPC.forge_request service () arg in
+  get_streamed_json cctxt meth path arg >>=? fun json_st ->
+  let parsed_st, push = Lwt_stream.create () in
+  let rec loop () =
+    Lwt_stream.get json_st >>= function
+    | Some (Ok json) -> begin
+        parse_answer cctxt service path json >>= function
+        | Ok v -> push (Some (Ok v)) ; loop ()
+        | Error _ as err ->
+            push (Some err) ; push None ; Lwt.return_unit
+      end
+    | Some (Error _) as v ->
+        push v ; push None ; Lwt.return_unit
+    | None -> push None ; Lwt.return_unit
+  in
+  Lwt.async loop ;
+  return parsed_st

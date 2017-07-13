@@ -1,0 +1,2 @@
+Ambiguity 1: 
+| None -> match tl with [] -> None | hd::tl -> loop hd tl

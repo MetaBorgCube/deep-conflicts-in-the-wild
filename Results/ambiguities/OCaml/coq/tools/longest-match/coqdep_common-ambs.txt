@@ -1,0 +1,22 @@
+Ambiguity 1: 
+| Some rem ->
+      match get_prefix (List.rev s) (List.rev rem) with
+      | None -> ()
+      | Some _ -> raise (M.Found binding)
+
+Ambiguity 2: 
+| None ->
+	  match search_ml_known str with
+	    | Some mldir ->
+	      let file = file_name str mldir in
+	      a_faire^" "^file
+	    | None -> a_faire
+
+Ambiguity 3: 
+| None ->
+		      match search_mlpack_known s with
+			| Some mldir -> declare ".cmo" mldir s
+			| None ->
+			  match search_ml_known s with
+			    | Some mldir -> declare ".cmo" mldir s
+			    | None -> warning_declare f str

@@ -1,0 +1,29 @@
+Ambiguity 1: 
+let stop = 
+      try com_eqn (List.length res_vars) equation_id functional_ref f_ref term_ref (subst_var function_name equation_lemma_type);
+	  false
+      with e when CErrors.noncritical e ->
+	begin
+	  if do_observe ()
+	  then Feedback.msg_debug (str "Cannot create equation Lemma " ++ CErrors.print e)
+	  else CErrors.user_err ~hdr:"Cannot create equation Lemma"
+               (str "Cannot create equation lemma." ++ spc () ++ 
+                str "This may be because the function is nested-recursive.")
+	  ;
+	  true
+	end
+    in
+    if not stop
+    then
+      let eq_ref = Nametab.locate (qualid_of_ident equation_id ) in
+      let f_ref = destConst (constr_of_global f_ref)
+      and functional_ref = destConst (constr_of_global functional_ref)
+      and eq_ref = destConst (constr_of_global eq_ref) in
+      generate_induction_principle f_ref tcc_lemma_constr
+	functional_ref eq_ref rec_arg_num (EConstr.of_constr rec_arg_type) (nb_prod evm (EConstr.of_constr res)) (EConstr.of_constr relation);
+      Flags.if_verbose
+        msgnl (h 1 (Ppconstr.pr_id function_name ++
+			 spc () ++ str"is defined" )++ fnl () ++
+		    h 1 (Ppconstr.pr_id equation_id ++
+			   spc () ++ str"is defined" )
+      )

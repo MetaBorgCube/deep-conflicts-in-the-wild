@@ -1,0 +1,26 @@
+Ambiguity 1: 
+| ([] , _ ) -> NotGE
+      | ( _ , []) -> Greater
+      | (x1::l1, x2::l2) ->
+          match order (x1,x2) with
+            Greater -> if List.for_all (fun n' -> gt_ord order (m,n')) l2
+                       then Greater else NotGE
+          | Equal -> lexrec (l1,l2)
+          | NotGE -> if List.exists (fun m' -> ge_ord order (m',n)) l1
+                     then Greater else NotGE
+
+Ambiguity 2: 
+| Term(op1,sons1) ->
+            match n with
+                Var vn ->
+                  if occurs vn m then Greater else NotGE
+              | Term(op2,sons2) ->
+                  match (op_order op1 op2) with
+                      Greater ->
+                        if List.for_all (fun n' -> gt_ord rporec (m,n')) sons2
+                        then Greater else NotGE
+                    | Equal ->
+                        ext rporec (m,n)
+                    | NotGE ->
+                        if List.exists (fun m' -> ge_ord rporec (m',n)) sons1
+                        then Greater else NotGE

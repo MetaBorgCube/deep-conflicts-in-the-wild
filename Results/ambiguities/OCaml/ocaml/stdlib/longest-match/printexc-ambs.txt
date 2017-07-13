@@ -1,0 +1,19 @@
+Ambiguity 1: 
+| [] ->
+        match x with
+        | Out_of_memory -> "Out of memory"
+        | Stack_overflow -> "Stack overflow"
+        | Match_failure(file, line, char) ->
+            sprintf locfmt file line char (char+5) "Pattern matching failed"
+        | Assert_failure(file, line, char) ->
+            sprintf locfmt file line char (char+6) "Assertion failed"
+        | Undefined_recursive_module(file, line, char) ->
+            sprintf locfmt file line char (char+6) "Undefined recursive module"
+        | _ ->
+            let x = Obj.repr x in
+            if Obj.tag x <> 0 then
+              (Obj.magic (Obj.field x 0) : string)
+            else
+              let constructor =
+                (Obj.magic (Obj.field (Obj.field x 0) 0) : string) in
+              constructor ^ (fields x)

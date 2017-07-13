@@ -1,0 +1,14 @@
+Ambiguity 1: 
+| Some attrs ->
+    match explicit_type attrs with
+    | [] ->
+      (* No explicit type, use the inferred type for bound identifiers *)
+      let ids = let_bound_idents [x] in
+      List.map
+        (fun id ->
+           let ty = typ (Env.find_value (Pident id) final_env).val_type in
+           Sig.value (Val.mk (mknoloc (Ident.name id)) ty)
+        ) ids
+    | l ->
+      (* Explicit type given with the syntax [@@mli (x1 : ty1), ..., (xn : tyn)] *)
+      List.map (fun (id, ty) -> Sig.value (Val.mk (mknoloc id) ty)) l

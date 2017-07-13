@@ -1,0 +1,14 @@
+Ambiguity 1: 
+buf.paren_depth <- buf.paren_depth - 1 ; 
+  if buf.paren_depth < 0  then
+    error lexbuf Unbalanced_paren
+  else 
+    let new_sexp =
+      if buf.has_prime then 
+        Data (List.rev   buf.top)
+      else List (List.rev   buf.top) 
+    in 
+    let top, has_prime =  Stack.pop buf.sexps in
+    buf.top<- top;
+    buf.has_prime<-has_prime;
+    push_atom lexbuf new_sexp buf

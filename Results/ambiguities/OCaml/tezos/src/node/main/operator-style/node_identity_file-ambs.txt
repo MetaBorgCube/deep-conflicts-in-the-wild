@@ -1,0 +1,16 @@
+Ambiguity 1: 
+Lwt_unix.file_exists file >>= function
+  | false ->
+      fail (No_identity_file file)
+  | true ->
+      Data_encoding_ezjsonm.read_file file >>=? fun json ->
+      let id = Data_encoding.Json.destruct P2p.Identity.encoding json in
+      match expected_pow with
+      | None -> return id
+      | Some expected ->
+          let target = Crypto_box.make_target expected in
+          if (Crypto_box.check_proof_of_work
+                id.public_key id.proof_of_work_stamp target) then
+            return id
+          else
+            fail (Insufficient_proof_of_work { expected })

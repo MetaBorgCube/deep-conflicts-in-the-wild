@@ -1,0 +1,6 @@
+Ambiguity 1: 
+let open_out_file f =
+  out_channel :=
+    try open_out (coqdoc_out f)
+    with Sys_error s -> Printf.eprintf "%s\n" s; exit 1
+

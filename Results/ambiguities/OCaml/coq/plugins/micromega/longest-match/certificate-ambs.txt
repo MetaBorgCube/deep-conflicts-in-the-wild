@@ -1,0 +1,67 @@
+Ambiguity 1: 
+| c::cert -> 
+    match l with
+    | [] -> failwith "make_certificate(1)"
+    | i::l ->  
+     let r = scalar_product cert l in
+     match compare_big_int c  zero_big_int with
+     | -1 -> Mc.PsatzAdd (
+      Mc.PsatzMulC (Mc.Pc ( bint_to_cst c), Mc.PsatzIn (Ml2C.nat i)), 
+      r)
+     | 0  -> r
+     | _ ->  Mc.PsatzAdd (
+      Mc.PsatzMulE (Mc.PsatzC (bint_to_cst c), Mc.PsatzIn (Ml2C.nat i)),
+      r)
+
+Ambiguity 2: 
+| _  -> 
+  let gcdi =  (gcd_list (List.map snd coeffs)) in
+  let gcd = Big_int gcdi in
+  if eq_num gcd (Int 1)
+  then Normalise(cstr,prf) 
+  else
+   if Int.equal (sign_num (mod_num cst gcd)) 0
+   then (* We can really normalise *)
+    begin
+     assert (sign_num gcd >=1 ) ;
+     let cstr = {
+      coeffs = List.map (fun (x,v) -> (x, v // gcd)) coeffs; 
+      op = op ; cst = cst // gcd
+     } in 
+     Normalise(cstr,Gcd(gcdi,prf))
+	      (*		    Normalise(cstr,CutPrf prf)*)
+    end
+   else
+    match op with
+    | Eq -> Unsat (CutPrf prf)
+    | Ge -> 
+     let cstr = {
+      coeffs = List.map (fun (x,v) -> (x, v // gcd)) coeffs; 
+      op = op ; cst = ceiling_num (cst // gcd)
+     } in Cut(cstr,CutPrf prf)
+
+Ambiguity 3: 
+| e::l ->
+   match extract (pred e) l with
+   | None,_ -> xextract2 (e::rl) l
+   | Some (r,e'),l' -> Some (r,e,e'), List.rev_append rl l'
+
+Ambiguity 4: 
+| Some pc' -> 
+   match check_sat pc' with
+   | Tauto -> acc
+   | Unsat prf -> raise (FoundProof prf)
+   | Cut(c,p)  -> (c,p)::acc
+   | Normalise (c,p) -> (c,p)::acc
+
+Ambiguity 5: 
+| f::fl -> 
+  match f x with
+  | None    -> app_funs fl x
+  | Some x' -> Some x'
+
+Ambiguity 6: 
+| Some prf  -> 
+    match start_enum id e (clb +/ (Int 1)) cub sys with
+    | None -> None
+    | Some l -> Some (prf::l)

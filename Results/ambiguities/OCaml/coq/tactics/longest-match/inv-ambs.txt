@@ -1,0 +1,13 @@
+Ambiguity 1: 
+let wrap_inv_error id = function (e, info) -> match e with
+  | Indrec.RecursionSchemeError
+      (Indrec.NotAllowedCaseAnalysis (_,(Type _ | Prop Pos as k),i)) ->
+      Proofview.tclENV >>= fun env ->
+      tclZEROMSG (
+	(strbrk "Inversion would require case analysis on sort " ++
+	pr_sort Evd.empty k ++
+	strbrk " which is not allowed for inductive definition " ++
+	pr_inductive env (fst i) ++ str "."))
+  | e -> Proofview.tclZERO ~info e
+
+(* The most general inversion tactic *)

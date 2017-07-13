@@ -1,0 +1,10 @@
+Ambiguity 1: 
+Proofview.tclEVARMAP >>= fun sigma ->
+          let gr =
+            try Proofview.tclUNIT (find_left sigma a seq)
+            with Not_found -> tclFAIL 0 (Pp.str "No link")
+          in
+          gr >>= fun gr ->
+          pf_constr_of_global gr >>= fun left ->
+	  pf_constr_of_global id >>= fun id -> 
+	    generalize [(mkApp(id, [|left|]))]

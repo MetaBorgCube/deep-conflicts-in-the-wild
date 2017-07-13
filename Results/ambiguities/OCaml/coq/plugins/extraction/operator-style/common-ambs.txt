@@ -1,0 +1,19 @@
+Ambiguity 1: 
+opened_libraries () =
+  if not (modular ()) then []
+  else
+    let used_files = mpfiles_list () in
+    let used_ks = List.map (fun mp -> Mod,string_of_modfile mp) used_files in
+    (* By default, we open all used files. Ambiguities will be resolved later
+       by using qualified names. Nonetheless, we don't open any file A that
+       contains an immediate submodule A.B hiding another file B : otherwise,
+       after such an open, there's no unambiguous way to refer to objects of B. *)
+    let to_open =
+      List.filter
+	(fun mp ->
+	   not (List.exists (fun k -> KMap.mem k (get_mpfiles_content mp)) used_ks))
+	used_files
+    in
+    mpfiles_clear ();
+    List.iter mpfiles_add to_open;
+    mpfiles_list ()

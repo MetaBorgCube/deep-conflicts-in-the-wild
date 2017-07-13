@@ -1,0 +1,60 @@
+Ambiguity 1: 
+if Evd.is_defined !evdref evk then
+	    (* If evk is already defined we replace it by its definition *)
+	    let nc = Evd.existential_value !evdref ev in
+	      (check_and_clear_in_constr env evdref err ids global nc)
+	  else
+	    (* We check for dependencies to elements of ids in the
+	       evar_info corresponding to e and in the instance of
+	       arguments. Concurrently, we build a new evar
+	       corresponding to e where hypotheses of ids have been
+	       removed *)
+	    let evi = Evd.find_undefined !evdref evk in
+	    let ctxt = Evd.evar_filtered_context evi in
+	    let ctxt = List.map (fun d -> map_named_decl EConstr.of_constr d) ctxt in
+	    let (rids,filter) =
+              List.fold_right2
+                (fun h a (ri,filter) ->
+                  try
+                  (* Check if some id to clear occurs in the instance
+                     a of rid in ev and remember the dependency *)
+                    let check id = if Id.Set.mem id ids then raise (Depends id) in
+                    let () = Id.Set.iter check (collect_vars !evdref (EConstr.of_constr a)) in
+                  (* Check if some rid to clear in the context of ev
+                     has dependencies in another hyp of the context of ev
+                     and transitively remember the dependency *)
+                    let check id _ =
+                      if occur_var_in_decl (Global.env ()) !evdref id h
+                      then raise (Depends id)
+                    in
+                    let () = Id.Map.iter check ri in
+                  (* No dependency at all, we can keep this ev's context hyp *)
+                    (ri, true::filter)
+                  with Depends id -> (Id.Map.add (NamedDecl.get_id h) id ri, false::filter))
+		ctxt (Array.to_list l) (Id.Map.empty,[]) in
+	    (* Check if some rid to clear in the context of ev has dependencies
+	       in the type of ev and adjust the source of the dependency *)
+	    let _nconcl =
+	      try
+                let nids = Id.Map.domain rids in
+                let global = Id.Set.exists is_section_variable nids in
+                check_and_clear_in_constr env evdref (EvarTypingBreak ev) nids global (evar_concl evi)
+	      with ClearDependencyError (rid,err) ->
+		raise (ClearDependencyError (Id.Map.find rid rids,err)) in
+
+            if Id.Map.is_empty rids then c
+            else
+              let origfilter = Evd.evar_filter evi in
+              let filter = Evd.Filter.apply_subfilter origfilter filter in
+              let evd = Sigma.Unsafe.of_evar_map !evdref in
+              let Sigma (_, evd, _) = restrict_evar evd evk filter None in
+              let evd = Sigma.to_evar_map evd in
+              evdref := evd;
+	    (* spiwack: hacking session to mark the old [evk] as having been "cleared" *)
+	      let evi = Evd.find !evdref evk in
+	      let extra = evi.evar_extra in
+	      let extra' = Store.set extra cleared true in
+	      let evi' = { evi with evar_extra = extra' } in
+	      evdref := Evd.add !evdref evk evi' ;
+	    (* spiwack: /hacking session *)
+              Evd.existential_value !evdref ev

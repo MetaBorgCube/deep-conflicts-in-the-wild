@@ -1,0 +1,112 @@
+Ambiguity 1: 
+lid, a -> match lid.txt with
+            Longident.Lident s -> lid, Hashtbl.find labels s, a
+          | _ -> assert false
+
+Ambiguity 2: 
+| Some exp ->
+                match get_path exp.exp_type with
+                  None -> newvar (), None
+                | Some (_, p', _) as op ->
+                    let decl = Env.find_type p' env in
+                    begin_def ();
+                    let ty =
+                      newconstr p' (instance_list env decl.type_params) in
+                    end_def ();
+                    generalize_structure ty;
+                    ty, op
+
+Ambiguity 3: 
+let (ty_arg, ty_res) =
+    try filter_arrow env (instance env ty_expected) l
+    with Unify _ ->
+      match expand_head env ty_expected with
+        {desc = Tarrow _} as ty ->
+          raise(Error(loc, env, Abstract_wrong_label(l, ty)))
+      | _ ->
+          raise(Error(loc_fun, env,
+                      Too_many_arguments (in_function <> None, ty_fun)))
+  in
+  let ty_arg =
+    if is_optional l then
+      let tv = newvar() in
+      begin
+        try unify env ty_arg (type_option tv)
+        with Unify _ -> assert false
+      end;
+      type_option tv
+    else ty_arg
+  in
+  if separate then begin
+    end_def ();
+    generalize_structure ty_arg;
+    generalize_structure ty_res
+  end;
+  let cases, partial =
+    type_cases ~in_function:(loc_fun,ty_fun) env ty_arg ty_res
+      true loc caselist in
+  let not_function ty =
+    let ls, tvar = list_labels env ty in
+    ls = [] && not tvar
+  in
+  if is_optional l && not_function ty_res then
+    Location.prerr_warning (List.hd cases).c_lhs.pat_loc
+      Warnings.Unerasable_optional_argument;
+  re {
+  exp_desc = Texp_function(l,cases, partial);
+    exp_loc = loc; exp_extra = [];
+    exp_type = instance env (newgenty (Tarrow(l, ty_arg, ty_res, Cok)));
+    exp_attributes = attrs;
+    exp_env = env }
+
+Ambiguity 4: 
+let arg =
+    let snap = if vars = [] then None else Some (Btype.snapshot ()) in
+    let arg = type_argument env sarg ty_arg (instance env ty_arg) in
+    end_def ();
+    try
+      check_univars env (vars <> []) "field value" arg label.lbl_arg vars;
+      arg
+    with exn when not (is_nonexpansive arg) -> try
+      (* Try to retype without propagating ty_arg, cf PR#4862 *)
+      may Btype.backtrack snap;
+      begin_def ();
+      let arg = type_exp env sarg in
+      end_def ();
+      generalize_expansive env arg.exp_type;
+      unify_exp env arg ty_arg;
+      check_univars env false "field value" arg label.lbl_arg vars;
+      arg
+    with Error (_, _, Less_general _) as e -> raise e
+    | _ -> raise exn    (* In case of failure return the first error *)
+  in
+  (lid, label, {arg with exp_type = instance env arg.exp_type})
+
+Ambiguity 5: 
+| Tarrow (l,t1,t2,_) when l = l1
+            || !Clflags.classic && l1 = "" && not (is_optional l) ->
+              (t1, t2)
+          | td ->
+              let ty_fun =
+                match td with Tarrow _ -> newty td | _ -> ty_fun in
+              let ty_res = result_type (omitted @ !ignored) ty_fun in
+              match ty_res.desc with
+                Tarrow _ ->
+                  if (!Clflags.classic || not (has_label l1 ty_fun)) then
+                    raise (Error(sarg1.pexp_loc, env,
+                                 Apply_wrong_label(l1, ty_res)))
+                  else
+                    raise (Error(funct.exp_loc, env, Incoherent_label_order))
+              | _ ->
+                  raise(Error(funct.exp_loc, env, Apply_non_function
+                                (expand_head env funct.exp_type)))
+
+Ambiguity 6: 
+| _ ->
+        match sargs with
+          (l, sarg0) :: _ when ignore_labels ->
+            raise(Error(sarg0.pexp_loc, env,
+                        Apply_wrong_label(l, ty_old)))
+        | _ ->
+            type_unknown_args args omitted ty_fun0
+              (sargs @ more_sargs)

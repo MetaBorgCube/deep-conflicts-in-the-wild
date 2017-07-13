@@ -1,0 +1,177 @@
+Ambiguity 1: 
+| u::l -> 
+			match t with 
+			  | GLambda(loc,na,_,nat,b) -> 
+			      GLetIn(Loc.ghost,na,u,None,aux b l)
+			  | _ -> 
+			      GApp(Loc.ghost,t,l)
+
+Ambiguity 2: 
+| GApp(loc1,GRef(loc2,eq_as_ref,_),[ty;GVar(loc3,id);rt])
+		when Globnames.eq_gr eq_as_ref (Lazy.force Coqlib.coq_eq_ref)  && n == Anonymous
+		  ->
+		begin
+		  try
+		    observe (str "computing new type for eq : " ++ pr_glob_constr rt);
+		    let t' =
+		      try fst (Pretyping.understand env (Evd.from_env env) t)(*FIXME*)
+                      with e when CErrors.noncritical e -> raise Continue
+		    in
+		    let is_in_b = is_free_in id b in
+		    let _keep_eq =
+		      not (List.exists (is_free_in id) args) || is_in_b  ||
+			List.exists (is_free_in id) crossed_types
+		    in
+		    let new_args = List.map (replace_var_by_term id rt) args in
+		    let subst_b =
+		      if is_in_b then b else  replace_var_by_term id rt b
+		    in
+		    let new_env = Environ.push_rel (LocalAssum (n,t')) env in
+		    let new_b,id_to_exclude =
+		      rebuild_cons
+			new_env
+			nb_args relname
+			new_args new_crossed_types
+			(depth + 1) subst_b
+		    in
+		    mkGProd(n,t,new_b),id_to_exclude
+		  with Continue ->
+		    let jmeq = Globnames.IndRef (fst (EConstr.destInd Evd.empty (jmeq ()))) in
+		    let ty',ctx = Pretyping.understand env (Evd.from_env env) ty in
+		    let ind,args' = Inductive.find_inductive env ty' in
+		    let mib,_ = Global.lookup_inductive (fst ind) in
+		    let nparam = mib.Declarations.mind_nparams in
+		    let params,arg' =
+		      ((Util.List.chop nparam args'))
+		    in
+		    let rt_typ =
+		       GApp(Loc.ghost,
+			    GRef (Loc.ghost,Globnames.IndRef (fst ind),None),
+			    (List.map
+			      (fun p -> Detyping.detype false []
+				 env (Evd.from_env env)
+				 (EConstr.of_constr p)) params)@(Array.to_list
+				      (Array.make
+					 (List.length args' - nparam)
+					 (mkGHole ()))))
+		    in
+		    let eq' =
+		      GApp(loc1,GRef(loc2,jmeq,None),[ty;GVar(loc3,id);rt_typ;rt])
+		    in
+		    observe (str "computing new type for jmeq : " ++ pr_glob_constr eq');
+		    let eq'_as_constr,ctx = Pretyping.understand env (Evd.from_env env) eq' in
+		    observe (str " computing new type for jmeq : done") ;
+		    let new_args =
+		      match kind_of_term eq'_as_constr with
+			| App(_,[|_;_;ty;_|]) ->
+			    let ty = Array.to_list (snd (destApp ty)) in
+			    let ty' = snd (Util.List.chop nparam ty) in
+			    List.fold_left2
+			      (fun acc var_as_constr arg ->
+                                let arg = EConstr.of_constr arg in
+				 if isRel var_as_constr
+				 then
+				   let na = RelDecl.get_name (Environ.lookup_rel (destRel var_as_constr) env) in
+				   match na with
+				     | Anonymous -> acc
+				     | Name id' ->
+					 (id',Detyping.detype false []
+					    env
+                                            (Evd.from_env env)
+					    arg)::acc
+				 else if isVar var_as_constr
+				 then (destVar var_as_constr,Detyping.detype false []
+					 env
+                                         (Evd.from_env env)
+					 arg)::acc
+				 else acc
+			      )
+			      []
+			      arg'
+			      ty'
+			| _ -> assert false
+		    in
+		    let is_in_b = is_free_in id b in
+		    let _keep_eq =
+		      not (List.exists (is_free_in id) args) || is_in_b  ||
+			List.exists (is_free_in id) crossed_types
+		    in
+		    let new_args =
+		      List.fold_left
+			(fun args (id,rt) ->
+			   List.map (replace_var_by_term id rt) args
+			)
+			args
+			((id,rt)::new_args)
+		    in
+		    let subst_b =
+		     if is_in_b then b else  replace_var_by_term id rt b
+		    in
+		    let new_env =
+		      let t',ctx = Pretyping.understand env (Evd.from_env env) eq' in
+		      Environ.push_rel (LocalAssum (n,t')) env
+		    in
+		    let new_b,id_to_exclude =
+		      rebuild_cons
+			new_env
+			nb_args relname
+			new_args new_crossed_types
+			(depth + 1) subst_b
+		    in
+		    mkGProd(n,eq',new_b),id_to_exclude
+		end
+		  (* J.F:. keep this comment  it explain how to remove some meaningless equalities
+		     if keep_eq then
+		     mkGProd(n,t,new_b),id_to_exclude
+		     else new_b, Id.Set.add id id_to_exclude
+		  *)
+	    | GApp(loc1,GRef(loc2,eq_as_ref,_),[ty;rt1;rt2])
+		when Globnames.eq_gr eq_as_ref (Lazy.force Coqlib.coq_eq_ref) && n == Anonymous
+		  ->
+	      begin
+		try 
+		  let l = decompose_raw_eq rt1 rt2 in 
+		  if List.length l > 1 
+		  then 
+		    let new_rt =
+		      List.fold_left 
+			(fun acc (lhs,rhs) -> 
+			  mkGProd(Anonymous,
+				  mkGApp(mkGRef(eq_as_ref),[mkGHole ();lhs;rhs]),acc)
+			)
+			b
+			l
+		    in
+		    rebuild_cons env nb_args relname args crossed_types depth new_rt
+		  else raise Continue
+	      with Continue -> 
+		observe (str "computing new type for prod : " ++ pr_glob_constr rt);
+		let t',ctx = Pretyping.understand env (Evd.from_env env) t in
+		let new_env = Environ.push_rel (LocalAssum (n,t')) env in
+		let new_b,id_to_exclude =
+		  rebuild_cons new_env
+		    nb_args relname
+		    args new_crossed_types
+		    (depth + 1) b
+		in
+		match n with
+		  | Name id when Id.Set.mem id id_to_exclude && depth >= nb_args ->
+		      new_b,Id.Set.remove id
+			(Id.Set.filter not_free_in_t id_to_exclude)
+		  | _ -> mkGProd(n,t,new_b),Id.Set.filter not_free_in_t id_to_exclude
+	      end
+	    | _ ->
+		observe (str "computing new type for prod : " ++ pr_glob_constr rt);
+		let t',ctx = Pretyping.understand env (Evd.from_env env) t in
+		let new_env = Environ.push_rel (LocalAssum (n,t')) env in
+		let new_b,id_to_exclude =
+		  rebuild_cons new_env
+		    nb_args relname
+		    args new_crossed_types
+		    (depth + 1) b
+		in
+		match n with
+		  | Name id when Id.Set.mem id id_to_exclude && depth >= nb_args ->
+		      new_b,Id.Set.remove id
+			(Id.Set.filter not_free_in_t id_to_exclude)
+		  | _ -> mkGProd(n,t,new_b),Id.Set.filter not_free_in_t id_to_exclude

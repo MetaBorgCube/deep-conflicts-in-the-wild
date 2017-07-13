@@ -1,0 +1,11 @@
+Ambiguity 1: 
+| file :: files ->
+          let file = if dir = "" then file else Filename.concat dir file in
+          let open Unix in
+          match lstat_kind file with
+          | Some S_REG when filter file ->
+              process (sz+1) (file :: acc) files dir stack
+          | Some S_DIR ->
+              let dirfiles = Array.to_list @@ Sys.readdir file in
+              process sz acc dirfiles file (Dir (files, dir, stack))
+          | _ -> process sz acc files dir stack

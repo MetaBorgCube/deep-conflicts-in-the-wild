@@ -1,0 +1,177 @@
+Ambiguity 1: 
+| true ->
+        State.Protocol.store state hash proto >>= function
+        | false ->
+            failwith
+              "Previously registred protocol (%a)"
+              Protocol_hash.pp_short hash
+        | true -> return ()
+
+Ambiguity 2: 
+| `Test_head _ | `Test_prevalidation ->
+        match Validator.test_validator node.mainnet_validator with
+        | None -> raise Not_found
+        | Some v -> v
+
+Ambiguity 3: 
+| `Test_head _ | `Test_prevalidation ->
+        match Validator.test_validator node.mainnet_validator with
+        | None -> raise Not_found
+        | Some (v, _) -> v
+
+Ambiguity 4: 
+| Some (_net_db, block) ->
+        State.Net.get node.state block.shell.net_id >>= function
+        | Error _ -> Lwt.return_none
+        | Ok net ->
+            State.Valid_block.read_exn net h >>= fun block ->
+            Lwt.return (Some block)
+
+Ambiguity 5: 
+| ( `Head n | `Test_head n ) as block ->
+        let validator = get_validator node block in
+        let net_db = Validator.net_db validator in
+        let net_state = Validator.net_state validator in
+        State.Valid_block.Current.head net_state >>= fun head ->
+        get_pred net_db n head >>= convert
+    | `Hash h ->
+        read_valid_block_exn node h >>= convert
+    | ( `Prevalidation | `Test_prevalidation ) as block ->
+        let validator = get_validator node block in
+        let pv = Validator.prevalidator validator in
+        let net_state = Validator.net_state validator in
+        State.Valid_block.Current.head net_state >>= fun head ->
+        Prevalidator.context pv >>= function
+        | Error _ -> Lwt.fail Not_found
+        | Ok { context ; fitness } ->
+            Context.get_protocol context >>= fun protocol ->
+            Context.get_test_network context >>= fun test_network ->
+            let proto_level =
+              if Protocol_hash.equal protocol head.protocol_hash then
+                head.proto_level
+              else
+                ((head.proto_level + 1) mod 256) in
+            let operations =
+              let pv_result, _ = Prevalidator.operations pv in
+              [ pv_result.applied ] in
+            Lwt.return
+              { hash = prevalidation_hash ;
+                level = Int32.succ head.level ;
+                proto_level ;
+                predecessor = head.hash ;
+                fitness ;
+                timestamp = Prevalidator.timestamp pv ;
+                protocol ;
+                operations_hash =
+                  Operation_list_list_hash.compute
+                    (List.map Operation_list_hash.compute operations) ;
+                operations = Some operations ;
+                data = MBytes.of_string "" ;
+                net_id = head.net_id ;
+                test_network ;
+              }
+
+Ambiguity 6: 
+| ( `Head n | `Test_head n ) as block ->
+        let validator = get_validator node block in
+        let net_state = Validator.net_state validator in
+        let net_db = Validator.net_db validator in
+        State.Valid_block.Current.head net_state >>= fun head ->
+        get_pred net_db n head >>= fun block ->
+        Lwt.return (Some (rpc_context block))
+    | `Hash hash-> begin
+        read_valid_block node hash >|= function
+        | None -> None
+        | Some block -> Some (rpc_context block)
+      end
+    | ( `Prevalidation | `Test_prevalidation ) as block ->
+        let validator, net_db = get_net node block in
+        let pv = Validator.prevalidator validator in
+        let net_state = Validator.net_state validator in
+        State.Valid_block.Current.head net_state >>= fun head ->
+        Prevalidator.context pv >>= function
+        | Error _ -> Lwt.fail Not_found
+        | Ok { context ; fitness } ->
+            Context.get_protocol context >>= fun protocol ->
+            let proto_level =
+              if Protocol_hash.equal protocol head.protocol_hash then
+                head.proto_level
+              else
+                ((head.proto_level + 1) mod 256) in
+            let operation_hashes =
+              let pv_result, _ = Prevalidator.operations pv in
+              [ pv_result.applied ] in
+            let operations_hash =
+              Operation_list_list_hash.compute
+                (List.map Operation_list_hash.compute operation_hashes) in
+            Lwt.return (Some {
+                Updater.block_hash = prevalidation_hash ;
+                block_header = {
+                  shell = {
+                    net_id = head.net_id ;
+                    level = Int32.succ head.level ;
+                    proto_level ;
+                    predecessor = head.hash ;
+                    timestamp = Prevalidator.timestamp pv ;
+                    operations_hash ;
+                    fitness ;
+                  } ;
+                  proto = MBytes.create 0 ;
+                } ;
+                operation_hashes = (fun () -> Lwt.return operation_hashes) ;
+                operations = begin fun () ->
+                  Lwt_list.map_p
+                    (Lwt_list.map_p
+                         (Distributed_db.Operation.read_exn net_db))
+                    operation_hashes
+                end ;
+                context ;
+              })
+
+Ambiguity 7: 
+| ( `Head n | `Test_head n ) as block ->
+        let validator = get_validator node block in
+        let net_state = Validator.net_state validator in
+        let net_db = Validator.net_db validator in
+        State.Valid_block.Current.head net_state >>= fun head ->
+        get_pred net_db n head >>= fun { operation_hashes } ->
+        Lazy.force operation_hashes
+    | (`Prevalidation | `Test_prevalidation) as block ->
+        let validator, _net = get_net node block in
+        let pv = Validator.prevalidator validator in
+        let { Prevalidation.applied }, _ = Prevalidator.operations pv in
+        Lwt.return [applied]
+    | `Hash hash ->
+        read_valid_block node hash >>= function
+        | None -> Lwt.return_nil
+        | Some { operation_hashes } ->
+            Lazy.force operation_hashes
+
+Ambiguity 8: 
+| ( `Head 0 | `Prevalidation
+        | `Test_head 0 | `Test_prevalidation ) as block ->
+          let validator = get_validator node block in
+          let net_state = Validator.net_state validator in
+          State.Valid_block.Current.head net_state >>= return
+      | `Head n | `Test_head n as block -> begin
+          let validator = get_validator node block in
+          let net_state = Validator.net_state validator in
+          let net_db = Validator.net_db validator in
+          State.Valid_block.Current.head net_state >>= fun head ->
+          get_pred net_db n head >>= return
+        end
+      | `Hash hash ->
+          read_valid_block node hash >>= function
+          | None -> Lwt.return (error_exn Not_found)
+          | Some data -> return data
+
+Ambiguity 9: 
+| Some block ->
+        get_rpc_context node block >>= function
+        | None -> Lwt.fail Not_found
+        | Some { context = ctxt } ->
+            Context.get_protocol ctxt >>= fun protocol_hash ->
+            let (module Proto) = Updater.get_exn protocol_hash in
+            Base58.complete str >>= fun l1 ->
+            Proto.complete_b58prefix ctxt str >>= fun l2 ->
+            Lwt.return (l1 @ l2)

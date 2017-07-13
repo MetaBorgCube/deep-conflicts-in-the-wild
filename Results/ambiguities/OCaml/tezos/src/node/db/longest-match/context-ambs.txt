@@ -1,0 +1,5 @@
+Ambiguity 1: 
+| Some data ->
+      match Data_encoding.Binary.of_bytes test_network_encoding data with
+      | None -> Lwt.fail (Failure "Unexpected error (Context.get_test_network)")
+      | Some r -> Lwt.return r

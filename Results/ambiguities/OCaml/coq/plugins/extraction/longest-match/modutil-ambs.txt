@@ -1,0 +1,9 @@
+Ambiguity 1: 
+| l :: ll ->
+	  match search_structure l (not (List.is_empty ll)) sel with
+	    | SEdecl d -> d
+	    | SEmodtype m -> assert false
+	    | SEmodule m ->
+		match m.ml_mod_expr with
+		  | MEstruct (_,sel) -> go ll sel
+		  | _ -> error_not_visible r

@@ -1,0 +1,10 @@
+Ambiguity 1: 
+let column = find_string_col "Worker" columns in
+          if job = "Dead" then
+            store#foreach (fun _ row ->
+              if store#get ~row ~column = id then store#remove row || true
+              else false)
+          else
+            let line = store#append () in
+            store#set ~row:line ~column id;
+            store#set ~row:line ~column:(find_string_col "Job name" columns) job

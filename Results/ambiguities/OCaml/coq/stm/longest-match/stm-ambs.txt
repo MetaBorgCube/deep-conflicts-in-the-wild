@@ -1,0 +1,160 @@
+Ambiguity 1: 
+| Some vcs, _ ->
+        let ids, tactic, undo =
+          if id = Stateid.initial || id = Stateid.dummy then [],false,0 else
+          match VCS.visit id with
+          | { step = `Fork ((_,_,_,l),_) } -> l, false,0
+          | { step = `Cmd { cids = l; ctac } } -> l, ctac,0
+          | { step = `Alias (_,{ expr = VernacUndo n}) } -> [], false, n
+          | _ -> [],false,0 in
+        match f acc (id, vcs, ids, tactic, undo) with
+        | `Stop x -> x
+        | `Cont acc -> next acc
+
+Ambiguity 2: 
+| id :: rest ->
+          match get_state seen id with
+          | None -> aux seen rest
+          | Some stuff -> stuff :: aux (id :: seen) rest
+
+Ambiguity 3: 
+| Some (_, cur) ->
+          match VCS.visit cur with
+          | { step = `Cmd { cast = { loc } } }
+          | { step = `Fork (( { loc }, _, _, _), _) } 
+          | { step = `Qed ( { qast = { loc } }, _) } 
+          | { step = `Sideff (`Ast ( { loc }, _)) } ->
+              let start, stop = Loc.unloc loc in
+              msg_error Pp.(
+                str"File " ++ str name ++ str ": proof of " ++ str r_name ++
+                str ": chars " ++ int start ++ str "-" ++ int stop ++
+                spc () ++ iprint (e, info))
+          | _ ->
+              msg_error Pp.(
+                str"File " ++ str name ++ str ": proof of " ++ str r_name ++
+                spc () ++ iprint (e, info))
+
+Ambiguity 4: 
+let edit_at id =
+  if Stateid.equal id Stateid.dummy then anomaly(str"edit_at dummy") else
+  let vcs = VCS.backup () in
+  let on_cur_branch id =
+    let rec aux cur =
+      if id = cur then true
+      else match VCS.visit cur with
+      | { step = `Fork _ } -> false
+      | { next } -> aux next in
+    aux (VCS.get_branch_pos (VCS.current_branch ())) in
+  let rec is_pure_aux id =
+    let view = VCS.visit id in
+    match view.step with
+    | `Cmd _ -> is_pure_aux view.next
+    | `Fork _ -> true
+    | _ -> false in
+  let is_pure id =
+    match (VCS.visit id).step with
+    | `Qed (_,last_step) -> is_pure_aux last_step
+    | _ -> assert false
+  in
+  let is_ancestor_of_cur_branch id =
+    Stateid.Set.mem id
+      (VCS.reachable (VCS.get_branch_pos (VCS.current_branch ()))) in
+  let has_failed qed_id =
+    match VCS.visit qed_id with
+    | { step = `Qed ({ fproof = Some (fp,_) }, _) } -> Future.is_exn fp
+    | _ -> false in
+  let rec master_for_br root tip =
+      if Stateid.equal tip Stateid.initial then tip else
+      match VCS.visit tip with
+      | { step = (`Fork _ | `Qed _) } -> tip
+      | { step = `Sideff (`Ast(_,id)) } -> id
+      | { step = `Sideff _ } -> tip
+      | { next } -> master_for_br root next in
+  let reopen_branch start at_id mode qed_id tip old_branch =
+    let master_id, cancel_switch, keep =
+      (* Hum, this should be the real start_id in the cluster and not next *)
+      match VCS.visit qed_id with
+      | { step = `Qed ({ fproof = Some (_,cs); keep },_) } -> start, cs, keep
+      | _ -> anomaly (str "ProofTask not ending with Qed") in
+    VCS.branch ~root:master_id ~pos:id
+      VCS.edit_branch (`Edit (mode, qed_id, master_id, keep, old_branch));
+    VCS.delete_boxes_of id;
+    cancel_switch := true;
+    Reach.known_state ~cache:(interactive ()) id;
+    VCS.checkout_shallowest_proof_branch ();
+    `Focus { stop = qed_id; start = master_id; tip } in
+  let no_edit = function
+   | `Edit (pm, _,_,_,_) -> `Proof(pm,1)
+   | x -> x in
+  let backto id bn =
+    List.iter VCS.delete_branch (VCS.branches ());
+    let ancestors = VCS.reachable id in
+    let { mine = brname, brinfo; others } = Backtrack.branches_of id in
+    List.iter (fun (name,{ VCS.kind = k; root; pos }) ->
+      if not(VCS.Branch.equal name VCS.Branch.master) &&
+         Stateid.Set.mem root ancestors then
+        VCS.branch ~root ~pos name k)
+      others;
+    VCS.reset_branch VCS.Branch.master (master_for_br brinfo.VCS.root id);
+    VCS.branch ~root:brinfo.VCS.root ~pos:brinfo.VCS.pos
+      (Option.default brname bn)
+      (no_edit brinfo.VCS.kind);
+    VCS.delete_boxes_of id;
+    VCS.gc ();
+    VCS.print ();
+    if not !Flags.async_proofs_full then
+      Reach.known_state ~cache:(interactive ()) id;
+    VCS.checkout_shallowest_proof_branch ();
+    `NewTip in
+  try
+    let rc =
+      let focused = List.exists ((=) VCS.edit_branch) (VCS.branches ()) in
+      let branch_info =
+        match snd (VCS.get_info id).vcs_backup with
+        | Some{ mine = bn, { VCS.kind = `Proof(m,_) }} -> Some(m,bn)
+        | Some{ mine = _, { VCS.kind = `Edit(m,_,_,_,bn) }} -> Some (m,bn)
+        | _ -> None in
+      match focused, VCS.proof_task_box_of id, branch_info with
+      | _, Some _, None -> assert false
+      | false, Some { qed = qed_id ; lemma = start }, Some(mode,bn) ->
+          let tip = VCS.cur_tip () in
+          if has_failed qed_id && is_pure qed_id && not !Flags.async_proofs_never_reopen_branch
+          then reopen_branch start id mode qed_id tip bn
+          else backto id (Some bn)
+      | true, Some { qed = qed_id }, Some(mode,bn) ->
+          if on_cur_branch id then begin
+            assert false
+          end else if is_ancestor_of_cur_branch id then begin
+            backto id (Some bn)
+          end else begin
+            anomaly(str"Cannot leave an `Edit branch open")
+          end
+      | true, None, _ ->
+          if on_cur_branch id then begin
+            VCS.reset_branch (VCS.current_branch ()) id;
+            Reach.known_state ~cache:(interactive ()) id;
+            VCS.checkout_shallowest_proof_branch ();
+            `NewTip
+          end else if is_ancestor_of_cur_branch id then begin
+            backto id None
+          end else begin
+            anomaly(str"Cannot leave an `Edit branch open")
+          end
+      | false, None, Some(_,bn) -> backto id (Some bn)
+      | false, None, None -> backto id None
+    in
+    VCS.print ();
+    rc
+  with e ->
+    let (e, info) = CErrors.push e in
+    match Stateid.get info with
+    | None ->
+        VCS.print ();
+        anomaly (str ("edit_at "^Stateid.to_string id^": ") ++
+          CErrors.print_no_report e)
+    | Some (_, id) ->
+        stm_prerr_endline (fun () -> "Failed at state " ^ Stateid.to_string id);
+        VCS.restore vcs;
+        VCS.print ();
+        Exninfo.iraise (e, info)
+

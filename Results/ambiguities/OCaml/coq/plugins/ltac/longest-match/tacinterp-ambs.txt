@@ -1,0 +1,42 @@
+Ambiguity 1: 
+| Val.Opt tag -> Option.map (fun v -> prj tag v) (unbox Val.typ_opt v (to_option v))
+  | Val.Pair (tag1, tag2) ->
+    let (x, y) = unbox Val.typ_pair v (to_pair v) in
+    (prj tag1 x, prj tag2 y)
+  | Val.Base t ->
+    let Val.Dyn (t', x) = v in
+    match Val.eq t t' with
+    | None -> cast_error t v
+    | Some Refl -> x
+
+Ambiguity 2: 
+begin
+      try try_interp_evaluable env (loc, id)
+      with Not_found ->
+        match r with
+        | EvalConstRef _ -> r
+        | _ -> error_global_not_found ~loc (qualid_of_ident id)
+    end
+
+Ambiguity 3: 
+| MsgInt n -> Ftactic.return (int n)
+  | MsgIdent (loc,id) ->
+    let v = try Some (Id.Map.find id ist.lfun) with Not_found -> None in
+    match v with
+    | None -> Ftactic.lift (Tacticals.New.tclZEROMSG (pr_id id ++ str" not found."))
+    | Some v -> message_of_value v
+
+Ambiguity 4: 
+begin function (err, info) -> match err with
+        | Not_found ->
+            Ftactic.enter { enter = begin fun gl ->
+              let env = Proofview.Goal.env gl in
+              Proofview.tclLIFT begin
+                debugging_step ist (fun () ->
+                  str "evaluation failed for" ++ fnl() ++
+                    Pptactic.pr_glob_tactic env e)
+              end
+            <*> Proofview.tclZERO Not_found
+            end }
+        | err -> Proofview.tclZERO ~info err
+      end

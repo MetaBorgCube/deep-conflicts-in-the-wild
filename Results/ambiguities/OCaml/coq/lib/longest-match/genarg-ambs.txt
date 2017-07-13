@@ -1,0 +1,28 @@
+Ambiguity 1: 
+| Some Refl ->
+    match genarg_type_eq u1 u2 with
+    | None -> None
+    | Some Refl -> Some Refl
+
+Ambiguity 2: 
+let argument_type_eq arg1 arg2 = match arg1, arg2 with
+| ArgumentType t1, ArgumentType t2 ->
+  match genarg_type_eq t1 t2 with
+  | None -> false
+  | Some Refl -> true
+
+
+
+Ambiguity 3: 
+let get_obj0 name =
+    try
+      let GenMap.Pack obj = GenMap.find name !arg0_map in obj
+    with Not_found ->
+      match M.default (ExtraArg name) with
+      | None ->
+        CErrors.anomaly (str M.name ++ str " function not found: " ++ str (ArgT.repr name))
+      | Some obj -> obj
+
+  (** For now, the following function is quite dummy and should only be applied
+      to an extra argument type, otherwise, it will badly fail. *)
+  

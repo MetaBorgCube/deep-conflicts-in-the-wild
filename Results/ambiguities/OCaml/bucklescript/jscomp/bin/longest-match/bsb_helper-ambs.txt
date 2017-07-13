@@ -1,0 +1,77 @@
+Ambiguity 1: 
+| Cons(k1,_,rest1) -> 
+    eq  key k1 ||
+    match rest1 with
+    | Empty -> false 
+    | Cons(k2,_,rest2) -> 
+      eq key k2  || 
+      match rest2 with 
+      | Empty -> false 
+      | Cons(k3,_,rest3) -> 
+        eq key k3  ||
+        small_bucket_mem eq key rest3
+
+Ambiguity 2: 
+| Cons(k1,d1,rest1) -> 
+    if eq  key k1 then Some d1 else 
+      match rest1 with
+      | Empty -> None 
+      | Cons(k2,d2,rest2) -> 
+        if eq key k2 then Some d2 else 
+          match rest2 with 
+          | Empty -> None 
+          | Cons(k3,d3,rest3) -> 
+            if eq key k3  then Some d3 else 
+              small_bucket_opt eq key rest3
+
+Ambiguity 3: 
+| Cons(k1,d1,rest1) -> 
+    if eq  key k1 then Some k1 else 
+      match rest1 with
+      | Empty -> None 
+      | Cons(k2,d2,rest2) -> 
+        if eq key k2 then Some k2 else 
+          match rest2 with 
+          | Empty -> None 
+          | Cons(k3,d3,rest3) -> 
+            if eq key k3  then Some k3 else 
+              small_bucket_key_opt eq key rest3
+
+Ambiguity 4: 
+| Cons(k1,d1,rest1) -> 
+    if eq  key k1 then  d1 else 
+      match rest1 with
+      | Empty -> default 
+      | Cons(k2,d2,rest2) -> 
+        if eq key k2 then  d2 else 
+          match rest2 with 
+          | Empty -> default 
+          | Cons(k3,d3,rest3) -> 
+            if eq key k3  then  d3 else 
+              small_bucket_default eq key default rest3
+
+Ambiguity 5: 
+| Cons(k1, d1, rest1) ->
+    if eq_key key k1 then d1 else
+      match rest1 with
+      | Empty -> raise Not_found
+      | Cons(k2, d2, rest2) ->
+        if eq_key key k2 then d2 else
+          match rest2 with
+          | Empty -> raise Not_found
+          | Cons(k3, d3, rest3) ->
+            if eq_key key k3  then d3 else find_rec key rest3
+
+Ambiguity 6: 
+| 1, x0 :: l -> Node (Empty, x0, Empty, 1), l
+    | 2, x0 :: x1 :: l -> Node (Node(Empty, x0, Empty, 1), x1, Empty, 2), l
+    | 3, x0 :: x1 :: x2 :: l ->
+      Node (Node(Empty, x0, Empty, 1), x1, Node(Empty, x2, Empty, 1), 2),l
+    | n, l ->
+      let nl = n / 2 in
+      let left, l = sub nl l in
+      match l with
+      | [] -> assert false
+      | mid :: l ->
+        let right, l = sub (n - nl - 1) l in
+        create left mid right, l

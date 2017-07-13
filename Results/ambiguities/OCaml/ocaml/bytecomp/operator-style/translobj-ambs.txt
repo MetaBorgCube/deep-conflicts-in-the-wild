@@ -1,0 +1,50 @@
+Ambiguity 1: 
+let meth obj lab =
+  let tag = meth_tag lab in
+  if not (!cache_required && !Clflags.native_code) then (tag, []) else
+  if not (is_path obj) then next_cache tag else
+  try
+    let r = List.assoc obj !method_table in
+    try
+      (tag, List.assoc tag !r)
+    with Not_found ->
+      let p = next_cache tag in
+      r := p :: !r;
+      p
+  with Not_found ->
+    let p = next_cache tag in
+    method_table := (obj, ref [p]) :: !method_table;
+    p
+
+
+
+Ambiguity 2: 
+let oo_wrap env req f x =
+  if !wrapping then
+    if !cache_required then f x else
+    try cache_required := true; let lam = f x in cache_required := false; lam
+    with exn -> cache_required := false; raise exn
+  else try
+    wrapping := true;
+    cache_required := req;
+    top_env := env;
+    classes := [];
+    method_ids := IdentSet.empty;
+    let lambda = f x in
+    let lambda =
+      List.fold_left
+        (fun lambda id ->
+          Llet(StrictOpt, id,
+               Lprim(Pmakeblock(0, Lambda.default_tag_info, Mutable),
+                     [lambda_unit; lambda_unit; lambda_unit], Location.none),
+               lambda))
+        lambda !classes
+    in
+    wrapping := false;
+    top_env := Env.empty;
+    lambda
+  with exn ->
+    wrapping := false;
+    top_env := Env.empty;
+    raise exn
+

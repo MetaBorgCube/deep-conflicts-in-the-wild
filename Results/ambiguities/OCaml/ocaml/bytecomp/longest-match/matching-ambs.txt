@@ -1,0 +1,254 @@
+Ambiguity 1: 
+| OrPat   ->
+                match p.pat_desc with
+                | Tpat_or (p1,p2,_) -> filter_rec [(p1::ps) ;(p2::ps)]@rem
+                | _ -> assert false
+
+Ambiguity 2: 
+| ([[]],i)::_ -> [[[]],i]
+    | (pss,i)::rem ->
+        let rem = make_rec rem in
+        match filter_matrix matcher pss with
+        | [] -> rem
+        | ([]::_) -> ([[]],i)::rem
+        | pss -> (pss,i)::rem
+
+Ambiguity 3: 
+| Tpat_construct (_,{cstr_tag=Cstr_extension _},_) ->
+      split_naive cls args def k
+  | _ ->
+
+      let group = get_group ex_pat in
+
+      let rec split_ex yes no = function
+        | [] ->
+            let yes = List.rev yes and no = List.rev no in
+            begin match no with
+            | [] ->
+                {me = Pm {cases=yes ; args=args ; default=def} ;
+                  matrix = as_matrix yes ;
+                  top_default = def},
+                k
+            | cl::rem ->
+                begin match yes with
+                | [] ->
+                    (* Could not success in raising up a constr matching up *)
+                    split_noex [cl] [] rem
+                | _ ->
+                    let {me=next ; matrix=matrix ; top_default=def}, nexts =
+                      split_noex [cl] [] rem in
+                    let idef = next_raise_count () in
+                    let def = cons_default matrix idef def in
+                    {me = Pm {cases=yes ; args=args ; default=def} ;
+                      matrix = as_matrix yes ;
+                      top_default = def },
+                    (idef, next)::nexts
+                end
+            end
+        | (p::_,_) as cl::rem ->
+            if group p && up_ok cl no then
+              split_ex (cl::yes) no rem
+            else
+              split_ex yes (cl::no) rem
+        | _ -> assert false
+
+      and split_noex yes no = function
+        | [] ->
+            let yes = List.rev yes and no = List.rev no in
+            begin match no with
+            | [] -> precompile_var args yes def k
+            | cl::rem ->
+                let {me=next ; matrix=matrix ; top_default=def}, nexts =
+                  split_ex [cl] [] rem in
+                let idef = next_raise_count () in
+                precompile_var
+                  args yes
+                  (cons_default matrix idef def)
+                  ((idef,next)::nexts)
+            end
+        | [ps,_ as cl]
+            when List.for_all group_var ps && yes <> [] ->
+       (* This enables an extra division in some frequent case :
+          last row is made of variables only *)
+              split_noex yes (cl::no) []
+        | (p::_,_) as cl::rem ->
+            if not (group p) && up_ok cl no then
+              split_noex (cl::yes) no rem
+            else
+              split_noex yes (cl::no) rem
+        | _ -> assert false in
+
+      match cls with
+      | ((p::_,_) as cl)::rem ->
+          if group p then split_ex [cl] [] rem
+          else split_noex [cl] [] rem
+      | _ ->  assert false
+
+Ambiguity 4: 
+| _ ->
+(* Precompile *)
+        let var_cls =
+          List.map
+            (fun (ps,act) -> match ps with
+            | _::ps -> ps,act | _     -> assert false)
+            cls
+        and var_def = make_default (fun _ rem -> rem) def in
+        let {me=first ; matrix=matrix}, nexts =
+          split_or (Some v) var_cls (arg::rargs) var_def in
+
+(* Compute top information *)
+        match nexts with
+        | [] -> (* If you need *)
+            dont_precompile_var args cls def k
+        | _  ->
+            let rfirst =
+              {me = PmVar {inside=first ; var_arg = av} ;
+                matrix = add_omega_column matrix ;
+                top_default = rebuild_default nexts def ; }
+            and rnexts = rebuild_nexts av nexts k in
+            rfirst, rnexts
+
+Ambiguity 5: 
+| 1 ->
+    let rec matcher_rec q rem = match q.pat_desc with
+    | Tpat_or (p1,p2,_) ->
+        let r1 = try Some (matcher_rec p1 rem) with NoMatch -> None
+        and r2 = try Some (matcher_rec p2 rem) with NoMatch -> None in
+        begin match r1,r2 with
+        | None, None -> raise NoMatch
+        | Some r1, None -> r1
+        | None, Some r2 -> r2
+        | Some (a1::rem1), Some (a2::_) ->
+            {a1 with
+             pat_loc = Location.none ;
+             pat_desc = Tpat_or (a1, a2, None)}::
+            rem
+        | _, _ -> assert false
+        end
+    | Tpat_construct (_, cstr1, [arg])
+      when cstr.cstr_tag = cstr1.cstr_tag -> arg::rem
+    | Tpat_any -> omega::rem
+    | _ -> raise NoMatch in
+    matcher_rec
+| _ ->
+    fun q rem -> match q.pat_desc with
+    | Tpat_or (_,_,_) -> raise OrPat
+    | Tpat_construct (_, cstr1, args)
+      when cstr.cstr_tag = cstr1.cstr_tag -> args @ rem
+    | Tpat_any -> Parmatch.omegas cstr.cstr_arity @ rem
+    | _        -> raise NoMatch
+
+Ambiguity 6: 
+| _,(pss,idef)::rem ->
+      let now, later =
+        List.partition
+          (fun (p,p_ctx) -> ctx_match p_ctx pss) to_test in
+      match now with
+      | [] -> scan_def env to_test rem
+      | _  -> scan_def ((List.map fst now,idef)::env) later rem
+
+Ambiguity 7: 
+| (cstr, act) :: rem ->
+        let (consts, nonconsts) = split_rec rem in
+        match cstr with
+          Cstr_constant n -> ((n, act) :: consts, nonconsts)
+        | Cstr_block n    -> (consts, (n, act) :: nonconsts)
+        | _ -> assert false
+
+Ambiguity 8: 
+| (cstr, act) :: rem ->
+        let (consts, nonconsts) = split_rec rem in
+        match cstr with
+          Cstr_extension(path, true) -> ((path, act) :: consts, nonconsts)
+        | Cstr_extension(path, false) -> (consts, (path, act) :: nonconsts)
+        | _ -> assert false
+
+Ambiguity 9: 
+| _ ->
+          match
+            (cstr.cstr_consts, cstr.cstr_nonconsts, consts, nonconsts)
+          with
+          | (1, 1, [0, act1], [0, act2]) ->
+              Lifthenelse(arg, act2, act1)
+          | (n,_,_,[])  ->
+              call_switcher None arg 0 (n-1) consts
+          | (n, _, _, _) ->
+              match same_actions nonconsts with
+              | None ->
+(* Emit a switch, as bytecode implements this sophisticated instruction *)
+                  let sw =
+                    {sw_numconsts = cstr.cstr_consts; sw_consts = consts;
+                     sw_numblocks = cstr.cstr_nonconsts; sw_blocks = nonconsts;
+                     sw_failaction = None} in
+                  let hs,sw = share_actions_sw sw in
+                  let sw = reintroduce_fail sw in
+                  hs (Lswitch (arg,sw))
+              | Some act ->
+                  Lifthenelse
+                    (Lprim (Pisint, [arg], loc),
+                     call_switcher
+                       None arg
+                       0 (n-1) consts,
+                     act)
+
+Ambiguity 10: 
+| _,_ ->
+      match (consts, nonconsts) with
+      | ([n, act1], [m, act2]) when fail=None ->
+          test_int_or_block arg act1 act2
+      | (_, []) -> (* One can compare integers and pointers *)
+          make_test_sequence_variant_constant fail arg consts
+      | ([], _) ->
+          let lam = call_switcher_variant_constr loc
+              fail arg nonconsts in
+          (* One must not dereference integers *)
+          begin match fail with
+          | None -> lam
+          | Some fail -> test_int_or_block arg fail lam
+          end
+      | (_, _) ->
+          let lam_const =
+            call_switcher_variant_constant
+              fail arg consts
+          and lam_nonconst =
+            call_switcher_variant_constr loc
+              fail arg nonconsts in
+          test_int_or_block arg lam_const lam_nonconst
+
+Ambiguity 11: 
+let rec comp_match_handlers comp_fun partial ctx arg first_match next_matchs =
+  match next_matchs with
+  | [] -> comp_fun partial ctx arg first_match
+  | rem ->
+      let rec c_rec body total_body = function
+        | [] -> body, total_body
+        (* Hum, -1 meant never taken
+        | (-1,pm)::rem -> c_rec body total_body rem *)
+        | (i,pm)::rem ->
+            let ctx_i,total_rem = jumps_extract i total_body in
+            begin match ctx_i with
+            | [] -> c_rec body total_body rem
+            | _ ->
+                try
+                  let li,total_i =
+                    comp_fun
+                      (match rem with [] -> partial | _ -> Partial)
+                      ctx_i arg pm in
+                  c_rec
+                    (Lstaticcatch (body,(i,[]),li))
+                    (jumps_union total_i total_rem)
+                    rem
+                with
+                | Unused ->
+                    c_rec (Lstaticcatch (body,(i,[]),lambda_unit))
+                      total_rem  rem
+            end in
+   try
+      let first_lam,total = comp_fun Partial ctx arg first_match in
+      c_rec first_lam total rem
+   with Unused -> match next_matchs with
+   | [] -> raise Unused
+   | (_,x)::xs ->  comp_match_handlers comp_fun partial ctx arg x xs
+
+(* To find reasonable names for variables *)
+

@@ -1,0 +1,11 @@
+Ambiguity 1: 
+| Some raw_name ->
+    let with_spilled =
+      if t.spill then
+        "spilled-" ^ raw_name
+      else
+        raw_name
+    in
+    match t.part with
+    | None -> with_spilled
+    | Some part -> with_spilled ^ "#" ^ string_of_int part

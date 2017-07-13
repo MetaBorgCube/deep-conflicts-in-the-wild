@@ -1,0 +1,31 @@
+Ambiguity 1: 
+f a >>= fun a' ->
+          f b >>= fun b' ->
+          M.map (fun l' -> a'::b'::l') (map f l)
+
+Ambiguity 2: 
+map_right f l >>= fun l' ->
+          f b >>= fun b' ->
+          M.map (fun a' -> a'::b'::l') (f a)
+
+Ambiguity 3: 
+fold_right f l x >>= fun acc ->
+          f b acc >>= fun acc ->
+          f a acc
+
+Ambiguity 4: 
+f x a >>= fun x' ->
+          f x' b >>= fun x'' ->
+          fold_left f x'' l
+
+Ambiguity 5: 
+f a >>= function
+        | None -> map_filter f l
+        | Some b ->
+          map_filter f l >>= fun filtered ->
+          return (b::filtered)
+
+Ambiguity 6: 
+f x a1 b1 >>= fun x' ->
+          f x' a2 b2 >>= fun x'' ->
+          fold_left2 r f x'' l1 l2

@@ -1,0 +1,17 @@
+Ambiguity 1: 
+let if_verbose_load verb f name ?path fname =
+  if not verb then f name ?path fname
+  else
+    let info = str "[Loading ML file " ++ str fname ++ str " ..." in
+    try
+      let path = f name ?path fname in
+      Feedback.msg_info (info ++ str " done]");
+      path
+    with reraise ->
+      Feedback.msg_info (info ++ str " failed]");
+      raise reraise
+
+(** Load a module for the first time (i.e. dynlink it)
+    or simulate its reload (i.e. doing nothing except maybe
+    an initialization function). *)
+

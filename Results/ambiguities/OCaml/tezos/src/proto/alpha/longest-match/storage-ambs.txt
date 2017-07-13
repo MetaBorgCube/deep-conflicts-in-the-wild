@@ -1,0 +1,13 @@
+Ambiguity 1: 
+| Some bytes ->
+      match
+        Data_encoding.Binary.of_bytes Raw_level_repr.encoding bytes
+      with
+      | None -> failwith "Invalid context"
+      | Some level -> return level
+
+Ambiguity 2: 
+| Some bytes ->
+      match Data_encoding.Binary.of_bytes Data_encoding.json bytes with
+      | None -> fail Invalid_sandbox_parameter
+      | Some json -> return (Some json)

@@ -1,0 +1,29 @@
+Ambiguity 1: 
+| Some vt ->
+        match vt with
+        | JBasics.TBasic bt -> (JTransType.string_of_basic_type bt)^"_undefined"
+        | JBasics.TObject ot ->
+            begin
+              match ot with
+              | JBasics.TArray _ -> assert false
+              | JBasics.TClass cn ->
+                  if String.equal (JBasics.cn_name cn) JConfig.string_cl then
+                    "string_undefined"
+                  else
+                  if JBasics.cn_equal cn JBasics.java_lang_object then
+                    "object_undefined"
+                  else assert false
+            end
+
+Ambiguity 2: 
+| Some node ->
+          if Javalib.defines_method node ms then cn
+          else
+            match node with
+            | Javalib.JInterface _ -> fallback_cn
+            | Javalib.JClass jclass ->
+                begin
+                  match jclass.Javalib.c_super_class with
+                  | None -> fallback_cn
+                  | Some super_cn -> loop fallback_cn super_cn
+                end

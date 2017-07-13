@@ -1,0 +1,6 @@
+Ambiguity 1: 
+| LocalDef _ :: hyps -> check k (index+1) hyps
+    | _::hyps ->
+        match whd_all env lpar.(k) with
+	  | Rel w when w = index -> check (k-1) (index+1) hyps
+	  | _ -> raise (IllFormedInd (LocalNonPar (k+1,index,l)))

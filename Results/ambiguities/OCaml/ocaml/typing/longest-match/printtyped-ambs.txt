@@ -1,0 +1,40 @@
+Ambiguity 1: 
+| (Tpat_constraint cty, _, attrs) :: rem ->
+        line i ppf "Tpat_constraint\n";
+        attributes i ppf attrs;
+        core_type i ppf cty;
+        pattern i ppf { x with pat_extra = rem }
+    | (Tpat_type (id, _), _, attrs) :: rem ->
+        line i ppf "Tpat_type %a\n" fmt_path id;
+        attributes i ppf attrs;
+        pattern i ppf { x with pat_extra = rem }
+    | [] ->
+  match x.pat_desc with
+  | Tpat_any -> line i ppf "Ppat_any\n";
+  | Tpat_var (s,_) -> line i ppf "Ppat_var \"%a\"\n" fmt_ident s;
+  | Tpat_alias (p, s,_) ->
+      line i ppf "Ppat_alias \"%a\"\n" fmt_ident s;
+      pattern i ppf p;
+  | Tpat_constant (c) -> line i ppf "Ppat_constant %a\n" fmt_constant c;
+  | Tpat_tuple (l) ->
+      line i ppf "Ppat_tuple\n";
+      list i pattern ppf l;
+  | Tpat_construct (li, _, po) ->
+      line i ppf "Ppat_construct %a\n" fmt_longident li;
+      list i pattern ppf po;
+  | Tpat_variant (l, po, _) ->
+      line i ppf "Ppat_variant \"%s\"\n" l;
+      option i pattern ppf po;
+  | Tpat_record (l, c) ->
+      line i ppf "Ppat_record\n";
+      list i longident_x_pattern ppf l;
+  | Tpat_array (l) ->
+      line i ppf "Ppat_array\n";
+      list i pattern ppf l;
+  | Tpat_or (p1, p2, _) ->
+      line i ppf "Ppat_or\n";
+      pattern i ppf p1;
+      pattern i ppf p2;
+  | Tpat_lazy p ->
+      line i ppf "Ppat_lazy\n";
+      pattern i ppf p

@@ -1,0 +1,83 @@
+Ambiguity 1: 
+| _ -> match status with
+                 | Some o -> o
+                 | None -> Evar_kinds.Define (not (Program.get_proofs_transparency ()))
+
+Ambiguity 2: 
+and obligation (user_num, name, typ) tac =
+  let num = pred user_num in
+  let prg = get_prog_err name in
+  let obls, rem = prg.prg_obligations in
+    if num < Array.length obls then
+      let obl = obls.(num) in
+	match obl.obl_body with
+	    None -> solve_obligation prg num tac
+	  | Some r -> error "Obligation already solved"
+    else error (sprintf "Unknown obligation number %i" (succ num))
+
+
+and solve_obligation_by_tac prg obls i tac =
+  let obl = obls.(i) in
+    match obl.obl_body with
+    | Some _ -> None
+    | None ->
+	try
+	  if List.is_empty (deps_remaining obls obl.obl_deps) then
+	    let obl = subst_deps_obl obls obl in
+	    let tac =
+	      match tac with
+	      | Some t -> t
+	      | None ->
+		  match obl.obl_tac with
+		  | Some t -> t
+		  | None -> !default_tactic
+	    in
+	    let evd = Evd.from_ctx prg.prg_ctx in
+	    let evd = Evd.update_sigma_env evd (Global.env ()) in
+	    let t, ty, ctx =
+	      solve_by_tac obl.obl_name (evar_of_obligation obl) tac
+	        (pi2 prg.prg_kind) (Evd.evar_universe_context evd)
+	    in
+	    let uctx = Evd.evar_context_universe_context ctx in
+	    let prg = {prg with prg_ctx = ctx} in
+	    let def, obl' = declare_obligation prg obl t ty uctx in
+	      obls.(i) <- obl';
+	      if def && not (pi2 prg.prg_kind) then (
+	        (* Declare the term constraints with the first obligation only *)
+	        let evd = Evd.from_env (Global.env ()) in
+	        let evd = Evd.merge_universe_subst evd (Evd.universe_subst (Evd.from_ctx ctx)) in
+		let ctx' = Evd.evar_universe_context evd in
+		  Some {prg with prg_ctx = ctx'})
+	      else Some prg
+	  else None
+	with e when CErrors.noncritical e ->
+          let (e, _) = CErrors.push e in
+          match e with
+	  | Refiner.FailError (_, s) ->
+	      user_err ~loc:(fst obl.obl_location) ~hdr:"solve_obligation" (Lazy.force s)
+          | e -> None (* FIXME really ? *)
+
+and solve_prg_obligations prg ?oblset tac =
+  let obls, rem = prg.prg_obligations in
+  let rem = ref rem in
+  let obls' = Array.copy obls in
+  let set = ref Int.Set.empty in
+  let p = match oblset with
+    | None -> (fun _ -> true)
+    | Some s -> set := s;
+      (fun i -> Int.Set.mem i !set)
+  in
+  let prgref = ref prg in
+  let _ =
+    Array.iteri (fun i x ->
+      if p i then
+        match solve_obligation_by_tac !prgref obls' i tac with
+	| None -> ()
+ 	| Some prg' ->
+	   prgref := prg';
+	   let deps = dependencies obls i in
+ 	   (set := Int.Set.union !set deps;
+ 	    decr rem))
+      obls'
+  in
+    update_obls !prgref obls' !rem

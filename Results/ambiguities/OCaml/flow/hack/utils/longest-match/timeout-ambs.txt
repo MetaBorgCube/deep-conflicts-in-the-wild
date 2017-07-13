@@ -1,0 +1,9 @@
+Ambiguity 1: 
+let with_timeout ~timeout ?on_timeout ~do_ =
+    let t = create (float timeout) in
+    try do_ t
+    with Timeout as exn ->
+      match on_timeout with
+      | None -> raise exn
+      | Some ft -> ft (); raise Timeout
+  

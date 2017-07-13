@@ -1,0 +1,18 @@
+Ambiguity 1: 
+nl chan ;
+      if !Global.with_index
+      then
+        let indices_names_to_build = List.map indices indices_to_build in
+        List.iter (puts_nl chan)
+          (List.flatten
+             (List.map
+                (fun (longname, shortname) ->
+                  if List.mem shortname indices_names_to_build
+                  then [ "@node " ^ longname ^ " index," ;
+                         "@unnumbered " ^ longname ^ " index" ;
+                         "@printindex " ^ shortname ; ]
+                  else [])
+                indices_names )) ;
+      if !Global.with_toc
+      then puts_nl chan "@contents" ;
+      puts_nl chan "@bye"

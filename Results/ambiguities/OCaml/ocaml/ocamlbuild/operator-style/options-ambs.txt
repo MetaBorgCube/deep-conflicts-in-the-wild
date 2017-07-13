@@ -1,0 +1,12 @@
+Ambiguity 1: 
+let log = !log_file_internal in
+    if log = "" then Log.init None
+    else if not (Filename.is_implicit log) then
+      failwith
+        (sprintf "Bad log file name: the file name must be implicit (not %S)" log)
+    else
+      let log = filename_concat !build_dir log in
+      Shell.mkdir_p (Filename.dirname log);
+      Shell.rm_f log;
+      let log = if !Log.level > 0 then Some log else None in
+      Log.init log

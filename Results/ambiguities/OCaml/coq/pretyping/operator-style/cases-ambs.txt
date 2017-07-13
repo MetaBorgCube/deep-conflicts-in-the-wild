@@ -1,0 +1,249 @@
+Ambiguity 1: 
+and match_current pb (initial,tomatch) =
+  let tm = adjust_tomatch_to_pattern pb tomatch in
+  let pb,tomatch = adjust_predicate_from_tomatch tomatch tm pb in
+  let ((current,typ),deps,dep) = tomatch in
+  match typ with
+    | NotInd (_,typ) ->
+	check_all_variables pb.env !(pb.evdref) typ pb.mat;
+	compile_all_variables initial tomatch pb
+    | IsInd (_,(IndType(indf,realargs) as indt),names) ->
+	let mind,_ = dest_ind_family indf in
+        let mind = Tacred.check_privacy pb.env mind in
+	let cstrs = get_constructors pb.env indf in
+	let arsign, _ = get_arity pb.env indf in
+	let eqns,onlydflt = group_equations pb (fst mind) current cstrs pb.mat in
+        let no_cstr = Int.equal (Array.length cstrs) 0 in
+	if (not no_cstr || not (List.is_empty pb.mat)) && onlydflt then
+	  compile_all_variables initial tomatch pb
+	else
+	  (* We generalize over terms depending on current term to match *)
+	  let pb,deps = generalize_problem (names,dep) pb deps in
+
+	  (* We compile branches *)
+	  let brvals = Array.map2 (compile_branch initial current realargs (names,dep) deps pb arsign) eqns cstrs in
+	  (* We build the (elementary) case analysis *)
+          let depstocheck = current::binding_vars_of_inductive !(pb.evdref) typ in
+          let brvals,tomatch,pred,inst =
+            postprocess_dependencies !(pb.evdref) depstocheck
+              brvals pb.tomatch pb.pred deps cstrs in
+          let brvals = Array.map (fun (sign,body) ->
+            it_mkLambda_or_LetIn body sign) brvals in
+	  let (pred,typ) =
+	    find_predicate pb.caseloc pb.env pb.evdref
+	      pred current indt (names,dep) tomatch in
+	  let ci = make_case_info pb.env (fst mind) pb.casestyle in
+	  let pred = nf_betaiota !(pb.evdref) pred in
+	  let case =
+	    make_case_or_project pb.env !(pb.evdref) indf ci pred current brvals
+	  in
+	  Typing.check_allowed_sort pb.env !(pb.evdref) mind current pred;
+	  { uj_val = applist (case, inst);
+	    uj_type = prod_applist !(pb.evdref) typ inst }
+
+
+(* Building the sub-problem when all patterns are variables. Case
+   where [current] is an intially pushed term. *)
+and shift_problem ((current,t),_,na) pb =
+  let ty = type_of_tomatch t in
+  let tomatch = lift_tomatch_stack 1 pb.tomatch in
+  let pred = specialize_predicate_var (current,t,na) pb.env pb.tomatch pb.pred in
+  let pb =
+    { pb with
+       env = push_rel (LocalDef (na,current,ty)) pb.env;
+       tomatch = tomatch;
+       pred = lift_predicate 1 pred tomatch;
+       history = pop_history pb.history;
+       mat = List.map (push_current_pattern (current,ty)) pb.mat } in
+  let j = compile pb in
+  { uj_val = subst1 current j.uj_val;
+    uj_type = subst1 current j.uj_type }
+
+(* Building the sub-problem when all patterns are variables,
+   non-initial case. Variables which appear as subterms of constructor
+   are already introduced in the context, we avoid creating aliases to
+   themselves by treating this case specially. *)
+and pop_problem ((current,t),_,na) pb =
+  let pred = specialize_predicate_var (current,t,na) pb.env pb.tomatch pb.pred in
+  let pb =
+    { pb with
+       pred = pred;
+       history = pop_history pb.history;
+       mat = List.map push_noalias_current_pattern pb.mat } in
+  compile pb
+
+(* Building the sub-problem when all patterns are variables. *)
+and compile_all_variables initial cur pb =
+  if initial then shift_problem cur pb
+  else pop_problem cur pb
+
+(* Building the sub-problem when all patterns are variables *)
+and compile_branch initial current realargs names deps pb arsign eqns cstr =
+  let sign, pb = build_branch initial current realargs deps names pb arsign eqns cstr in
+  sign, (compile pb).uj_val
+
+(* Abstract over a declaration before continuing splitting *)
+and compile_generalization pb i d rest =
+  let pb =
+    { pb with
+       env = push_rel d pb.env;
+       tomatch = rest;
+       mat = List.map (push_generalized_decl_eqn pb.env i d) pb.mat } in
+  let j = compile pb in
+  { uj_val = mkLambda_or_LetIn d j.uj_val;
+    uj_type = mkProd_wo_LetIn d j.uj_type }
+
+(* spiwack: the [initial] argument keeps track whether the alias has
+   been introduced by a toplevel branch ([true]) or a deep one
+   ([false]). *)
+and compile_alias initial pb (na,orig,(expanded,expanded_typ)) rest =
+  let f c t =
+    let alias = LocalDef (na,c,t) in
+    let pb =
+      { pb with
+         env = push_rel alias pb.env;
+         tomatch = lift_tomatch_stack 1 rest;
+         pred = lift_predicate 1 pb.pred pb.tomatch;
+         history = pop_history_pattern pb.history;
+         mat = List.map (push_alias_eqn alias) pb.mat } in
+    let j = compile pb in
+    let sigma = !(pb.evdref) in
+    { uj_val =
+        if isRel sigma c || isVar sigma c || count_occurrences sigma (mkRel 1) j.uj_val <= 1 then
+          subst1 c j.uj_val
+        else
+          mkLetIn (na,c,t,j.uj_val);
+      uj_type = subst1 c j.uj_type } in
+  (* spiwack: when an alias appears on a deep branch, its non-expanded
+     form is automatically a variable of the same name. We avoid
+     introducing such superfluous aliases so that refines are elegant. *)
+  let just_pop () =
+    let pb =
+      { pb with
+        tomatch = rest;
+        history = pop_history_pattern pb.history;
+        mat = List.map drop_alias_eqn pb.mat } in
+    compile pb
+  in
+  let sigma = !(pb.evdref) in
+  (* If the "match" was orginally over a variable, as in "match x with
+     O => true | n => n end", we give preference to non-expansion in
+     the default clause (i.e. "match x with O => true | n => n end"
+     rather than "match x with O => true | S p => S p end";
+     computationally, this avoids reallocating constructors in cbv
+     evaluation; the drawback is that it might duplicate the instances
+     of the term to match when the corresponding variable is
+     substituted by a non-evaluated expression *)
+  if not (Flags.is_program_mode ()) && (isRel sigma orig || isVar sigma orig) then
+    (* Try to compile first using non expanded alias *)
+    try
+      if initial then f orig (Retyping.get_type_of pb.env sigma orig)
+      else just_pop ()
+    with e when precatchable_exception e ->
+    (* Try then to compile using expanded alias *)
+    (* Could be needed in case of dependent return clause *)
+    pb.evdref := sigma;
+    f expanded expanded_typ
+  else
+    (* Try to compile first using expanded alias *)
+    try f expanded expanded_typ
+    with e when precatchable_exception e ->
+    (* Try then to compile using non expanded alias *)
+    (* Could be needed in case of a recursive call which requires to
+       be on a variable for size reasons *)
+    pb.evdref := sigma;
+    if initial then f orig (Retyping.get_type_of pb.env !(pb.evdref) orig)
+    else just_pop ()
+
+
+(* Remember that a non-trivial pattern has been consumed *)
+and compile_non_dep_alias pb rest =
+  let pb =
+    { pb with
+       tomatch = rest;
+       history = pop_history_pattern pb.history;
+       mat = List.map drop_alias_eqn pb.mat } in
+  compile pb
+
+Ambiguity 2: 
+compile_cases loc style (typing_fun, evdref) tycon env (predopt, tomatchl, eqns) =
+  if predopt == None && Flags.is_program_mode () && Program.is_program_cases () then
+    compile_program_cases loc style (typing_fun, evdref)
+      tycon env (predopt, tomatchl, eqns)
+  else
+
+  (* We build the matrix of patterns and right-hand side *)
+  let matx = matx_of_eqns env eqns in
+
+  (* We build the vector of terms to match consistently with the *)
+  (* constructors found in patterns *)
+  let tomatchs = coerce_to_indtype typing_fun evdref env matx tomatchl in
+
+
+
+  (* If an elimination predicate is provided, we check it is compatible
+     with the type of arguments to match; if none is provided, we
+     build alternative possible predicates *)
+  let arsign = extract_arity_signature env tomatchs tomatchl in
+  let preds = prepare_predicate loc typing_fun env !evdref tomatchs arsign tycon predopt in
+
+  let compile_for_one_predicate (sigma,nal,pred) =
+    (* We push the initial terms to match and push their alias to rhs' envs *)
+    (* names of aliases will be recovered from patterns (hence Anonymous *)
+    (* here) *)
+
+    let out_tmt na = function NotInd (None,t) -> LocalAssum (na,t)
+			    | NotInd (Some b,t) -> LocalDef (na,b,t)
+			    | IsInd (typ,_,_) -> LocalAssum (na,typ) in
+    let typs = List.map2 (fun na (tm,tmt) -> (tm,out_tmt na tmt)) nal tomatchs in
+
+    let typs =
+      List.map (fun (c,d) -> (c,extract_inductive_data env sigma d,d)) typs in
+
+    let dep_sign =
+      find_dependencies_signature !evdref
+        (List.make (List.length typs) true)
+        typs in
+
+    let typs' =
+      List.map3
+        (fun (tm,tmt) deps na ->
+          let deps = if not (isRel !evdref tm) then [] else deps in
+          ((tm,tmt),deps,na))
+        tomatchs dep_sign nal in
+
+    let initial_pushed = List.map (fun x -> Pushed (true,x)) typs' in
+
+    (* A typing function that provides with a canonical term for absurd cases*)
+    let typing_fun tycon env evdref = function
+    | Some t ->	typing_fun tycon env evdref t
+    | None -> evd_comb0 use_unit_judge evdref in
+
+    let myevdref = ref sigma in
+
+    let pb =
+      { env       = env;
+        evdref    = myevdref;
+	pred      = pred;
+	tomatch   = initial_pushed;
+	history   = start_history (List.length initial_pushed);
+	mat       = matx;
+	caseloc   = loc;
+	casestyle = style;
+	typing_function = typing_fun } in
+
+    let j = compile pb in
+
+    (* We coerce to the tycon (if an elim predicate was provided) *)
+    let j = inh_conv_coerce_to_tycon loc env myevdref j tycon in
+    evdref := !myevdref;
+    j in
+
+  (* Return the term compiled with the first possible elimination  *)
+  (* predicate for which the compilation succeeds *)
+  let j = list_try_compile compile_for_one_predicate preds in
+
+  (* We check for unused patterns *)
+  List.iter (check_unused_pattern env) matx;
+
+  j

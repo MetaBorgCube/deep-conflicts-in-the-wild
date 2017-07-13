@@ -1,0 +1,236 @@
+Ambiguity 1: 
+let b_len = Array.length a in
+  if b_len = 0 then [||] else  
+  let b = Array.copy a in  
+  for i = 0 to  b_len - 1 do
+      Array.unsafe_set b i (Array.unsafe_get a (b_len - 1 -i )) 
+  done;
+  b
+
+Ambiguity 2: 
+while !i < j &&  
+        let u = String.unsafe_get s !i in 
+        u = '\t' || u = '\n' || u = ' ' 
+  do 
+    incr i;
+  done
+
+Ambiguity 3: 
+while !k >= !i && 
+        let u = String.unsafe_get s !k in 
+        u = '\t' || u = '\n' || u = ' ' do 
+    decr k ;
+  done
+
+Ambiguity 4: 
+let finish_delim = offset + beg_len in 
+
+  if finish_delim >  s_len  then -1 
+  else 
+    let i = ref offset  in
+    while !i <  finish_delim
+          && String.unsafe_get s !i =
+             String.unsafe_get beg (!i - offset) do 
+      incr i 
+    done;
+    if !i = finish_delim then 
+      digits_of_str ~offset:finish_delim s 2 
+    else 
+      -1
+
+Ambiguity 5: 
+to_sorted_array h = 
+  if h.size = 0 then [||]
+  else 
+    let v = choose_exn h in 
+    let arr = Array.make h.size v in
+    let d = h.data in 
+    for i = 0 to h.data_mask do 
+      set_bucket  arr (Array.unsafe_get d i)
+    done;
+    arr
+
+Ambiguity 6: 
+let src_arr = src.arr in 
+  if src_len = 0 then [||]
+  else 
+    let first_one = f (Array.unsafe_get src_arr 0) in 
+    let arr = Array.make  src_len  first_one in
+    for i = 1 to src_len - 1 do
+      Array.unsafe_set arr i (f (Array.unsafe_get src_arr i))
+    done;
+    arr
+
+Ambiguity 7: 
+let src_arr = src.arr in 
+  if src_len = 0 then []
+  else 
+    let acc = ref [] in         
+    for i =  src_len - 1 downto 0 do
+      acc := f (Array.unsafe_get src_arr i) :: !acc
+    done;
+    !acc
+
+Ambiguity 8: 
+let len = src.len in 
+  if len = 0 then { len ; arr = [| |] }
+  else 
+    let src_arr = src.arr in 
+    let arr = Array.make len (Array.unsafe_get src_arr 0) in
+    for i = 1 to len - 1 do
+      Array.unsafe_set arr i (f i (Array.unsafe_get src_arr i))
+    done;
+    {
+      len ;
+      arr ;
+    }
+
+Ambiguity 9: 
+let src_len = src.len in 
+  if src_len = 0 then { len = 0 ; arr = [||]}
+  (* TODO: we may share the empty array 
+     but sharing mutable state is very challenging, 
+     the tricky part is to avoid mutating the immutable array,
+     here it looks fine -- 
+     invariant: whenever [.arr] mutated, make sure  it is not an empty array
+     Actually no: since starting from an empty array 
+     {[
+       push v (* the address of v should not be changed *)
+     ]}
+  *)
+  else 
+    let src_arr = src.arr in 
+    let first = f (Array.unsafe_get src_arr 0 ) in 
+    let arr = Array.make  src_len first in
+    for i = 1 to src_len - 1 do
+      Array.unsafe_set arr i (f (Array.unsafe_get src_arr i))
+    done;
+    {
+      len = src_len;
+      arr = arr;
+    }
+
+Ambiguity 10: 
+init len f =
+  if len < 0 then invalid_arg  "Resize_array.init"
+  else if len = 0 then { len = 0 ; arr = [||] }
+  else 
+    let first = f 0 in 
+    let arr = Array.make len first in
+    for i = 1 to len - 1 do
+      Array.unsafe_set arr i (f i)
+    done;
+    {
+
+      len ;
+      arr 
+    }
+
+Ambiguity 11: 
+let d_arr = d.arr in 
+    if s < d_len || s < Array.length d_arr then ()
+    else 
+      let new_capacity = min Sys.max_array_length s in 
+      let new_d_arr = Array.make new_capacity null in 
+       unsafe_blit d_arr 0 new_d_arr 0 d_len;
+      d.arr <- new_d_arr
+
+Ambiguity 12: 
+let src_arr = src.arr in 
+  if src_len = 0 then [||]
+  else 
+    let first_one = f (Array.unsafe_get src_arr 0) in 
+    let arr = Array.make  src_len  first_one in
+    for i = 1 to src_len - 1 do
+      Array.unsafe_set arr i (f (Array.unsafe_get src_arr i))
+    done;
+    arr
+
+Ambiguity 13: 
+let src_arr = src.arr in 
+  if src_len = 0 then []
+  else 
+    let acc = ref [] in         
+    for i =  src_len - 1 downto 0 do
+      acc := f (Array.unsafe_get src_arr i) :: !acc
+    done;
+    !acc
+
+Ambiguity 14: 
+let len = src.len in 
+  if len = 0 then { len ; arr = [| |] }
+  else 
+    let src_arr = src.arr in 
+    let arr = Array.make len (Array.unsafe_get src_arr 0) in
+    for i = 1 to len - 1 do
+      Array.unsafe_set arr i (f i (Array.unsafe_get src_arr i))
+    done;
+    {
+      len ;
+      arr ;
+    }
+
+Ambiguity 15: 
+let src_len = src.len in 
+  if src_len = 0 then { len = 0 ; arr = [||]}
+  (* TODO: we may share the empty array 
+     but sharing mutable state is very challenging, 
+     the tricky part is to avoid mutating the immutable array,
+     here it looks fine -- 
+     invariant: whenever [.arr] mutated, make sure  it is not an empty array
+     Actually no: since starting from an empty array 
+     {[
+       push v (* the address of v should not be changed *)
+     ]}
+  *)
+  else 
+    let src_arr = src.arr in 
+    let first = f (Array.unsafe_get src_arr 0 ) in 
+    let arr = Array.make  src_len first in
+    for i = 1 to src_len - 1 do
+      Array.unsafe_set arr i (f (Array.unsafe_get src_arr i))
+    done;
+    {
+      len = src_len;
+      arr = arr;
+    }
+
+Ambiguity 16: 
+init len f =
+  if len < 0 then invalid_arg  "Resize_array.init"
+  else if len = 0 then { len = 0 ; arr = [||] }
+  else 
+    let first = f 0 in 
+    let arr = Array.make len first in
+    for i = 1 to len - 1 do
+      Array.unsafe_set arr i (f i)
+    done;
+    {
+
+      len ;
+      arr 
+    }
+
+Ambiguity 17: 
+let d_arr = d.arr in 
+    if s < d_len || s < Array.length d_arr then ()
+    else 
+      let new_capacity = min Sys.max_array_length s in 
+      let new_d_arr = Array.make new_capacity null in 
+       unsafe_blit d_arr 0 new_d_arr 0 d_len;
+      d.arr <- new_d_arr
+
+Ambiguity 18: 
+buf.paren_depth <- buf.paren_depth - 1 ; 
+  if buf.paren_depth < 0  then
+    error lexbuf Unbalanced_paren
+  else 
+    let new_sexp =
+      if buf.has_prime then 
+        Data (List.rev   buf.top)
+      else List (List.rev   buf.top) 
+    in 
+    let top, has_prime =  Stack.pop buf.sexps in
+    buf.top<- top;
+    buf.has_prime<-has_prime;
+    push_atom lexbuf new_sexp buf

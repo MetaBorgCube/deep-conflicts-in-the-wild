@@ -1,0 +1,21 @@
+Ambiguity 1: 
+let rec read_num max =
+  let quit () =
+    Printf.printf "\nGoodbye!\n%!";
+    exit 0 in
+  Printf.printf "# %!";
+  let l = try read_line () with End_of_file -> quit () in
+  if l = "u" then None
+  else if l = "x" then quit ()
+  else
+    try
+      let v = int_of_string l in
+      if v < 0 || v >= max then
+        let () =
+          Printf.printf "Out-of-range input! (only %d children)\n%!" max in
+        read_num max
+      else Some v
+    with Failure "int_of_string" ->
+      Printf.printf "Unrecognized input! <n> enters the <n>-th child, u goes up 1 level, x exits\n%!";
+      read_num max
+

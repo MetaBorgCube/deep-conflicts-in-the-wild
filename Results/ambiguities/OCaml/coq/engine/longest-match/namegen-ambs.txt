@@ -1,0 +1,4 @@
+Ambiguity 1: 
+| Anonymous -> match !reserved_type_name t with
+	| Name id -> id
+	| Anonymous -> Id.of_string default

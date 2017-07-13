@@ -1,0 +1,94 @@
+Ambiguity 1: 
+let rec parse_expr env term =
+     let combine env op (t1,t2) =
+      let (expr1,env) = parse_expr env t1 in
+      let (expr2,env) = parse_expr env t2 in
+      (op expr1 expr2,env) in
+
+       try (Mc.PEc (parse_constant term) , env)
+       with ParseError -> 
+	 match EConstr.kind sigma term with
+	   | App(t,args) ->
+               (
+		 match EConstr.kind sigma t with
+		   | Const c ->
+		       ( match assoc_ops sigma t ops_spec  with
+			   | Binop f -> combine env f (args.(0),args.(1))
+                   | Opp     -> let (expr,env) = parse_expr env args.(0) in
+                       (Mc.PEopp expr, env)
+                   | Power   ->
+                       begin
+			 try
+                           let (expr,env) = parse_expr env args.(0) in
+                           let power = (parse_exp expr args.(1)) in
+                             (power  , env)
+			 with e when CErrors.noncritical e ->
+                           (* if the exponent is a variable *)
+                           let (env,n) = Env.compute_rank_add env sigma term in (Mc.PEX n, env)
+                       end
+                   | Ukn  s ->
+                       if debug
+                       then (Printf.printf "unknown op: %s\n" s; flush stdout;);
+                       let (env,n) = Env.compute_rank_add env sigma term in (Mc.PEX n, env)
+               )
+		   |   _ -> parse_variable env term
+               )
+	   | _ -> parse_variable env term in
+     parse_expr env term
+
+Ambiguity 2: 
+begin
+	  try
+            (* the evaluation order is important in the following *)
+            let f = assoc_const sigma op rconst_assoc in
+            let a = rconstant sigma args.(0) in
+            let b = rconstant sigma args.(1) in
+            f a b
+	  with
+	      ParseError -> 
+		match op with
+		| op when EConstr.eq_constr sigma op (Lazy.force coq_Rinv) ->
+                  let arg = rconstant sigma args.(0) in 
+                  if Mc.qeq_bool (Mc.q_of_Rcst arg) {Mc.qnum = Mc.Z0 ; Mc.qden = Mc.XH}
+                  then raise ParseError (* This is a division by zero -- no semantics *)
+                  else Mc.CInv(arg) 
+		| op when EConstr.eq_constr sigma op (Lazy.force coq_IQR)  -> Mc.CQ (parse_q sigma args.(0))
+		| op when EConstr.eq_constr sigma op   (Lazy.force coq_IZR)  -> Mc.CZ (parse_z sigma args.(0))
+		| _ ->  raise ParseError
+	end
+
+Ambiguity 3: 
+| e :: l2 ->
+     match find_witness prover (e::l1) with
+      | None -> None
+      | Some w ->
+	 (match witness prover l1 l2 with
+	  | None -> None
+	  | Some l -> Some (w::l)
+	 )
+
+Ambiguity 4: 
+| e :: l ->
+      match find_witness prover e  with
+       | None -> None
+       | Some w ->
+	  (match xwitness_list l with
+	   | None -> None
+	   | Some l -> Some (w :: l)
+	  )
+
+Ambiguity 5: 
+let res = try prover.compact prf remap with x when CErrors.noncritical x ->
+      if debug then Printf.fprintf stdout "Proof compaction %s" (Printexc.to_string x) ;
+      (* This should not happen -- this is the recovery plan... *)
+      match prover.prover (prover.get_option () ,List.map fst new_cl) with
+        | None -> failwith "proof compaction error"
+        | Some p ->  p
+    in
+    if debug then
+      begin
+        Printf.printf " -> %a\n"
+          prover.pp_prf res ;
+        flush stdout
+      end ;
+    res

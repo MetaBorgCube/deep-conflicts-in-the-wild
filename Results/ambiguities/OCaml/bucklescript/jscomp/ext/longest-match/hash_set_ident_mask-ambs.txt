@@ -1,0 +1,31 @@
+Ambiguity 1: 
+| {ident = key1 }::rest -> 
+    Ext_ident.equal key   key1 ||
+    match rest with 
+    | [] -> false 
+    | {ident = key2} :: rest -> 
+      Ext_ident.equal key   key2 ||
+      match rest with 
+      | [] -> false 
+      | {ident = key3; _} :: rest -> 
+        Ext_ident.equal key   key3 ||
+        small_bucket_mem key rest
+
+Ambiguity 2: 
+| key1::rest -> 
+    if Ext_ident.equal key   key1.ident  then 
+      if key1.mask then false else (key1.mask <- true ; true) 
+    else 
+      match rest with 
+      | [] -> false
+      | key2 :: rest -> 
+        if Ext_ident.equal key key2.ident  then 
+          if key2.mask then false else (key2.mask <- true ; true)
+        else 
+          match rest with 
+          | [] -> false
+          | key3 :: rest -> 
+            if Ext_ident.equal key key3.ident then 
+              if key3.mask then false else (key3.mask <- true ; true)
+            else 
+              small_bucket_mask  key rest

@@ -1,0 +1,4 @@
+Ambiguity 1: 
+pop q >>= fun elt ->
+    f elt >>= fun () ->
+    iter q ~f

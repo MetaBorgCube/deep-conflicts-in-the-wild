@@ -1,0 +1,5 @@
+Ambiguity 1: 
+| Encoding { prefix ; of_raw ; wrap } :: encodings ->
+          match remove_prefix ~prefix s with
+          | None -> find s encodings
+          | Some msg -> of_raw msg |> Utils.map_option ~f:wrap

@@ -1,0 +1,17 @@
+Ambiguity 1: 
+| Goto dest ->
+      match !states.(dest) with
+        Perform act_num ->
+          output_string !oc ("action_" ^ string_of_int act_num ^ " lexbuf")
+      | _ ->
+          output_string !oc ("state_" ^ string_of_int dest ^ " lexbuf")
+
+Ambiguity 2: 
+| (name,state_num) :: rest ->
+      output_string !oc (name ^ " lexbuf =\n");
+      output_string !oc "  Lexing.init lexbuf;\n";
+      output_string !oc ("  state_" ^ string_of_int state_num ^
+                        " lexbuf\n");
+      match rest with
+        [] -> ()
+      | _  -> output_string !oc "\nand "; output_entries rest

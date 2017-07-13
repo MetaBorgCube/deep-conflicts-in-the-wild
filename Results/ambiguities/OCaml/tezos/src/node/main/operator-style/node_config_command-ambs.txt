@@ -1,0 +1,26 @@
+Ambiguity 1: 
+if not @@ Sys.file_exists args.config_file then
+    Format.eprintf
+      "\n\
+       Warning: no config file at %s,\n\
+      \         displaying the default configuration.\n@."
+      args.config_file ;
+  Node_shared_arg.read_and_patch_config_file args >>=? fun cfg ->
+  Node_config_file.check cfg >>= fun () ->
+  print_endline @@ Node_config_file.to_string cfg ;
+  return ()
+
+Ambiguity 2: 
+Node_shared_arg.read_and_patch_config_file args >>=? fun cfg ->
+  Node_config_file.check cfg >>= fun () ->
+  Node_config_file.write args.config_file cfg
+
+Ambiguity 3: 
+Node_shared_arg.read_and_patch_config_file args >>=? fun cfg ->
+    Node_config_file.check cfg >>= fun () ->
+    Node_config_file.write args.config_file cfg
+
+Ambiguity 4: 
+Node_shared_arg.read_and_patch_config_file args >>=? fun cfg ->
+    Node_config_file.check cfg >>= fun () ->
+    Node_config_file.write args.config_file cfg

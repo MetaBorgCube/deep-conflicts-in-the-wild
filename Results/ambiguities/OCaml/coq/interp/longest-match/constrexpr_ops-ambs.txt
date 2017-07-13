@@ -1,0 +1,27 @@
+Ambiguity 1: 
+| b :: bl ->
+        match b with
+        | CLocalDef ((loc1,_) as n, oty, b) ->
+            let env, c = loop (Loc.merge loc1 loc) bl c in
+            let env = add_name_in_env env n in
+            (env, CLetIn (loc,n,oty,b,c))
+        | CLocalAssum ((loc1,_)::_ as nl, bk, t) ->
+            let env, c = loop (Loc.merge loc1 loc) bl c in
+            let env = List.fold_left add_name_in_env env nl in
+            (env, mkC loc (nl,bk,t) c)
+        | CLocalAssum ([],_,_) -> loop loc bl c
+        | CLocalPattern (loc1, p, ty) ->
+            let env, c = loop (Loc.merge loc1 loc) bl c in
+            let ni = Hook.get fresh_var env c in
+            let id = (loc1, Name ni) in
+            let ty = match ty with
+                 | Some ty -> ty
+                 | None -> CHole (loc1, None, IntroAnonymous, None)
+            in
+            let e = CRef (Libnames.Ident (loc1, ni), None) in
+            let c =
+              CCases
+                (loc, LetPatternStyle, None, [(e,None,None)],
+                 [(loc1, [(loc1,[p])], c)])
+            in
+            (ni :: env, mkC loc ([id],Default Explicit,ty) c)

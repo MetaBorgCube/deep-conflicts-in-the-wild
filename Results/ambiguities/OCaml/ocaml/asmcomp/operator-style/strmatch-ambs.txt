@@ -1,0 +1,13 @@
+Ambiguity 1: 
+swap k idxs cases =
+    if k = 0 then idxs,cases
+    else
+      let idxs = swap_list k idxs
+      and cases =
+        List.map
+          (fun (ps,act) -> swap_list k ps,act)
+          cases in
+      if dbg then begin
+        pp_match stderr "SWAP" idxs cases
+      end ;
+      idxs,cases

@@ -1,0 +1,26 @@
+Ambiguity 1: 
+Context.get ctxt version_key >>= function
+    | None ->
+        Context.set
+          ctxt version_key (MBytes.of_string version_value) >>= fun ctxt ->
+        return ctxt
+    | Some bytes ->
+        let s = MBytes.to_string bytes in
+        fail_unless Compare.String.(s = version_value)
+          Incompatible_protocol_version >>=? fun () ->
+        return ctxt
+
+Ambiguity 2: 
+Context.get ctxt version_key >>= function
+    | None ->
+        set_sandboxed ctxt json >>= fun ctxt ->
+        Pubkey.may_change_default ctxt json >>= fun ctxt ->
+        return ctxt
+    | Some _ ->
+        get_sandboxed ctxt >>=? function
+        | None ->
+            fail Unimplemented_sandbox_migration
+        | Some _ ->
+            (* FIXME GRGR fail if parameter changed! *)
+            (* failwith "Changing sandbox parameter is not yet implemented" *)
+            return ctxt

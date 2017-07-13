@@ -1,0 +1,15 @@
+Ambiguity 1: 
+| None ->
+          let make_footprint_trace footprint_ap =
+            let trace =
+              TraceDomain.of_source
+                (TraceDomain.Source.make_footprint footprint_ap proc_data.pdesc) in
+            Some (TaintDomain.make_normal_leaf trace) in
+          let root, _ = AccessPath.extract access_path in
+          match FormalMap.get_formal_index root proc_data.extras.formal_map with
+          | Some formal_index ->
+              make_footprint_trace (make_footprint_access_path formal_index access_path)
+          | None ->
+              if is_global root
+              then make_footprint_trace access_path
+              else None

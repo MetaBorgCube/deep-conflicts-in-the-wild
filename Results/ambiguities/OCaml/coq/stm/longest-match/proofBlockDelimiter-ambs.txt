@@ -1,0 +1,6 @@
+Ambiguity 1: 
+| Some node ->
+        match f acc node with
+        | `Stop -> None
+        | `Found x -> Some x
+        | `Cont acc -> crawl (prev_node node) acc

@@ -1,0 +1,21 @@
+Ambiguity 1: 
+| None ->
+      (* ident is not locally bound, therefore this is a use under a lambda
+         or within a loop.  Increase use count by 2 -- enough so
+         that single-use optimizations will not apply. *)
+      match Ident_hashtbl.find_opt occ ident with 
+      | Some r -> absorb_info r {times = 1; captured =  true}
+      | None ->
+        (* Not a let-bound variable, ignore *)
+        ()
+
+Ambiguity 2: 
+| None ->
+      (* ident is not locally bound, therefore this is a use under a lambda
+         or within a loop.  Increase use count by 2 -- enough so
+         that single-use optimizations will not apply. *)
+      match Ident_hashtbl.find_opt occ ident with 
+      | Some r -> absorb_info r {n with captured = true} 
+      | None ->
+        (* Not a let-bound variable, ignore *)
+        ()

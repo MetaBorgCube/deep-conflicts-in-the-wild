@@ -1,0 +1,3 @@
+Ambiguity 1: 
+let old_f = !end_library_hook in
+  end_library_hook := fun () -> old_f(); f ()

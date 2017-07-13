@@ -1,0 +1,11 @@
+Ambiguity 1: 
+| Some previous_amount ->
+      match Tez_repr.(previous_amount -? amount) with
+      | Ok amount ->
+          if Tez_repr.(amount = zero) then
+            Storage.Rewards.Amount.remove c (delegate, cycle) >>= fun ctxt ->
+            return ctxt
+          else
+            Storage.Rewards.Amount.set c (delegate, cycle) amount
+      | Error _ ->
+          fail Incorrect_discard

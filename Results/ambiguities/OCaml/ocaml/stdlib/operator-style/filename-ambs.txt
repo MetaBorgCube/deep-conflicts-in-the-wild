@@ -1,0 +1,7 @@
+Ambiguity 1: 
+loop i =
+      if i = l then Buffer.add_char b '\"' else
+      match s.[i] with
+      | '\"' -> loop_bs 0 i;
+      | '\\' -> loop_bs 0 i;
+      | c    -> Buffer.add_char b c; loop (i+1)

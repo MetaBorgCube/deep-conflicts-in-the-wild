@@ -1,0 +1,6 @@
+Ambiguity 1: 
+fmt x ->
+      if M.is_empty x then F.fprintf fmt "empty" else
+        let (s1, c1) = M.min_binding x in
+        pp1 fmt (s1, c1);
+        M.iter (fun s c -> F.fprintf fmt " + %a" pp1 (s, c)) (M.remove s1 x)

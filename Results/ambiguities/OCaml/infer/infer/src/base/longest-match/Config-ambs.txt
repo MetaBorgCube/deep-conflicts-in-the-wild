@@ -1,0 +1,20 @@
+Ambiguity 1: 
+| Some Crashcontext -> crashcontext := true
+   | Some Eradicate -> eradicate := true
+   | Some Tracing -> biabduction := true; tracing := true
+   | Some (CaptureOnly | CompileOnly | Checkers | Linters) -> ()
+   | None ->
+       let open CLOpt in
+       match command_opt with
+       | Some Compile -> analyzer := Some CompileOnly
+       | Some Capture -> analyzer := Some CaptureOnly
+       | _ -> biabduction := true
+
+Ambiguity 2: 
+| Some `Capture -> true, false (* capture, no lint *)
+  | Some `Lint_and_capture -> true, true (* capture, lint *)
+  | None ->
+      match !analyzer with
+      | Some Linters -> false, true (* no capture, lint *)
+      | Some BiAbduction -> true, false (* capture, no lint *)
+      | _ -> true, true

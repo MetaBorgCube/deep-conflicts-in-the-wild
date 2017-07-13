@@ -1,0 +1,22 @@
+Ambiguity 1: 
+let convert_address address =
+  try
+    let n = String.index address ':' in
+      let host = String.sub address 0 n
+      and port = String.sub address (n + 1) (String.length address - n - 1)
+      in
+        (PF_INET,
+         ADDR_INET
+           ((try inet_addr_of_string host with Failure _ ->
+               try (gethostbyname host).h_addr_list.(0) with Not_found ->
+                 prerr_endline ("Unknown host: " ^ host);
+                 failwith "Can't convert address"),
+            (try int_of_string port with Failure _ ->
+               prerr_endline "The port number should be an integer";
+               failwith "Can't convert address")))
+  with Not_found ->
+    match Sys.os_type with
+      "Win32" -> failwith "Unix sockets not supported"
+    | _ -> (PF_UNIX, ADDR_UNIX address)
+
+(*** Report a unix error. ***)

@@ -1,0 +1,7 @@
+Ambiguity 1: 
+| _ ->
+      if is_custom_var_pointer pointer then
+        Pvar.mk (Mangled.from_string name.Clang_ast_t.ni_name) procname
+      else match CAst_utils.get_decl decl_ref.Clang_ast_t.dr_decl_pointer with
+        | Some var_decl -> sil_var_of_decl context var_decl procname
+        | None -> assert false

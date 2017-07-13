@@ -1,0 +1,16 @@
+Ambiguity 1: 
+b () -> 
+        info_opt |? fun ({i_deprecated;i_desc} : Odoc_info.info ) ->
+          i_deprecated
+          |? (fun d ->
+              bp b {|<div class="warning">
+                     <span class="label">%s</span>
+                     %a
+                     </div>
+                   |} 
+                Odoc_messages.deprecated self#html_of_text  d );
+          i_desc |?
+          (function 
+            | [Odoc_info.Raw ""] -> ()
+            |  d -> self#html_of_text b d; bs b "<br>\n"
+          )

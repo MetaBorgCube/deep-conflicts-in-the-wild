@@ -1,0 +1,41 @@
+Ambiguity 1: 
+| d :: rest ->
+          let id = NamedDecl.get_id d in
+          let typ = nf_evar sigma (NamedDecl.get_type d) in
+	  let typ = whd_all env sigma typ in
+	  if is_empty_type sigma typ then
+	    simplest_elim (mkVar id)
+	  else match EConstr.kind sigma typ with
+	  | Prod (na,t,u) when is_empty_type sigma u ->
+             let is_unit_or_eq =
+               if use_negated_unit_or_eq_type () then match_with_unit_or_eq_type sigma t
+               else None in
+	     Tacticals.New.tclORELSE
+               (match is_unit_or_eq with
+               | Some _ ->
+                   let hd,args = decompose_app sigma t in
+                   let (ind,_ as indu) = destInd sigma hd in
+                   let nparams = Inductiveops.inductive_nparams_env env ind in
+                   let params = Util.List.firstn nparams args in
+                   let p = applist ((mkConstructUi (indu,1)), params) in
+                   (* Checking on the fly that it type-checks *)
+                   simplest_elim (mkApp (mkVar id,[|p|]))
+               | None ->
+                 Tacticals.New.tclZEROMSG (Pp.str"Not a negated unit type."))
+	      (Proofview.tclORELSE
+                 (Proofview.Goal.enter { enter = begin fun gl ->
+                   let is_conv_leq = Tacmach.New.pf_apply is_conv_leq gl in
+	           filter_hyp (fun typ -> is_conv_leq typ t)
+		     (fun id' -> simplest_elim (mkApp (mkVar id,[|mkVar id'|])))
+                 end })
+                 begin function (e, info) -> match e with
+	           | Not_found -> seek_neg rest
+                   | e -> Proofview.tclZERO ~info e
+                 end)
+	  | _ -> seek_neg rest
+
+Ambiguity 2: 
+begin function (e, info) -> match e with
+          | Not_found -> Tacticals.New.tclZEROMSG (Pp.str"Not a contradiction.")
+          | e -> Proofview.tclZERO ~info e
+        end

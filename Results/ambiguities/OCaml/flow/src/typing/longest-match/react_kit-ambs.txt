@@ -1,0 +1,33 @@
+Ambiguity 1: 
+| Some (k, p) ->
+          let todo = SMap.remove k todo in
+          match Property.read_t p with
+          | None -> next todo shape
+          | Some t ->
+            rec_flow cx trace (t, ReactKitT (reason_op,
+              SimplifyPropType (Shape
+                (ResolveProp (k, todo, shape)), tout)))
+
+Ambiguity 2: 
+| (_, mixin), ((obj, spec), todo, mixins_rev)::stack' ->
+        (* Done resolving a mixin *)
+        let mixins_rev = Known mixin :: mixins_rev in
+        match todo with
+        | [] ->
+          (* No more mixins, resume parent stack with accumulated mixins *)
+          let stack = (obj, flatten_mixins mixins_rev spec), stack' in
+          on_resolve_mixins stack
+        | t::todo ->
+          (* Resolve next mixin in parent's mixin list *)
+          let stack' = ((obj, spec), todo, mixins_rev)::stack' in
+          resolve (Spec stack') t
+
+Ambiguity 3: 
+| Some (k, p) ->
+          let todo = SMap.remove k todo in
+          match Property.read_t p with
+          | None -> next todo prop_types
+          | Some t ->
+            let tool = PropTypes (stack,
+              ResolveProp (k, todo, prop_types)) in
+            resolve tool t

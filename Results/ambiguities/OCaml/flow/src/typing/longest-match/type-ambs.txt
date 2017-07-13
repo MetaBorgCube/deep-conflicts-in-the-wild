@@ -1,0 +1,6 @@
+Ambiguity 1: 
+| Some (base, tset) ->
+      match base_of_t t with
+      | Some tbase when tbase = base ->
+        Some (EnumSet.mem t tset)
+      | _ -> Some false

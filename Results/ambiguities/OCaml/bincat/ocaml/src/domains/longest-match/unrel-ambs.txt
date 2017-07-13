@@ -1,0 +1,83 @@
+Ambiguity 1: 
+| Val m' ->
+          let v', _ = eval_exp m' src in
+          let v' = span_taint m' src v' in
+          L.debug (fun p -> p "(set) %s = %s (%s)" (Asm.string_of_lval dst true) (Asm.string_of_exp src true) (D.to_string v'));
+          let b = D.is_tainted v' in
+          if D.is_bot v' then
+              BOT, b
+          else
+              match dst with
+              | Asm.V r -> 
+                begin
+                    match r with
+                    | Asm.T r' ->
+                      Val (Env.add (Env.Key.Reg r') v' m'), b
+                    | Asm.P (r', low, up) ->
+                      try
+                          let prev = Env.find (Env.Key.Reg r') m' in		    
+                          Val (Env.replace (Env.Key.Reg r') (D.combine prev v' low up) m'), b
+                      with
+                        Not_found -> BOT, b
+                end
+              | Asm.M (e, n) ->
+                let v, b' = eval_exp m' e in
+                let addrs = D.to_addresses v in
+                let l     = Data.Address.Set.elements addrs in
+                try
+                    match l with
+                    | [a] -> (* strong update *) Val (write_in_memory a m' v' n true false), b||b'
+                    | l   -> (* weak update *) Val (List.fold_left (fun m a ->  write_in_memory a m v' n false false) m' l), b||b'
+                with Exceptions.Empty -> BOT, false
+                         
+    
+
+Ambiguity 2: 
+| Val m' ->
+	 let v, _ = eval_exp m' addr in
+	 let addrs = Data.Address.Set.elements (D.to_addresses v) in
+	 let term = fst (eval_exp m' terminator) in
+	 let off = sz / 8 in
+	 let rec find (a: Data.Address.t) (o: int): (int * D.t list) =
+	   if o >= upper_bound then
+	     if with_exception then raise Not_found
+	       else o, [] 
+	   else
+	     let a' = Data.Address.add_offset a (Z.of_int o) in
+	     let v = get_mem_value m' a' sz in
+	     if D.compare v cmp term then
+	       match pad_options with
+	       | None -> o, []
+	       | Some (pad_char, pad_left) ->
+		  if o = upper_bound then upper_bound, []
+		  else
+		    let n = upper_bound-o in
+		    let z = D.of_word (Data.Word.of_int (Z.of_int (Char.code pad_char)) 8) in
+		    if pad_left then L.abort (fun p -> p "left padding in i_get_bytes not managed")
+		    else
+		      let chars = ref [] in
+		      for _i = 0 to n-1 do
+			chars := z::!chars
+		      done;
+		      upper_bound, !chars
+	     else
+	       let o', l = find a (o+off) in
+	       o', v::l
+	 in
+	 match addrs with
+	 | [a] -> find a 0 
+	 | _::_ ->
+	    let res = List.fold_left (fun acc a ->
+	      try
+		let n = find a 0 in
+		match acc with
+		| None -> Some n
+		| Some prev -> Some (max prev n)
+	      with _ -> acc) None addrs
+	    in
+	    begin
+	      match res with
+	      | Some n -> n
+	      | None -> raise Not_found
+	    end
+	 | [] -> raise Not_found

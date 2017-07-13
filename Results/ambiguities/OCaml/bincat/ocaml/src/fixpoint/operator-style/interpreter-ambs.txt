@@ -1,0 +1,28 @@
+Ambiguity 1: 
+cfa_iteration (update_abstract_value: Cfa.t -> Cfa.State.t -> Data.Address.t -> Cfa.State.t list -> Cfa.State.t list)
+			(next: Cfa.t -> Cfa.State.t -> Cfa.State.t list)
+			(unroll: Cfa.t -> Cfa.State.t -> Cfa.State.t -> Cfa.State.t) (g: Cfa.t) (s: Cfa.State.t) (dump: Cfa.t -> unit): Cfa.t =
+	if D.is_bot s.Cfa.State.v then
+	begin
+	  dump g;
+	  L.abort (fun p -> p "analysis not started: empty meet with previous computed value")
+	end
+      else
+	let module Vertices = Set.Make(Cfa.State) in
+	let continue = ref true in
+	let waiting = ref (Vertices.singleton s) in
+	try
+	  while !continue do
+	    let v = Vertices.choose !waiting in	
+	    waiting := Vertices.remove v !waiting;
+	    let v' = next g v in
+	    let new_vertices = List.fold_left (fun l v' -> (update_abstract_value g v v'.Cfa.State.ip [v'])@l) [] v' in
+	    let new_vertices' = List.map (unroll g v) new_vertices in
+	    let vertices' = filter_vertices false g new_vertices' in
+	    List.iter (fun v -> waiting := Vertices.add v !waiting) vertices';
+	    continue := not (Vertices.is_empty !waiting)
+	  done;
+	  g
+	with
+	| Invalid_argument _ -> L.analysis (fun p -> p "entry node of the CFA reached"); g
+	| e -> dump g; raise e

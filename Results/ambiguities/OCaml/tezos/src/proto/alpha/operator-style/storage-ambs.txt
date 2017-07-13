@@ -1,0 +1,26 @@
+Ambiguity 1: 
+is_first_block ctxt >>=? function
+  | false ->
+      get_first_level ctxt >>=? fun level ->
+      return (ctxt, false, level)
+  | true ->
+      Context.set ctxt version_key
+        (MBytes.of_string version_value) >>= fun ctxt ->
+      set_first_level ctxt level >>=? fun ctxt ->
+      return (ctxt, true, level)
+
+Ambiguity 2: 
+Lwt.return (Raw_level_repr.of_int32 level ) >>=? fun level ->
+  Lwt.return (Fitness_repr.to_int64 fitness) >>=? fun fitness ->
+  may_tag_first_block ctxt level >>=? fun (ctxt, first_block, first_level) ->
+  get_sandboxed ctxt >>=? fun sandbox ->
+  Constants_repr.read sandbox >>=? function constants ->
+  let level =
+    Level_repr.from_raw
+      ~first_level
+      ~cycle_length:constants.Constants_repr.cycle_length
+      ~voting_period_length:constants.Constants_repr.voting_period_length
+    level in
+  return ({ context = ctxt ; constants ; level ;
+            timestamp ; fitness ; first_level},
+          first_block)

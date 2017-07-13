@@ -1,0 +1,34 @@
+Ambiguity 1: 
+debug fmsg = 
+    if loglevel () >= 4 then
+	let msg = fmsg Printf.sprintf in
+	Printf.fprintf !logfid  "[DEBUG] %s: %s\n" modname msg;
+	flush !logfid
+
+Ambiguity 2: 
+info fmsg = 
+    if loglevel () >= 3 then
+	let msg = fmsg Printf.sprintf in
+	Printf.fprintf !logfid  "[INFO]  %s: %s\n" modname msg;
+	flush !logfid
+
+Ambiguity 3: 
+warn fmsg = 
+    if loglevel () >= 2 then
+	let msg = fmsg Printf.sprintf in
+	Printf.fprintf !logfid  "[WARN]  %s: %s\n" modname msg;
+	flush !logfid
+
+Ambiguity 4: 
+analysis fmsg = 
+    if !Config.loglevel >= 1 then
+	let msg = fmsg Printf.sprintf in
+	Printf.fprintf !logfid  "[ANALYSIS] %s: %s\n" modname msg;
+	flush !logfid
+
+Ambiguity 5: 
+decoder fmsg = 
+    if !Config.loglevel >= 1 then
+	let msg = fmsg Printf.sprintf in
+	Printf.fprintf !logfid  "[DECODER] %s: %s\n" modname msg;
+	flush !logfid

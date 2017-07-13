@@ -1,0 +1,32 @@
+Ambiguity 1: 
+| Some b ->
+            match C.of_bytes b with
+            | None -> Lwt.return acc
+            | Some v -> f (of_path root) v acc
+
+Ambiguity 2: 
+Not_found ->
+      use store (fun store -> Store.get store hash) >>= function
+      | Some op -> Lwt.return op
+      | None ->
+          try Lwt.waiter_of_wakener (Table.find tbl hash).wakener
+          with Not_found -> request session rdata hash
+
+  
+
+Ambiguity 3: 
+| "" :: ds ->
+          Store.list t [prefix] >>= fun prefixes ->
+          Lwt_list.map_p (fun prefix -> loop prefix ds) prefixes
+          >|= List.flatten
+      | [d] ->
+          Store.list t [prefix] >>= fun prefixes ->
+          Lwt_list.filter_map_p (fun prefix ->
+              match remove_prefix d (List.hd (List.rev prefix)) with
+              | None -> Lwt.return_none
+              | Some _ -> Lwt.return (Some (build prefix))
+            ) prefixes
+      | d :: ds ->
+          Store.dir_mem t (prefix @ [d]) >>= function
+          | true -> loop (prefix @ [d]) ds
+          | false -> Lwt.return_nil

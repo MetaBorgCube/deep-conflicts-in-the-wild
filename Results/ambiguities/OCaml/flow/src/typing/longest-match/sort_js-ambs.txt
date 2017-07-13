@@ -1,0 +1,15 @@
+Ambiguity 1: 
+| None ->
+        if (List.mem r state.stack) then
+          (** either back edge, or cross edge where strongly connected component
+              is not yet complete **)
+          (* update lowlink with index of r *)
+          let index_r = FilenameMap.find_unsafe r state.indices in
+          lowlink := min !lowlink index_r
+        else
+          match FilenameMap.get r state.heights with
+          | Some h ->
+              (** cross edge where strongly connected component is complete **)
+              (* update height *)
+              height := max !height h
+          | None -> ()

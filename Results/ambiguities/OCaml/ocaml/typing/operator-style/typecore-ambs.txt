@@ -1,0 +1,148 @@
+Ambiguity 1: 
+if keep then p.pat_type else
+      let tyl = List.map (build_as_type env) pl in
+      let ty_args, ty_res = instance_constructor cstr in
+      List.iter2 (fun (p,ty) -> unify_pat env {p with pat_type = ty})
+        (List.combine pl tyl) ty_args;
+      ty_res
+
+Ambiguity 2: 
+if lbl.lbl_private = Private then p.pat_type else
+      let ty = newvar () in
+      let ppl = List.map (fun (_, l, p) -> l.lbl_pos, p) lpl in
+      let do_label lbl =
+        let _, ty_arg, ty_res = instance_label false lbl in
+        unify_pat env {p with pat_type = ty} ty_res;
+        let refinable =
+          lbl.lbl_mut = Immutable && List.mem_assoc lbl.lbl_pos ppl &&
+          match (repr lbl.lbl_arg).desc with Tpoly _ -> false | _ -> true in
+        if refinable then begin
+          let arg = List.assoc lbl.lbl_pos ppl in
+          unify_pat env {arg with pat_type = build_as_type env arg} ty_arg
+        end else begin
+          let _, ty_arg', ty_res' = instance_label false lbl in
+          unify env ty_arg ty_arg';
+          unify_pat env p ty_res'
+        end in
+      Array.iter do_label lbl.lbl_all;
+      ty
+
+Ambiguity 3: 
+if not gen && (* first try a single coercion *)
+                  let snap = snapshot () in
+                  let ty, b = enlarge_type env ty' in
+                  try
+                    force (); Ctype.unify env arg.exp_type ty; true
+                  with Unify _ ->
+                    backtrack snap; false
+                then ()
+                else begin try
+                  let force' = subtype env arg.exp_type ty' in
+                  force (); force' ();
+                  if not gen then
+                    Location.prerr_warning loc
+                      (Warnings.Not_principal "this ground coercion");
+                with Subtype (tr1, tr2) ->
+                  (* prerr_endline "coercion failed"; *)
+                  raise(Error(loc, env, Not_subtype(tr1, tr2)))
+                end
+
+Ambiguity 4: 
+unify_exp env {texp with exp_type = ty_fun} ty_expected;
+      if args = [] then texp else
+      (* eta-expand to avoid side effects *)
+      let var_pair name ty =
+        let id = Ident.create name in
+        {pat_desc = Tpat_var (id, mknoloc name); pat_type = ty;pat_extra=[];
+         pat_attributes = [];
+         pat_loc = Location.none; pat_env = env},
+        {exp_type = ty; exp_loc = Location.none; exp_env = env;
+         exp_extra = []; exp_attributes = [];
+         exp_desc =
+         Texp_ident(Path.Pident id, mknoloc (Longident.Lident name),
+                    {val_type = ty; val_kind = Val_reg;
+                     val_attributes = [];
+                     Types.val_loc = Location.none})}
+      in
+      let eta_pat, eta_var = var_pair "eta" ty_arg in
+      let func texp =
+        let e =
+          {texp with exp_type = ty_res; exp_desc =
+           Texp_apply
+             (texp,
+              args @ ["", Some eta_var, Required])}
+        in
+        { texp with exp_type = ty_fun; exp_desc =
+          Texp_function("", [case eta_pat e], Total) }
+      in
+      Location.prerr_warning texp.exp_loc
+        (Warnings.Eliminated_optional_arguments (List.map (fun (l, _, _) -> l) args));
+      if warn then Location.prerr_warning texp.exp_loc
+          (Warnings.Without_principality "eliminated optional argument");
+      if is_nonexpansive texp then func texp else
+      (* let-expand to have side effects *)
+      let let_pat, let_var = var_pair "arg" texp.exp_type in
+      re { texp with exp_type = ty_fun; exp_desc =
+           Texp_let (Nonrecursive,
+                     [{vb_pat=let_pat; vb_expr=texp; vb_attributes=[];
+                       vb_loc=Location.none;
+                      }],
+                     func let_var) }
+
+Ambiguity 5: 
+end_def();
+  if !Clflags.strict_sequence then
+    let expected_ty = instance_def Predef.type_unit in
+    unify_exp env exp expected_ty;
+    exp else
+  let ty = expand_head env exp.exp_type and tv = newvar() in
+  begin match ty.desc with
+  | Tarrow _ ->
+      Location.prerr_warning loc Warnings.Partial_application
+  | Tconstr (p, _, _) when Path.same p Predef.path_unit -> ()
+  | Tvar _ when ty.level > tv.level ->
+      Location.prerr_warning loc Warnings.Nonreturning_statement
+  | Tvar _ ->
+      add_delayed_check (fun () -> check_application_result env true exp)
+  | _ ->
+      Location.prerr_warning loc Warnings.Statement_type
+  end;
+  unify_var env tv ty;
+  exp
+
+Ambiguity 6: 
+pat ->
+        if not warn_unused then pat, None
+        else
+          let some_used = ref false in
+            (* has one of the identifier of this pattern been used? *)
+          let slot = ref [] in
+          List.iter
+            (fun (id,_) ->
+              let vd = Env.find_value (Path.Pident id) new_env in
+              (* note: Env.find_value does not trigger the value_used event *)
+              let name = Ident.name id in
+              let used = ref false in
+              if not (name = "" || name.[0] = '_' || name.[0] = '#') then
+                add_delayed_check
+                  (fun () ->
+                    if not !used then
+                      Location.prerr_warning vd.Types.val_loc
+                        ((if !some_used then check_strict else check) name)
+                  );
+              Env.set_value_used_callback
+                name vd
+                (fun () ->
+                  match !current_slot with
+                  | Some slot ->
+                      slot := (name, vd) :: !slot; rec_needed := true
+                  | None ->
+                      List.iter
+                        (fun (name, vd) -> Env.mark_value_used env name vd)
+                        (get_ref slot);
+                      used := true;
+                      some_used := true
+                )
+            )
+            (Typedtree.pat_bound_idents pat);
+          pat, Some slot

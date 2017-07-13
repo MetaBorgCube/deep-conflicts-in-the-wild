@@ -1,0 +1,15 @@
+Ambiguity 1: 
+str "The reduction tactics " ++
+		 match recargs, nargs, never with
+		 | _,_, true -> str "never unfold " ++ pr_global ref
+		 | [], 0, _ -> str "always unfold " ++ pr_global ref
+		 | _::_, n, _ when n < 0 ->
+		    str "unfold " ++ pr_global ref ++ pp_recargs ++ pp_nomatch
+		 | _::_, n, _ when n > List.fold_left max 0 recargs ->
+		    str "unfold " ++ pr_global ref ++ pp_recargs ++
+		      str " and" ++ pp_nargs ++ pp_nomatch
+		 | _::_, _, _ ->
+		    str "unfold " ++ pr_global ref ++ pp_recargs ++ pp_nomatch
+		 | [], n, _ when n > 0 ->
+		    str "unfold " ++ pr_global ref ++ pp_nargs ++ pp_nomatch
+		 | _ -> str "unfold " ++ pr_global ref ++ pp_nomatch

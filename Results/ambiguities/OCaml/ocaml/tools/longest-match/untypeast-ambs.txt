@@ -1,0 +1,40 @@
+Ambiguity 1: 
+| { pat_extra=[Tpat_type (_path, lid), _, _attrs]; _ } -> Ppat_type lid
+    | { pat_extra= (Tpat_constraint ct, _, _attrs) :: rem; _ } ->
+        Ppat_constraint (untype_pattern { pat with pat_extra=rem },
+                         untype_core_type ct)
+    | _ ->
+    match pat.pat_desc with
+      Tpat_any -> Ppat_any
+    | Tpat_var (id, name) ->
+        begin
+          match (Ident.name id).[0] with
+            'A'..'Z' ->
+              Ppat_unpack name
+          | _ ->
+              Ppat_var name
+        end
+    | Tpat_alias (pat, _id, name) ->
+        Ppat_alias (untype_pattern pat, name)
+    | Tpat_constant cst -> Ppat_constant cst
+    | Tpat_tuple list ->
+        Ppat_tuple (List.map untype_pattern list)
+    | Tpat_construct (lid, _, args) ->
+        Ppat_construct (lid,
+          (match args with
+              [] -> None
+            | [arg] -> Some (untype_pattern arg)
+            | args ->
+                Some
+                  (Pat.tuple ~loc:pat.pat_loc
+                     (List.map untype_pattern args)
+                  )
+          ))
+    | Tpat_variant (label, pato, _) ->
+        Ppat_variant (label, option untype_pattern pato)
+    | Tpat_record (list, closed) ->
+        Ppat_record (List.map (fun (lid, _, pat) ->
+              lid, untype_pattern pat) list, closed)
+    | Tpat_array list -> Ppat_array (List.map untype_pattern list)
+    | Tpat_or (p1, p2, _) -> Ppat_or (untype_pattern p1, untype_pattern p2)
+    | Tpat_lazy p -> Ppat_lazy (untype_pattern p)

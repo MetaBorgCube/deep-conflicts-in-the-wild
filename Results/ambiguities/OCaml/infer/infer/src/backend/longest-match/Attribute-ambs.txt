@@ -1,0 +1,25 @@
+Ambiguity 1: 
+| None ->
+              match hpred with
+              | Sil.Hpointsto (Exp.Lvar pvar1, Sil.Eexp (exp2, Sil.Iformal(_, _) ), _)
+                when Exp.equal exp2 e &&
+                     (Pvar.is_local pvar1 || Pvar.is_seed pvar1) ->
+                  Some (Exp.Lvar pvar1)
+              | Sil.Hpointsto (exp1, Sil.Estruct (fields, _), _) ->
+                  List.fold_right ~f:(fun (field, strexp) res ->
+                      match res with
+                      | Some _ -> res
+                      | None ->
+                          match strexp with
+                          | Sil.Eexp (exp2, _) when Exp.equal exp2 e ->
+                              (match find_in_sigma exp1 seen_hpreds with
+                               | Some vfs -> Some (Exp.Lfield (vfs, field, Typ.mk Tvoid))
+                               | None -> None)
+                          | _ -> None) fields ~init:None
+              | _ -> None
+
+Ambiguity 2: 
+| None ->
+      match get_objc_null tenv prop e with
+      | Some (Apred (Aobjc_null, [_; vfs])) -> Some vfs
+      | _ -> None

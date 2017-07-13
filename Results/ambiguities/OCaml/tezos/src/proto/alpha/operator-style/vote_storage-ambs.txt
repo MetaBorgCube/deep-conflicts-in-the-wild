@@ -1,0 +1,26 @@
+Ambiguity 1: 
+Roll_storage.fold ctxt (ctxt, 0l)
+    ~f:(fun _roll contract (ctxt, total as acc) ->
+        Contract_storage.get_delegate_opt ctxt contract >>=? function
+        | None -> return acc
+        | Some delegate ->
+            begin
+              Storage.Vote.Listings.get_option ctxt delegate >>=? function
+              | None -> return 0l
+              | Some count -> return count
+            end >>=? fun count ->
+            Storage.Vote.Listings.init_set
+              ctxt delegate (Int32.succ count) >>=? fun ctxt ->
+            return (ctxt, Int32.succ total)) >>=? fun (ctxt, total) ->
+  Storage.Vote.Listings_size.init ctxt total >>=? fun ctxt ->
+  return ctxt
+
+Ambiguity 2: 
+Storage.Vote.Listings.clear ctxt >>= fun ctxt ->
+  Storage.Vote.Listings_size.remove ctxt >>= fun ctxt ->
+  return ctxt
+
+Ambiguity 3: 
+Storage.Vote.Current_quorum.init ctxt 80_00l >>=? fun ctxt ->
+  Storage.Vote.Current_period_kind.init ctxt Proposal >>=? fun ctxt ->
+  return ctxt

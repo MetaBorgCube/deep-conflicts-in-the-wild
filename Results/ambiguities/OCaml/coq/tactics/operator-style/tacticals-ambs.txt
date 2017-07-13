@@ -1,0 +1,31 @@
+Ambiguity 1: 
+t >>= fun res ->
+      (tclINDEPENDENT
+         (tclZEROMSG (str"Proof is not complete."))
+      ) <*>
+        tclUNIT res
+
+Ambiguity 2: 
+tclEVARMAP >>= fun sigma_initial ->
+      if sigma == sigma_initial then tac
+      else
+        let check_evars_if x =
+          if not accept_unresolved_holes then
+            tclEVARMAP >>= fun sigma_final ->
+              tclENV >>= fun env ->
+                try
+                  let () = check_evars env sigma_final sigma sigma_initial in
+                  tclUNIT x
+                with e when CErrors.noncritical e ->
+                  tclZERO e
+          else
+            tclUNIT x
+        in
+        Proofview.Unsafe.tclEVARS sigma <*> tac >>= check_evars_if
+
+Ambiguity 3: 
+Proofview.tclEVARMAP >>= fun sigma ->
+    Proofview.tclENV >>= fun env ->
+    let (sigma, c) = Evd.fresh_global env sigma ref in
+    let c = EConstr.of_constr c in
+    Proofview.Unsafe.tclEVARS sigma <*> Proofview.tclUNIT c

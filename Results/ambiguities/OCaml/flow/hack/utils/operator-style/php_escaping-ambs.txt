@@ -1,0 +1,7 @@
+Ambiguity 1: 
+if hex_count = 0 then
+          Buffer.add_string buf "\\x"
+        else
+          let c = parse_numeric_escape ("0x" ^ String.sub s (!idx) hex_count) in
+          Buffer.add_char buf c;
+          idx := !idx + hex_count

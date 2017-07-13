@@ -1,0 +1,9 @@
+Ambiguity 1: 
+if sys_file_exists f then
+            if Filename.check_suffix f ".cmi" then
+              let f' = caml_obj_ext_of_cmi f in
+              if f' <> fn then
+                if sys_file_exists f' then aux f'
+                else if pack_mode then aux f else ()
+              else ()
+            else aux f

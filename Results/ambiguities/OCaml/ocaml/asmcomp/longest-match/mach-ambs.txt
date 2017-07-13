@@ -1,0 +1,23 @@
+Ambiguity 1: 
+| _ ->
+      f i;
+      match i.desc with
+        Iend -> ()
+      | Ireturn | Iop(Itailcall_ind) | Iop(Itailcall_imm _) -> ()
+      | Iifthenelse(tst, ifso, ifnot) ->
+          instr_iter f ifso; instr_iter f ifnot; instr_iter f i.next
+      | Iswitch(index, cases) ->
+          for i = 0 to Array.length cases - 1 do
+            instr_iter f cases.(i)
+          done;
+          instr_iter f i.next
+      | Iloop(body) ->
+          instr_iter f body; instr_iter f i.next
+      | Icatch(_, body, handler) ->
+          instr_iter f body; instr_iter f handler; instr_iter f i.next
+      | Iexit _ -> ()
+      | Itrywith(body, handler) ->
+          instr_iter f body; instr_iter f handler; instr_iter f i.next
+      | Iraise _ -> ()
+      | _ ->
+          instr_iter f i.next

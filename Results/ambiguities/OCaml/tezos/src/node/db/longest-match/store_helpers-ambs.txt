@@ -1,0 +1,52 @@
+Ambiguity 1: 
+| [] ->
+          list t prefix >>= fun prefixes ->
+          Lwt_list.map_p (function
+              | `Key prefix | `Dir prefix -> loop (i+1) prefix []) prefixes
+          >|= List.flatten
+      | [d] when i = I.path_length - 1 ->
+          if (i >= I.path_length) then invalid_arg "IO.resolve" ;
+          list t prefix >>= fun prefixes ->
+          Lwt_list.map_p (function
+              | `Key prefix | `Dir prefix ->
+                  match Utils.remove_prefix d (List.hd (List.rev prefix)) with
+                  | None -> Lwt.return_nil
+                  | Some _ -> loop (i+1) prefix [])
+            prefixes
+          >|= List.flatten
+      | "" :: ds ->
+          list t prefix >>= fun prefixes ->
+          Lwt_list.map_p (function
+              | `Key prefix | `Dir prefix -> loop (i+1) prefix ds) prefixes
+          >|= List.flatten
+      | d :: ds ->
+          if (i >= I.path_length) then invalid_arg "IO.resolve" ;
+          S.known_dir t (prefix @ [d]) >>= function
+          | true -> loop (i+1) (prefix @ [d]) ds
+          | false -> Lwt.return_nil
+
+Ambiguity 2: 
+| `Key file ->
+              match I.of_path file with
+              | None -> assert false
+              | Some p -> f p acc
+
+Ambiguity 3: 
+| `Key file ->
+              S.read_opt s file >>= function
+              | None -> Lwt.return acc
+              | Some b ->
+                  match V.of_bytes b with
+                  | Error _ ->
+                      (* Silently ignore unparsable data *)
+                      Lwt.return acc
+                  | Ok v ->
+                      match I.of_path file with
+                      | None -> assert false
+                      | Some path -> f path v acc
+
+Ambiguity 4: 
+| `Key p ->
+              match I.of_path p with
+              | None -> assert false
+              | Some path -> f path acc

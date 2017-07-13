@@ -1,0 +1,24 @@
+Ambiguity 1: 
+prefix cctxt ->
+         Client_node_rpcs.complete
+           cctxt.rpc_config ~block:cctxt.config.block prefix >>=? fun completions ->
+         match completions with
+         | [] -> Pervasives.exit 3
+         | _ :: _ :: _ when !unique -> Pervasives.exit 3
+         | completions ->
+             List.iter print_endline completions ;
+             return ()
+
+Ambiguity 2: 
+Client_node_rpcs.bootstrapped cctxt.rpc_config >>=? fun stream ->
+         Lwt_stream.iter_s (function
+             | Ok (hash, time) ->
+                 cctxt.message "Current head: %a (%a)"
+                   Block_hash.pp_short hash
+                   Time.pp_hum time
+             | Error err ->
+                 cctxt.error "Error: %a"
+                   pp_print_error err
+           ) stream >>= fun () ->
+         cctxt.answer "Bootstrapped." >>= fun () ->
+         return ()

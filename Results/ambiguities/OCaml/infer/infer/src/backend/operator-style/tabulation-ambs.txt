@@ -1,0 +1,36 @@
+Ambiguity 1: 
+filter hpred =
+      if not (hpred_has_only_footprint_vars hpred) then
+        begin
+          L.d_warning "Missing fields hpred has non-footprint vars: "; Sil.d_hpred hpred; L.d_ln ();
+          false
+        end
+      else match hpred with
+        | Sil.Hpointsto(Exp.Var _, _, _) -> true
+        | Sil.Hpointsto(Exp.Lvar pvar, _, _) -> Pvar.is_global pvar
+        | _ ->
+            L.d_warning "Missing fields in complex pred: "; Sil.d_hpred hpred; L.d_ln ();
+            false
+
+Ambiguity 2: 
+if Prover.check_zero tenv e then
+          let desc = Errdesc.explain_divide_by_zero tenv e (State.get_node ()) (State.get_loc ()) in
+          let new_path, path_pos_opt =
+            let current_path, _ = State.get_path () in
+            if Paths.Path.contains_position post_path path_pos
+            then post_path, Some path_pos
+            else current_path, None (* position not found, only use the path up to the callee *) in
+          State.set_path new_path path_pos_opt;
+          let exn = Exceptions.Divide_by_zero (desc, __POS__) in
+          Reporting.log_warning caller_pname exn
+
+Ambiguity 3: 
+let _results = List.map ~f:(fun (p, path) -> (compute_result p, path)) instantiated_post in
+  if List.exists ~f:(fun (x, _) -> is_none x) _results then (* at least one combine failed *)
+    None
+  else
+    let results =
+      List.map ~f:(function (Some x, path) -> (x, path) | (None, _) -> assert false)
+        _results in
+    print_results tenv actual_pre (List.map ~f:fst results);
+    Some results

@@ -1,0 +1,39 @@
+Ambiguity 1: 
+while !i < j &&  
+        let u = String.unsafe_get s !i in 
+        u = '\t' || u = '\n' || u = ' ' 
+  do 
+    incr i;
+  done
+
+Ambiguity 2: 
+while !k >= !i && 
+        let u = String.unsafe_get s !k in 
+        u = '\t' || u = '\n' || u = ' ' do 
+    decr k ;
+  done
+
+Ambiguity 3: 
+let finish_delim = offset + beg_len in 
+
+  if finish_delim >  s_len  then -1 
+  else 
+    let i = ref offset  in
+    while !i <  finish_delim
+          && String.unsafe_get s !i =
+             String.unsafe_get beg (!i - offset) do 
+      incr i 
+    done;
+    if !i = finish_delim then 
+      digits_of_str ~offset:finish_delim s 2 
+    else 
+      -1
+
+Ambiguity 4: 
+let b_len = Array.length a in
+  if b_len = 0 then [||] else  
+  let b = Array.copy a in  
+  for i = 0 to  b_len - 1 do
+      Array.unsafe_set b i (Array.unsafe_get a (b_len - 1 -i )) 
+  done;
+  b

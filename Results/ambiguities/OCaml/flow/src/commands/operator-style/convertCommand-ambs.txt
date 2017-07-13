@@ -1,0 +1,15 @@
+Ambiguity 1: 
+let oc = open_out outfile in
+    if
+      let fmt = Format.formatter_of_out_channel oc in
+      call_succeeds (Printer_dts.program fmt) ast
+    then
+      let () = Printf.printf "No errors!\n\n" in
+      close_out oc;
+      0, 1, 1
+    else
+      let () = Printf.printf "No errors!\n\n" in
+      Printf.printf "Conversion was not successful!\n\n";
+      close_out oc;
+      Sys.remove outfile;
+      0, 0, 1

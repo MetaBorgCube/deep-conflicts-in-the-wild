@@ -1,0 +1,41 @@
+Ambiguity 1: 
+| Resource.Cache.Bcannot_be_built ->
+      (dprintf 5 "%a already failed" Resource.print target; failed target (Leaf target))
+  | Resource.Cache.Bsuspension(s) ->
+      (dprintf 5 "%a was suspended -> resuming" Resource.print target;
+       Resource.Cache.resume_suspension s)
+  | Resource.Cache.Bnot_built_yet ->
+    if not (Pathname.is_relative target) && Pathname.exists target then
+      if Resource.Cache.external_is_up_to_date target then ()
+      else (* perhaps the error can be refined *) failed target (Leaf target)
+    else
+    if Resource.exists_in_source_dir target then
+      Resource.Cache.import_in_build_dir target
+    else
+    match List.filter_opt (Rule.can_produce target) rules with
+    | [] -> failed target (Leaf target)
+    | matching_rules ->
+      let rec until_works rs backtraces =
+        match rs with
+        | [] -> assert false
+        | r :: rs ->
+            try
+              List.iter (force_self (depth + 1) on_the_go) (Rule.deps_of_rule r);
+              try
+                Rule.call (self_firsts (depth + 1) on_the_go) r
+              with Rule.Failed -> raise (Failed (Leaf target))
+            with Failed backtrace ->
+              if rs = [] then failed target (Depth (target, Choice (backtrace :: backtraces)))
+              else
+                let () =
+                  match backtrace with
+                  | Depth (top_prod, _) -> Resource.Cache.clear_resource_failed top_prod
+                  | Target _ | Choice _ | Leaf _ -> ()
+                in until_works rs (backtrace :: backtraces)
+      in until_works matching_rules []
+
+Ambiguity 2: 
+| Good res ->
+          match Resource.Cache.get_optional_resource_suspension res with
+          | None -> acc
+          | Some (cmd, thunk) -> (cmd :: acc1, thunk :: acc2)

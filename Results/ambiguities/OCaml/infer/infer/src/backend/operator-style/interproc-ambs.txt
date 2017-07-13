@@ -1,0 +1,11 @@
+Ambiguity 1: 
+changed =
+    if Paths.PathSet.is_empty d then false
+    else
+      let node_id = Procdesc.Node.get_id node in
+      let old_todo = htable_retrieve wl.Worklist.path_set_todo node_id in
+      let old_visited = htable_retrieve wl.Worklist.path_set_visited node_id in
+      let d' = Paths.PathSet.diff d old_visited in (* differential fixpoint *)
+      let todo_new = Paths.PathSet.union old_todo d' in
+      Hashtbl.replace wl.Worklist.path_set_todo node_id todo_new;
+      not (Paths.PathSet.equal old_todo todo_new)

@@ -1,0 +1,63 @@
+Ambiguity 1: 
+| Some c ->
+  match outer_iterator with
+  | GVar (_,v) when Id.equal v ldots_var -> (* Not enough context *) raise Not_found
+  | _ -> outer_iterator, c
+
+Ambiguity 2: 
+let rec aux c =
+    let keepfound = !found in
+    (* n^2 complexity but small and done only once per notation *)
+    try compare_recursive_parts found aux aux' (split_at_recursive_part c)
+    with Not_found ->
+    found := keepfound;
+    match c with
+    | GApp (_,GVar (loc,f),[c]) when Id.equal f ldots_var ->
+	(* Fall on the second part of the recursive pattern w/o having
+	   found the first part *)
+	user_err ~loc 
+	(str "Cannot find where the recursive pattern starts.")
+    | c ->
+	aux' c
+  and aux' = function
+  | GVar (_,id) -> add_id found id; NVar id
+  | GApp (_,g,args) -> NApp (aux g, List.map aux args)
+  | GLambda (_,na,bk,ty,c) -> add_name found na; NLambda (na,aux ty,aux c)
+  | GProd (_,na,bk,ty,c) -> add_name found na; NProd (na,aux ty,aux c)
+  | GLetIn (_,na,b,t,c) -> add_name found na; NLetIn (na,aux b,Option.map aux t,aux c)
+  | GCases (_,sty,rtntypopt,tml,eqnl) ->
+      let f (_,idl,pat,rhs) = List.iter (add_id found) idl; (pat,aux rhs) in
+      NCases (sty,Option.map aux rtntypopt,
+        List.map (fun (tm,(na,x)) ->
+	  add_name found na;
+	  Option.iter
+	    (fun (_,_,nl) -> List.iter (add_name found) nl) x;
+          (aux tm,(na,Option.map (fun (_,ind,nal) -> (ind,nal)) x))) tml,
+        List.map f eqnl)
+  | GLetTuple (loc,nal,(na,po),b,c) ->
+      add_name found na;
+      List.iter (add_name found) nal;
+      NLetTuple (nal,(na,Option.map aux po),aux b,aux c)
+  | GIf (loc,c,(na,po),b1,b2) ->
+      add_name found na;
+      NIf (aux c,(na,Option.map aux po),aux b1,aux b2)
+  | GRec (_,fk,idl,dll,tl,bl) ->
+      Array.iter (add_id found) idl;
+      let dll = Array.map (List.map (fun (na,bk,oc,b) ->
+	 if bk != Explicit then
+	   error "Binders marked as implicit not allowed in notations.";
+	 add_name found na; (na,Option.map aux oc,aux b))) dll in
+      NRec (fk,idl,dll,Array.map aux tl,Array.map aux bl)
+  | GCast (_,c,k) -> NCast (aux c,Miscops.map_cast_type aux k)
+  | GSort (_,s) -> NSort s
+  | GHole (_,w,naming,arg) ->
+     if arg != None then has_ltac := true;
+     NHole (w, naming, arg)
+  | GRef (_,r,_) -> NRef r
+  | GEvar _ | GPatVar _ ->
+      error "Existential variables not allowed in notations."
+
+  in
+  let t = aux a in
+  (* Side effect *)
+  t, !found, !has_ltac

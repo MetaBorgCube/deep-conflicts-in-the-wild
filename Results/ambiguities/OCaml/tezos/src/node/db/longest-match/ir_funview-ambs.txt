@@ -1,0 +1,139 @@
+Ambiguity 1: 
+| t, [] -> List.iter (fun (key, v) -> f key (`Left v)) t
+      | (k1,v1)::t1, (k2,v2)::t2 ->
+          match compare_k k1 k2 with
+          | 0 ->
+              f k1 (`Both (v1, v2));
+              aux t1 t2
+          | x -> if x < 0 then (
+              f k1 (`Left v1);
+              aux t1 l2
+            ) else (
+                f k2 (`Right v2);
+                aux l1 t2
+              )
+
+Ambiguity 2: 
+| Key (db, k as key) ->
+        P.Contents.read (P.Repo.contents_t db) k >>= function
+        | None   -> Lwt.return_none
+        | Some c ->
+          t := Both (key, c);
+          Lwt.return (Some c)
+
+Ambiguity 3: 
+| { node = Some n ; _ } -> Lwt.return (Some n)
+      | { key = Some (db, k) ; _ } ->
+        P.Node.read (P.Repo.node_t db) k >>= function
+        | None   -> Lwt.return_none
+        | Some n ->
+          let n = import db n in
+          t.node <- Some n;
+          Lwt.return (Some n)
+
+Ambiguity 4: 
+| Some (h, p) ->
+        Node.read node >>= function
+        | None -> Lwt.return_none
+        | Some t ->
+          match Node.read_succ t h with
+          | None   -> Lwt.return_none
+          | Some v -> aux v p
+
+Ambiguity 5: 
+| _          , None -> Lwt.return_none
+    | _          , Some (path, file) ->
+      sub t path >>= function
+      | None   -> Lwt.return_none
+      | Some n -> Node.read_contents n file
+
+Ambiguity 6: 
+| Some (path, file) ->
+      let rec aux view path =
+        match Path.decons path with
+        | None        -> Node.with_contents view file v
+        | Some (h, p) ->
+          Node.read view >>= function
+          | None ->
+            if v = None then Lwt.return_none
+            else err_not_found "update_contents" k (* XXX ?*)
+          | Some n ->
+            match Node.read_succ n h with
+            | Some child -> begin
+              aux child p >>= function
+              | None -> Lwt.return_none
+              | Some child -> begin
+                  if v = None then
+                    (* remove empty dirs *)
+                    Node.is_empty child >>= function
+                    | true  -> Lwt.return_none
+                    | false -> Lwt.return (Some child)
+                  else
+                    Lwt.return (Some child)
+                end >>= fun child ->
+                Node.with_succ view h child
+              end
+            | None ->
+              if v = None then
+                Lwt.return_none
+              else
+                aux (Node.empty ()) p >>= function
+                | None -> assert false
+                | Some _ as child -> Node.with_succ view h child
+      in
+      let n = match t with `Node n -> n | _ -> Node.empty () in
+      aux n path >>= function
+      | None -> Lwt.return t
+      | Some node ->
+        Node.is_empty node >>= function
+        | true  -> Lwt.return `Empty
+        | false -> Lwt.return (`Node node)
+
+Ambiguity 7: 
+| _    ->
+      match t with
+      | `Contents _ -> Lwt.return `Empty
+      | `Empty -> Lwt.return t
+      | `Node n ->
+        let rec aux view path =
+          match Path.decons path with
+          | None       -> assert false
+          | Some (h,p) ->
+            if Path.is_empty p then
+              Node.with_succ view h None
+            else
+              Node.read view >>= function
+              | None   -> Lwt.return_none
+              | Some n ->
+                match Node.read_succ n h with
+                | None       ->
+                      Lwt.return_none
+                | Some child ->
+                    aux child p >>= function
+                    | None -> Lwt.return_none
+                    | Some child -> begin
+                        (* remove empty dirs *)
+                        Node.is_empty child >>= function
+                        | true  -> Lwt.return_none
+                        | false -> Lwt.return (Some child)
+                      end >>= fun child ->
+                        Node.with_succ view h child
+        in
+        aux n k >>= function
+      | None -> Lwt.return t
+      | Some node ->
+        Node.is_empty node >>= function
+        | true  -> Lwt.return `Empty
+        | false -> Lwt.return (`Node node)
+
+Ambiguity 8: 
+| `Contents c ->
+              match !c with
+              | Contents.Both _
+              | Contents.Key _       -> ()
+              | Contents.Contents x  ->
+                Stack.push (fun () ->
+                    P.Contents.add (P.Repo.contents_t repo) x >>= fun k ->
+                    c := Contents.Key (repo, k);
+                    Lwt.return_unit
+                  ) todo

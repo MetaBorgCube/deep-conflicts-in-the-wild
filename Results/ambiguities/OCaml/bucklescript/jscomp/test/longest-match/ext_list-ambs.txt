@@ -1,0 +1,11 @@
+Ambiguity 1: 
+| a::l -> 
+    match p a with
+    | None -> for_all_opt p l
+    | v -> v
+
+Ambiguity 2: 
+| x :: l -> 
+    match  p x with 
+    | Some _ as v  ->  v
+    | None -> find_opt p l

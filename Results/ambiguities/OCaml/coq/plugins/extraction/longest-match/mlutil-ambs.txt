@@ -1,0 +1,122 @@
+Ambiguity 1: 
+| Keep :: _ -> NonLogicalSig
+  | Kill k :: s ->
+     match k, sign_kind s with
+     | _, NonLogicalSig -> NonLogicalSig
+     | Ktype, (SafeLogicalSig | EmptySig) -> SafeLogicalSig
+     | _, _ -> UnsafeLogicalSig
+
+Ambiguity 2: 
+| k :: s ->
+     match k, sign_no_final_keeps s with
+     | Keep, [] -> []
+     | k, l -> k::l
+
+Ambiguity 3: 
+let rec simpl o = function
+  | MLapp (f, []) -> simpl o f
+  | MLapp (MLapp(f,a),a') -> simpl o (MLapp(f,a@a'))
+  | MLapp (f, a) ->
+     (* When the head of the application is magic, no need for magic on args *)
+     let a = if is_magic f then List.map unmagic a else a in
+     simpl_app o (List.map (simpl o) a) (simpl o f)
+  | MLcase (typ,e,br) ->
+      let br = Array.map (fun (l,p,t) -> (l,p,simpl o t)) br in
+      simpl_case o typ br (simpl o e)
+  | MLletin(Dummy,_,e) -> simpl o (ast_pop e)
+  | MLletin(id,c,e) ->
+      let e = simpl o e in
+      if
+	(is_atomic c) || (is_atomic e) ||
+	(let n = nb_occur_match e in
+	 (Int.equal n 0 || (Int.equal n 1 && expand_linear_let o id e)))
+      then
+	simpl o (ast_subst c e)
+      else
+	MLletin(id, simpl o c, e)
+  | MLfix(i,ids,c) ->
+      let n = Array.length ids in
+      if ast_occurs_itvl 1 n c.(i) then
+	MLfix (i, ids, Array.map (simpl o) c)
+      else simpl o (ast_lift (-n) c.(i)) (* Dummy fixpoint *)
+  | MLmagic(MLmagic _ as e) -> simpl o e
+  | MLmagic(MLapp (f,l)) -> simpl o (MLapp (MLmagic f, l))
+  | MLmagic(MLletin(id,c,e)) -> simpl o (MLletin(id,c,MLmagic e))
+  | MLmagic(MLcase(typ,e,br)) ->
+     let br' = Array.map (fun (ids,p,c) -> (ids,p,MLmagic c)) br in
+     simpl o (MLcase(typ,e,br'))
+  | MLmagic(MLexn _ as e) -> e
+  | a -> ast_map (simpl o) a
+
+(* invariant : list [a] of arguments is non-empty *)
+
+and simpl_app o a = function
+  | MLlam (Dummy,t) ->
+      simpl o (MLapp (ast_pop t, List.tl a))
+  | MLlam (id,t) -> (* Beta redex *)
+      (match nb_occur_match t with
+	 | 0 -> simpl o (MLapp (ast_pop t, List.tl a))
+	 | 1 when (is_tmp id || o.opt_lin_beta) ->
+	     simpl o (MLapp (ast_subst (List.hd a) t, List.tl a))
+	 | _ ->
+	     let a' = List.map (ast_lift 1) (List.tl a) in
+	     simpl o (MLletin (id, List.hd a, MLapp (t, a'))))
+  | MLmagic (MLlam (id,t)) ->
+      (* When we've at least one argument, we permute the magic
+         and the lambda, to simplify things a bit (see #2795).
+         Alas, the 1st argument must also be magic then. *)
+      simpl_app o (magic_hd a) (MLlam (id,MLmagic t))
+  | MLletin (id,e1,e2) when o.opt_let_app ->
+      (* Application of a letin: we push arguments inside *)
+      MLletin (id, e1, simpl o (MLapp (e2, List.map (ast_lift 1) a)))
+  | MLcase (typ,e,br) when o.opt_case_app ->
+      (* Application of a case: we push arguments inside *)
+      let br' =
+	Array.map
+	  (fun (l,p,t) ->
+	     let k = List.length l in
+	     let a' = List.map (ast_lift k) a in
+	     (l, p, simpl o (MLapp (t,a')))) br
+      in simpl o (MLcase (typ,e,br'))
+  | (MLdummy _ | MLexn _) as e -> e
+	(* We just discard arguments in those cases. *)
+  | f -> MLapp (f,a)
+
+(* Invariant : all empty matches should now be [MLexn] *)
+
+and simpl_case o typ br e =
+  try
+    (* Generalized iota-redex *)
+    if not o.opt_case_iot then raise Impossible;
+    simpl o (iota_gen br e)
+  with Impossible ->
+    (* Swap the case and the lam if possible *)
+    let ids,br = if o.opt_case_fun then permut_case_fun br [] else [],br in
+    let n = List.length ids in
+    if not (Int.equal n 0) then
+      simpl o (named_lams ids (MLcase (typ, ast_lift n e, br)))
+    else
+      (* Can we merge several branches as the same constant or function ? *)
+      if lang() == Scheme || is_custom_match br
+      then MLcase (typ, e, br)
+      else match factor_branches o typ br with
+	| Some (f,ints) when Int.equal (Int.Set.cardinal ints) (Array.length br) ->
+	  (* If all branches have been factorized, we remove the match *)
+	  simpl o (MLletin (Tmp anonymous_name, e, f))
+	| Some (f,ints) ->
+	  let last_br =
+	    if ast_occurs 1 f then ([Tmp anonymous_name], Prel 1, f)
+	    else ([], Pwild, ast_pop f)
+	  in
+	  let brl = Array.to_list br in
+	  let brl_opt = List.filteri (fun i _ -> not (Int.Set.mem i ints)) brl in
+	  let brl_opt = brl_opt @ [last_br] in
+	  MLcase (typ, e, Array.of_list brl_opt)
+	| None -> MLcase (typ, e, br)
+
+(*S Local prop elimination. *)
+(* We try to eliminate as many [prop] as possible inside an [ml_ast]. *)
+
+(*s In a list, it selects only the elements corresponding to a [Keep]
+   in the boolean list [l]. *)
+

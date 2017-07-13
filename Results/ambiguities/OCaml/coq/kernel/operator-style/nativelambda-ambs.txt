@@ -1,0 +1,8 @@
+Ambiguity 1: 
+extend v =
+      if Int.equal v.size (Array.length v.elems) then 
+	let new_size = min (2*v.size) Sys.max_array_length in
+	if new_size <= v.size then invalid_arg "Vect.extend";
+	let new_elems = Array.make new_size v.elems.(0) in
+	Array.blit v.elems 0 new_elems 0 (v.size);
+	v.elems <- new_elems

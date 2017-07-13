@@ -1,0 +1,5 @@
+Ambiguity 1: 
+if not (List.is_empty opaques) then
+    let lst = hov 1 (spc () ++ prlist_with_sep spc safe_pr_global opaques) in
+    if accessed then warn_extraction_opaque_accessed lst
+    else warn_extraction_opaque_as_axiom lst

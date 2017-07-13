@@ -1,0 +1,219 @@
+Ambiguity 1: 
+begin function (e, info) -> match e with
+            | RefinerError IntroNeedsProduct ->
+                Tacticals.New.tclZEROMSG (str "No product even after head-reduction.")
+            | e -> Proofview.tclZERO ~info e
+          end
+
+Ambiguity 2: 
+begin function (e, info) -> match e with
+      | RefinerError IntroNeedsProduct ->
+          tac ids
+      | e -> Proofview.tclZERO ~info e
+      end
+
+Ambiguity 3: 
+| _ -> match i with
+      | Some i -> i
+      | None -> error "Could not find inductive argument of elimination scheme."
+
+Ambiguity 4: 
+begin function (e, info) -> match e with
+      | IsNonrec ->
+          (* For records, induction principles aren't there by default
+             anymore.  Instead, we do a case analysis. *)
+          general_case_analysis with_evars clear_flag cx
+      | e -> Proofview.tclZERO ~info e
+    end
+
+Ambiguity 5: 
+| DefinedRecord l ->
+      (* goes from left to right when i increases! *)
+      match List.nth l i with
+      | Some proj ->
+	  let args = Context.Rel.to_extended_vect mkRel 0 sign in
+	  let proj =
+	    if Environ.is_projection proj env then
+	      mkProj (Projection.make proj false, mkApp (c, args))
+	    else
+	      mkApp (mkConstU (proj,u), Array.append (Array.of_list params)
+		[|mkApp (c, args)|])
+	  in
+	  let app = it_mkLambda_or_LetIn proj sign in
+	  let t = Retyping.get_type_of env sigma app in
+	    Some (app, t)
+      | None -> None
+
+Ambiguity 6: 
+(e, info) -> match e with
+          | PretypeError _|RefinerError _|UserError _|Failure _ ->
+            Some (try_red_apply red_thm (exn0, info))
+          | _ -> None
+
+Ambiguity 7: 
+(e, info) -> match e with
+            | PretypeError _|RefinerError _|UserError _|Failure _->
+              Some tac
+            | _ -> None
+
+Ambiguity 8: 
+(e, info) -> match e with
+      | PretypeError _|RefinerError _|UserError _|Failure _ ->
+        Some (try_red_apply thm_ty0 (e, info))
+      | _ -> None
+
+Ambiguity 9: 
+let rec aux clause =
+    try progress_with_clause flags innerclause clause
+    with e when CErrors.noncritical e ->
+    let e' = CErrors.push e in
+    try aux (clenv_push_prod clause)
+    with NotExtensibleClause ->
+      match e with
+      | UnableToApply -> explain_unable_to_apply_lemma loc env sigma thm innerclause
+      | _ -> iraise e'
+  in
+  aux (make_clenv_binding env sigma (d,thm) lbind)
+
+Ambiguity 10: 
+| [] ->
+      (* Behave as IntroAnonymous *)
+      intro_patterns_core with_evars b avoid ids thin destopt bound n tac
+        [dloc,IntroNaming IntroAnonymous]
+  | (loc,pat) :: l ->
+  if exceed_bound n bound then error_unexpected_extra_pattern loc bound pat else
+  match pat with
+  | IntroForthcoming onlydeps ->
+      intro_forthcoming_then_gen (NamingAvoid (avoid@explicit_intro_names l))
+	  destopt onlydeps n bound
+        (fun ids -> intro_patterns_core with_evars b avoid ids thin destopt bound
+          (n+List.length ids) tac l)
+  | IntroAction pat ->
+      intro_then_gen (make_tmp_naming avoid l pat)
+	destopt true false
+        (intro_pattern_action loc with_evars (b || not (List.is_empty l)) false
+          pat thin destopt
+          (fun thin bound' -> intro_patterns_core with_evars b avoid ids thin destopt bound' 0
+            (fun ids thin ->
+              intro_patterns_core with_evars b avoid ids thin destopt bound (n+1) tac l)))
+  | IntroNaming pat ->
+      intro_pattern_naming loc with_evars b avoid ids pat thin destopt bound (n+1) tac l
+
+Ambiguity 11: 
+| Anonymous ->
+      match EConstr.kind sigma c with
+      | Var id ->
+	 (* Keep the name even if not occurring: may be used by intros later *)
+	  Name id
+      | _ ->
+	  if noccurn sigma 1 cl then Anonymous else
+	    (* On ne s'etait pas casse la tete : on avait pris pour nom de
+               variable la premiere lettre du type, meme si "c" avait ete une
+               constante dont on aurait pu prendre directement le nom *)
+	    named_hd env sigma t Anonymous
+
+Ambiguity 12: 
+| _ ->
+      match ipat with
+      | None ->
+        (* Like generalize with extra support for "with" bindings *)
+        (* even though the "with" bindings forces full application *)
+        Tacticals.New.tclTHENLAST (cut typ) (exact_no_check term)
+      | Some (loc,ipat) ->
+        (* Like pose proof with extra support for "with" bindings *)
+        (* even though the "with" bindings forces full application *)
+        let naming,tac = prepare_intros_loc loc false IntroAnonymous MoveLast ipat in
+        Tacticals.New.tclTHENFIRST
+          (assert_before_then_gen false naming typ tac)
+	  (exact_no_check term)
+
+Ambiguity 13: 
+begin function (e, info) -> match e with
+      | UserError (Some "move_hyp",_) ->
+       (* May happen e.g. with "destruct x using s" with an hypothesis
+          which is morally an induction hypothesis to be "MoveLast" if
+          known as such but which is considered instead as a subterm of
+          a constructor to be move at the place of x. *)
+          dest_intro_patterns with_evars avoid thin MoveLast pat tac
+      | e -> Proofview.tclZERO ~info e
+    end
+
+Ambiguity 14: 
+Exit -> (* Ending by computing indref: *)
+    match !res.indarg with
+      | None -> !res (* No indref *)
+      | Some (LocalDef _) -> error_ind_scheme ""
+      | Some (LocalAssum (_,ind)) ->
+	  let indhd,indargs = decompose_app sigma ind in
+	  try {!res with indref = Some (fst (Termops.global_of_constr sigma indhd)) }
+	  with e when CErrors.noncritical e ->
+            error "Cannot find the inductive type of the inductive scheme."
+
+
+
+Ambiguity 15: 
+| Some elimc ->
+      let elimt = Retyping.get_type_of env sigma (fst elimc) in
+      let scheme = compute_elim_sig sigma ~elimc elimt in
+      match scheme.indref with
+      | None ->
+         (* in the absence of information, do not assume it may be
+            partially applied *)
+          fun _ -> true
+      | Some _ ->
+          (* Last argument is supposed to be the induction argument *)
+          check_expected_type env sigma elimc elimt
+
+Ambiguity 16: 
+| c::l' ->
+          Proofview.tclEVARMAP >>= fun sigma ->
+	  match EConstr.kind sigma c with
+	    | Var id when not (mem_named_context_val id (Global.named_context_val ()))
+		&& not with_evars ->
+		let _ = newlc:= id::!newlc in
+		atomize_list l'
+
+	    | _ ->
+                Proofview.Goal.enter { enter = begin fun gl ->
+                let type_of = Tacmach.New.pf_unsafe_type_of gl in
+                let sigma = Tacmach.New.project gl in
+                let x =
+		  id_of_name_using_hdchar (Global.env()) sigma (type_of c) Anonymous in
+
+                let id = new_fresh_id [] x gl in
+		let newl' = List.map (fun r -> replace_term sigma c (mkVar id) r) l' in
+		let _ = newlc:=id::!newlc in
+		Tacticals.New.tclTHEN
+		  (letin_tac None (Name id) c None allHypsAndConcl)
+		  (atomize_list newl')
+                end }
+
+Ambiguity 17: 
+begin function (e, info) -> match e with
+      | NoEquationFound -> Hook.get forward_setoid_reflexivity
+      | e -> Proofview.tclZERO ~info e
+    end
+
+Ambiguity 18: 
+begin function (e, info) -> match e with
+      | NoEquationFound -> Hook.get forward_setoid_symmetry
+      | e -> Proofview.tclZERO ~info e
+    end
+
+Ambiguity 19: 
+begin function (e, info) -> match e with
+      | NoEquationFound -> Hook.get forward_setoid_symmetry_in id
+      | e -> Proofview.tclZERO ~info e
+    end
+
+Ambiguity 20: 
+| None,eq,eq_kind ->
+      match t with
+      | None -> Tacticals.New.tclZEROMSG (str"etransitivity not supported for this relation.")
+      | Some t -> prove_transitivity eq eq_kind t
+
+Ambiguity 21: 
+begin function (e, info) -> match e with
+      | NoEquationFound -> Hook.get forward_setoid_transitivity t
+      | e -> Proofview.tclZERO ~info e
+    end

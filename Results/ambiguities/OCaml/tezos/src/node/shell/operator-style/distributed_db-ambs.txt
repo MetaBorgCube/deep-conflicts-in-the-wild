@@ -1,0 +1,230 @@
+Ambiguity 1: 
+lwt_debug "Read message from %a: %a"
+      P2p.Peer_id.pp_short state.gid Message.pp_json msg >>= fun () ->
+
+    match msg with
+
+    | Get_current_branch net_id ->
+        may_handle_global global_db net_id @@ fun net_db ->
+        if not (Net_id.Table.mem state.peer_active_nets net_id) then
+          ignore
+          @@ P2p.try_send global_db.p2p state.conn
+          @@ Get_current_branch net_id ;
+        net_db.callback.current_branch 200 >>= fun locator ->
+        ignore
+        @@ P2p.try_send global_db.p2p state.conn
+        @@ Current_branch (net_id, locator) ;
+        Lwt.return_unit
+
+    | Current_branch (net_id, locator) ->
+        may_activate global_db state net_id @@ fun net_db ->
+        net_db.callback.notify_branch state.gid locator ;
+        Lwt.return_unit
+
+    | Deactivate net_id ->
+        may_handle state net_id @@ fun net_db ->
+        deactivate state net_db ;
+        Net_id.Table.remove state.peer_active_nets net_id ;
+        Lwt.return_unit
+
+    | Get_current_head net_id ->
+        may_handle state net_id @@ fun net_db ->
+        net_db.callback.current_head 200 >>= fun (head, mempool) ->
+        ignore
+        @@ P2p.try_send global_db.p2p state.conn
+        @@ Current_head (net_id, head, mempool) ;
+        Lwt.return_unit
+
+    | Current_head (net_id, head, mempool) ->
+        may_handle state net_id @@ fun net_db ->
+        net_db.callback.notify_head state.gid head mempool ;
+        Lwt.return_unit
+
+    | Get_block_headers (net_id, hashes) ->
+        may_handle state net_id @@ fun net_db ->
+        (* Should we filter out invalid block ? *)
+        (* Should we filter out blocks whose validity is unknown ? *)
+        (* Should we blame request of unadvertised blocks ? *)
+        Lwt_list.iter_p
+          (fun hash ->
+             Raw_block_header.Table.read
+               net_db.block_header_db.table hash >|= function
+             | None -> ()
+             | Some p ->
+                 ignore @@
+                 P2p.try_send global_db.p2p state.conn (Block_header p))
+          hashes
+
+    | Block_header block ->
+        may_handle state block.shell.net_id @@ fun net_db ->
+        let hash = Store.Block_header.hash block in
+        Raw_block_header.Table.notify
+          net_db.block_header_db.table state.gid hash block >>= fun () ->
+        Lwt.return_unit
+
+    | Get_operations (net_id, hashes) ->
+        may_handle state net_id @@ fun net_db ->
+        Lwt_list.iter_p
+          (fun hash ->
+             Raw_operation.Table.read
+               net_db.operation_db.table hash >|= function
+             | None -> ()
+             | Some p ->
+                 ignore @@
+                 P2p.try_send global_db.p2p state.conn (Operation p))
+          hashes
+
+    | Operation operation ->
+        may_handle state operation.shell.net_id @@ fun net_db ->
+        let hash = Store.Operation.hash operation in
+        Raw_operation.Table.notify
+          net_db.operation_db.table state.gid hash operation >>= fun () ->
+        Lwt.return_unit
+
+    | Get_protocols hashes ->
+        Lwt_list.iter_p
+          (fun hash ->
+             Raw_protocol.Table.read
+               global_db.protocol_db.table hash >|= function
+             | None -> ()
+             | Some p ->
+                 ignore @@
+                 P2p.try_send global_db.p2p state.conn (Protocol p))
+          hashes
+
+    | Protocol protocol ->
+        let hash = Store.Protocol.hash protocol in
+        Raw_protocol.Table.notify
+          global_db.protocol_db.table state.gid hash protocol >>= fun () ->
+        Lwt.return_unit
+
+    | Get_operation_list (net_id, hashes) ->
+        may_handle state net_id @@ fun net_db ->
+        Lwt_list.iter_p
+          (fun (block, ofs as key) ->
+             Raw_operation_list.Table.read
+               net_db.operation_list_db.table key >>= function
+             | None -> Lwt.return_unit
+             | Some (ops, path) ->
+                 ignore @@
+                 P2p.try_send
+                   global_db.p2p state.conn
+                   (Operation_list (net_id, block, ofs, ops, path)) ;
+                 Lwt.return_unit)
+          hashes
+
+    | Operation_list (net_id, block, ofs, ops, path) ->
+        may_handle state net_id @@ fun net_db ->
+        (* TODO early detection of non-requested list. *)
+        let found_hash, found_ofs =
+          Operation_list_list_hash.check_path
+            path (Operation_list_hash.compute ops) in
+        if found_ofs <> ofs then
+          Lwt.return_unit
+        else
+          Raw_block_header.Table.read
+            net_db.block_header_db.table block >>= function
+          | None -> Lwt.return_unit
+          | Some bh ->
+              if Operation_list_list_hash.compare
+                   found_hash bh.shell.operations_hash <> 0 then
+                Lwt.return_unit
+              else
+                Raw_operation_list.Table.notify
+                  net_db.operation_list_db.table state.gid
+                  (block, ofs) (ops, path) >>= fun () ->
+        Lwt.return_unit
+
+Ambiguity 2: 
+worker_loop global_db state =
+    Lwt_utils.protect ~canceler:state.canceler begin fun () ->
+      P2p.recv global_db.p2p state.conn
+    end >>= function
+    | Ok msg ->
+        handle_msg global_db state msg >>= fun () ->
+        worker_loop global_db state
+    | Error _ ->
+        Net_id.Table.iter
+          (fun _ -> deactivate state)
+          state.peer_active_nets ;
+        P2p.Peer_id.Table.remove global_db.p2p_readers state.gid ;
+        Lwt.return_unit
+
+Ambiguity 3: 
+Raw_operation.shutdown net.operation_db >>= fun () ->
+  Raw_block_header.shutdown net.block_header_db >>= fun () ->
+    Lwt.return_unit >>= fun () ->
+  Lwt.return_unit
+
+Ambiguity 4: 
+P2p.Peer_id.Table.fold
+    (fun _peer_id reader acc ->
+       P2p_reader.shutdown reader >>= fun () -> acc)
+    p2p_readers
+    Lwt.return_unit >>= fun () ->
+  Net_id.Table.fold
+    (fun _ net_db acc ->
+      Raw_operation.shutdown net_db.operation_db >>= fun () ->
+      Raw_block_header.shutdown net_db.block_header_db >>= fun () ->
+      acc)
+    active_nets
+    Lwt.return_unit >>= fun () ->
+  P2p.shutdown p2p >>= fun () ->
+  Lwt.return_unit
+
+Ambiguity 5: 
+State.Operation_list.read_count_opt
+      net.net block >>= function
+    | None -> Lwt.return_none
+    | Some len -> do_read net block [] len >>= fun ops -> Lwt.return (Some ops)
+
+Ambiguity 6: 
+State.Operation_list.read_count_opt net.net block >>= function
+    | Some _ -> Lwt.return_false
+    | None ->
+        let hashes = List.map Operation_list_hash.compute opss in
+        Lwt_list.mapi_p
+          (fun i ops ->
+             let path = Operation_list_list_hash.compute_path hashes i in
+             Raw_operation_list.Table.inject
+               net.operation_list_db.table
+               (block, i) (ops, path))
+          opss >>= fun injected ->
+        Lwt.return (List.for_all (fun x -> x) injected)
+
+Ambiguity 7: 
+Block_header.known net_db hash >>= function
+          | true ->
+              failwith "Previously injected block."
+          | false ->
+              let computed_hash =
+                Operation_list_list_hash.compute
+                  (List.map Operation_list_hash.compute operations) in
+              fail_unless
+                (Operation_list_list_hash.compare
+                   computed_hash block.shell.operations_hash = 0)
+                (Exn (Failure "Incoherent operation list")) >>=? fun () ->
+              Raw_block_header.Table.inject
+                net_db.block_header_db.table hash block >>= function
+              | false ->
+                  failwith "Previously injected block."
+              | true ->
+                  Operation_list.inject_all
+                    net_db hash operations >>= fun _ ->
+                  return (hash, block)
+
+Ambiguity 8: 
+acc >>= function
+       | Some _ -> acc
+       | None ->
+           Block_header.read net hash >>= function
+           | None -> acc
+           | Some block -> Lwt.return (Some (net, block))
+
+Ambiguity 9: 
+acc >>= function
+       | Some _ -> acc
+       | None ->
+           Operation.read net hash >>= function
+           | None -> acc
+           | Some block -> Lwt.return (Some (net, block))

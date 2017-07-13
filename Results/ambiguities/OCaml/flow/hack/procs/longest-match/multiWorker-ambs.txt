@@ -1,0 +1,18 @@
+Ambiguity 1: 
+| [] ->
+        (* No worker available: wait for some workers to finish. *)
+        collect [] handles acc
+    | worker :: workers ->
+        (* At least one worker is available... *)
+        match next () with
+        | Wait -> collect (worker :: workers) handles acc
+        | Done ->
+            (* ... but no more job to be distributed, let's collect results. *)
+            dispatch [] handles acc
+        | Job bucket ->
+            (* ... send a job to the worker.*)
+            let handle =
+              Worker.call worker
+                (fun xl -> job neutral xl)
+                bucket in
+            dispatch workers (handle :: handles) acc

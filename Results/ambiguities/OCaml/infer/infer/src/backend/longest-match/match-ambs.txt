@@ -1,0 +1,52 @@
+Ambiguity 1: 
+| [f] -> f ()
+  | f:: fs ->
+      let res_f = f ()
+      in match res_f with
+      | None -> execute_with_backtracking fs
+      | Some _ -> res_f
+
+Ambiguity 2: 
+| hpat:: hpats ->
+      if not hpat.flag then None
+      else match hpat.hpred with
+        | Sil.Hpointsto _ | Sil.Hlseg (Sil.Lseg_NE, _, _, _, _) | Sil.Hdllseg (Sil.Lseg_NE, _, _, _, _, _, _) -> None
+        | Sil.Hlseg (_, _, e1, e2, _) ->
+            let fully_instantiated = not (List.exists ~f:(fun id -> Sil.ident_in_exp id e1) vars)
+            in if (not fully_instantiated) then None else
+              let e1' = Sil.exp_sub sub e1
+              in begin
+                match exp_match e1' sub vars e2 with
+                | None -> None
+                | Some (sub_new, vars_leftover) ->
+                    instantiate_to_emp p condition sub_new vars_leftover hpats
+              end
+        | Sil.Hdllseg (_, _, iF, oB, oF, iB, _) ->
+            let fully_instantiated =
+              not (List.exists ~f:(fun id -> Sil.ident_in_exp id iF || Sil.ident_in_exp id oB) vars)
+            in if (not fully_instantiated) then None else
+              let iF' = Sil.exp_sub sub iF in
+              let oB' = Sil.exp_sub sub oB
+              in match exp_list_match [iF'; oB'] sub vars [oF; iB] with
+              | None -> None
+              | Some (sub_new, vars_leftover) ->
+                  instantiate_to_emp p condition sub_new vars_leftover hpats
+
+Ambiguity 3: 
+| Some (sub_new, vars_leftover) ->
+              let (para2_exist_vars, para2_inst) = Sil.hpara_dll_instantiate para2 iF2 oB2 oF2 es_shared2 in
+              (* let allow_impl hpred = {hpred=hpred; flag=hpat.flag} in *)
+              let allow_impl hpred = { hpred = hpred; flag = true } in
+              let (para2_hpat, para2_hpats) = match List.map ~f:allow_impl para2_inst with
+                | [] -> assert false (* the body of a parameter should contain at least one * conjunct *)
+                | para2_pat :: para2_pats -> (para2_pat, para2_pats) in
+              let new_vars = para2_exist_vars @ vars_leftover in
+              let new_hpats = para2_hpats @ hpats
+              in match (iter_match_with_impl tenv iter condition sub_new new_vars para2_hpat new_hpats) with
+              | None -> None
+              | Some (sub_res, p_leftover) when condition p_leftover sub_res ->
+                  let not_in_para2_exist_vars id =
+                    not (List.exists ~f:(fun id' -> Ident.equal id id') para2_exist_vars) in
+                  let sub_res' = Sil.sub_filter not_in_para2_exist_vars sub_res
+                  in Some (sub_res', p_leftover)
+              | Some _ -> None

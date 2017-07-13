@@ -1,0 +1,25 @@
+Ambiguity 1: 
+begin try
+      (* If the command actually works, ignore its effects on the state.
+       * Note that error has to be printed in the right state, hence
+       * within the purified function *)
+      Future.purify
+        (fun v ->
+           try f v; raise HasNotFailed
+           with
+           | HasNotFailed as e -> raise e
+           | e ->
+              let e = CErrors.push e in
+              raise (HasFailed (CErrors.iprint
+                (ExplainErr.process_vernac_interp_error ~allow_uncaught:false e))))
+        ()
+    with e when CErrors.noncritical e ->
+      let (e, _) = CErrors.push e in
+      match e with
+      | HasNotFailed ->
+          user_err ~hdr:"Fail" (str "The command has not failed!")
+      | HasFailed msg ->
+          if not !Flags.quiet || !test_mode || !ide_slave then Feedback.msg_info
+            (str "The command has indeed failed with message:" ++ fnl () ++ msg)
+      | _ -> assert false
+  end

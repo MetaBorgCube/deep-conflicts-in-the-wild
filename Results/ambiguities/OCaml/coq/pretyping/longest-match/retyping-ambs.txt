@@ -1,0 +1,5 @@
+Ambiguity 1: 
+| h::rest ->
+      match EConstr.kind sigma (whd_all env sigma typ) with
+        | Prod (na,c1,c2) -> subst_type env sigma (subst1 h c2) rest
+        | _ -> retype_error NonFunctionalConstruction

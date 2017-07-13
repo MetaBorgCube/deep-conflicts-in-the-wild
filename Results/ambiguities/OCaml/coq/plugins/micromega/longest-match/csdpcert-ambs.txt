@@ -1,0 +1,9 @@
+Ambiguity 1: 
+| (e,k)::l ->
+     let (eq,ge,neq) = f (i+1) l in
+      match k with
+       | Mc.Equal -> ((e,i)::eq,ge,neq)
+       | Mc.NonStrict -> (eq,(e,Axiom_le i)::ge,neq)
+       | Mc.Strict    -> (* e > 0 == e >= 0 /\ e <> 0 *)
+	  (eq, (e,Axiom_lt i)::ge,(e,Axiom_lt i)::neq)
+       | Mc.NonEqual -> (eq,ge,(e,Axiom_eq i)::neq)

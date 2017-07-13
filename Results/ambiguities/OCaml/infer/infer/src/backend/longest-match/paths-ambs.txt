@@ -1,0 +1,27 @@
+Ambiguity 1: 
+let rec doit n fmt path =
+      try
+        if n > 0 then raise Not_found;
+        let num = PathMap.find path !delayed in
+        F.fprintf fmt "P%d" num
+      with Not_found ->
+      match path with
+      | Pstart (node, _) ->
+          F.fprintf fmt "n%a" Procdesc.Node.pp node
+      | Pnode (node, _, session, path, _, _) ->
+          F.fprintf fmt "%a(s%d).n%a" (doit (n - 1)) path (session :> int) Procdesc.Node.pp node
+      | Pjoin (path1, path2, _) ->
+          F.fprintf fmt "(%a + %a)" (doit (n - 1)) path1 (doit (n - 1)) path2
+      | Pcall (path1, _, ExecCompleted path2, _) ->
+          F.fprintf fmt "(%a{%a})" (doit (n - 1)) path1 (doit (n - 1)) path2
+      | Pcall (path, _, ExecSkipped reason, _) ->
+          F.fprintf fmt "(%a: %s)" (doit (n - 1)) path reason in
+    let print_delayed () =
+      if not (PathMap.is_empty !delayed) then begin
+        let f path num = F.fprintf fmt "P%d = %a@\n" num (doit 1) path in
+        F.fprintf fmt "where@\n";
+        PathMap.iter f !delayed
+      end in
+    add_delayed path;
+    doit 0 fmt path;
+    print_delayed ()

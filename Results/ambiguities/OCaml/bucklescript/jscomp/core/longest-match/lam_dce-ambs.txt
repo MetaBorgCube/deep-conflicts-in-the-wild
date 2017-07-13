@@ -1,0 +1,13 @@
+Ambiguity 1: 
+| Nop _ -> x :: acc  
+      | Recursive bindings ->
+        let b = 
+          List.fold_right (fun ((id,_) as v) acc ->
+              if Ident_hash_set.mem visited id then 
+                v :: acc 
+              else
+                acc  
+            ) bindings [] in            
+        match b with 
+        | [] -> acc  
+        | _ -> (Recursive b) :: acc

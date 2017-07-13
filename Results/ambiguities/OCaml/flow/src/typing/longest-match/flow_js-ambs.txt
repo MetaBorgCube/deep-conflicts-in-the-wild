@@ -1,0 +1,264 @@
+Ambiguity 1: 
+| None ->
+            let exports_tmap = Context.find_exports cx exports.exports_tmap in
+            match SMap.get "default" exports_tmap with
+              | Some t -> t
+              | None ->
+                (**
+                 * A common error while using `import` syntax is to forget or
+                 * misunderstand the difference between `import foo from ...`
+                 * and `import {foo} from ...`. The former means to import the
+                 * default export to a local var called "foo", and the latter
+                 * means to import a named export called "foo" to a local var
+                 * called "foo".
+                 *
+                 * To help guide users here, if we notice that the module being
+                 * imported from has no default export (but it does have a named
+                 * export that fuzzy-matches the local name specified), we offer
+                 * that up as a possible "did you mean?" suggestion.
+                 *)
+                let known_exports = SMap.keys exports_tmap in
+                let suggestion = typo_suggestion known_exports local_name in
+                add_output cx ~trace (FlowError.ENoDefaultExport
+                  (reason, module_name, suggestion));
+                AnyT.why module_reason
+
+Ambiguity 2: 
+| _ ->
+          match up with
+          | Field (DefT (_, OptionalT ut), upolarity) ->
+            rec_flow cx trace (l,
+              LookupT (ureason, NonstrictReturning None, [], propref,
+                LookupProp (use_op, Field (ut, upolarity))))
+          | _ ->
+            let u =
+              LookupT (ureason, Strict lreason, [], propref,
+                LookupProp (use_op, up)) in
+            rec_flow cx trace (super, ReposLowerT (lreason, u))
+
+Ambiguity 3: 
+| None ->
+        match SMap.get (internal_name x) pmap with
+        | Some p ->
+          (* unshadow *)
+          pmap
+            |> SMap.remove (internal_name x)
+            |> SMap.add x p
+            |> Context.add_property_map cx id;
+          p
+        | None ->
+          (* Create prop and link shadow props along the proto chain. *)
+          let reason_prop = locationless_reason (RShadowProperty x) in
+          let t = mk_tvar cx reason_prop in
+          (match proto_ids with
+          | [] -> ()
+          | id::ids ->
+            let p_proto = find_or_intro_shadow_prop cx trace x (id, ids) in
+            let t_proto = Property.assert_field p_proto in
+            rec_flow cx trace (t_proto, UnifyT (t_proto, t)));
+          (* Add prop *)
+          let p = Field (t, Neutral) in
+          pmap
+            |> SMap.add x p
+            |> Context.add_property_map cx id;
+          p
+
+Ambiguity 4: 
+| None, Some { key; value; dict_polarity; _ }
+        when not (is_dictionary_exempt s) ->
+      rec_flow_t cx trace (string_key s reason_prop, key);
+      let lp = Field (value, dict_polarity) in
+      let up = match up with
+      | Field (DefT (_, OptionalT ut), upolarity) ->
+        Field (ut, upolarity)
+      | _ -> up
+      in
+      if lit
+      then
+        match Property.read_t lp, Property.read_t up with
+        | Some lt, Some ut -> rec_flow cx trace (lt, UseT (use_op, ut))
+        | _ -> ()
+      else
+        rec_flow_p cx trace ~use_op lreason ureason propref (lp, up)
+    | _ ->
+      (* property doesn't exist in inflowing type *)
+      match up with
+      | Field (DefT (_, OptionalT _), _) when lit ->
+        (* if property is marked optional or otherwise has a maybe type,
+           and if inflowing type is a literal (i.e., it is not an
+           annotation), then we add it to the inflowing type as
+           an optional property *)
+        (* Band-aid to avoid side effect in speculation mode. Even in
+           non-speculation mode, the side effect here is racy, so it either
+           needs to be taken out or replaced with something more
+           robust. Tracked by #11299251. *)
+        if not (Speculation.speculating ()) then
+          Context.set_prop cx lflds s up;
+      | _ ->
+        (* otherwise, look up the property in the prototype *)
+        let strict = match sealed_in_op ureason lflags.sealed, ldict with
+        | false, None -> ShadowRead (Some lreason, Nel.one lflds)
+        | true, None -> Strict lreason
+        | _ -> NonstrictReturning None
+        in
+        rec_flow cx trace (lproto,
+          LookupT (ureason, strict, [], propref,
+            LookupProp (use_op, up)))
+
+Ambiguity 5: 
+| (case_id, case_r, l, u)::trials ->
+      let case = { case_id; unresolved = TypeSet.empty; actions = []} in
+      (* speculatively match the pair of types in this trial *)
+      let error = speculative_match cx trace
+        { Speculation.ignore; speculation_id; case } l u in
+      match error with
+      | None ->
+        (* no error, looking great so far... *)
+        begin match match_state with
+        | Speculation.NoMatch _ ->
+          (* everything had failed up to this point. so no ambiguity yet... *)
+          if TypeSet.is_empty case.unresolved
+          (* ...and no unresolved tvars encountered during the speculative
+             match! This is great news. It means that this alternative will
+             definitely succeed. Fire any deferred actions and short-cut. *)
+          then fire_actions cx trace case.actions
+          (* Otherwise, record that we've found a promising alternative. *)
+          else loop (Speculation.ConditionalMatch case) trials
+
+        | Speculation.ConditionalMatch prev_case ->
+          (* umm, there's another previously found promising alternative *)
+          (* so compute the difference in side effects between that alternative
+             and this *)
+          let ts = diff prev_case case in
+          (* if the side effects of the previously found promising alternative
+             are fewer, then keep holding on to that alternative *)
+          if ts = [] then loop match_state trials
+          (* otherwise, we have an ambiguity; blame the unresolved tvars and
+             short-cut *)
+          else begin
+            let prev_case_id = prev_case.case_id in
+            let cases: Type.t list = choices_of_spec spec in
+            blame_unresolved cx trace prev_case_id case_id cases case_r r ts
+          end
+        end
+      | Some err ->
+        (* if an error is found, then throw away this alternative... *)
+        begin match match_state with
+        | Speculation.NoMatch errs ->
+          (* ...adding to the error list if no promising alternative has been
+             found yet *)
+          loop (Speculation.NoMatch (err::errs)) trials
+        | _ -> loop match_state trials
+        end
+
+Ambiguity 6: 
+| None ->
+    match propref with
+    | Named _ ->
+      let strict =
+        if sealed_in_op reason_op o.flags.sealed
+        then Strict reason_obj
+        else ShadowRead (None, Nel.one o.props_tmap)
+      in
+      rec_flow cx trace (o.proto_t,
+        LookupT (reason_op, strict, [], propref, RWProp (tout, Read)))
+    | Computed elem_t ->
+      match elem_t with
+      | OpenT _ ->
+        let loc = loc_of_t elem_t in
+        add_output cx ~trace FlowError.(EInternal (loc, PropRefComputedOpen))
+      | DefT (_, StrT Literal _) ->
+        let loc = loc_of_t elem_t in
+        add_output cx ~trace FlowError.(EInternal (loc, PropRefComputedLiteral))
+      | DefT (_, AnyT) | DefT (_, StrT _) | DefT (_, NumT _) ->
+        (* any, string, and number keys are allowed, but there's nothing else to
+           flow without knowing their literal values. *)
+        rec_flow_t cx trace (AnyT.why reason_op, tout)
+      | _ ->
+        let reason_prop = reason_of_t elem_t in
+        add_output cx ~trace (FlowError.EObjectComputedPropertyAccess
+          (reason_op, reason_prop))
+
+Ambiguity 7: 
+| None ->
+    match propref with
+    | Named (reason_prop, _) ->
+      if sealed_in_op reason_op o.flags.sealed
+      then
+        let err =
+          FlowError.EPropNotFound ((reason_prop, reason_obj), UnknownUse) in
+        add_output cx ~trace err
+      else
+        let strict = ShadowWrite (Nel.one o.props_tmap) in
+        rec_flow cx trace (o.proto_t,
+          LookupT (reason_op, strict, [], propref, RWProp (tin, Write)))
+    | Computed elem_t ->
+      match elem_t with
+      | OpenT _ ->
+        let loc = loc_of_t elem_t in
+        add_output cx ~trace FlowError.(EInternal (loc, PropRefComputedOpen))
+      | DefT (_, StrT Literal _) ->
+        let loc = loc_of_t elem_t in
+        add_output cx ~trace FlowError.(EInternal (loc, PropRefComputedLiteral))
+      | DefT (_, AnyT) | DefT (_, StrT _) | DefT (_, NumT _) ->
+        (* any, string, and number keys are allowed, but there's nothing else to
+           flow without knowing their literal values. *)
+        rec_flow_t cx trace (tin, AnyT.why reason_op)
+      | _ ->
+        let reason_prop = reason_of_t elem_t in
+        add_output cx ~trace (FlowError.EObjectComputedPropertyAssign
+          (reason_op, reason_prop))
+
+Ambiguity 8: 
+| None ->
+      match Context.get_prop cx id (internal_name x) with
+      | Some p -> p
+      | None ->
+        let t, p = intro_shadow_prop id in
+        chain_link t proto_ids;
+        p
+
+Ambiguity 9: 
+| SuperProp lp ->
+    rec_flow_p cx trace ureason lreason propref (lp, p)
+  | RWProp (tout, rw) ->
+    match rw, Property.access rw p with
+    | Read, Some t -> rec_flow_t cx trace (t, tout)
+    | Write, Some t -> rec_flow_t cx trace (tout, t)
+    | _, None ->
+      let x = match propref with Named (_, x) -> Some x | Computed _ -> None in
+      add_output cx ~trace
+        (FlowError.EPropAccess ((lreason, ureason), x, p, rw))
+
+Ambiguity 10: 
+| _ ->
+      (* Try to re-use an already created repositioning tvar.
+         See repos_cache.ml for details. *)
+      match Repos_cache.find id reason !Cache.repos_cache with
+      | Some t -> t
+      | None ->
+        let mk_tvar_where = if is_derivable_reason r
+          then mk_tvar_derivable_where
+          else mk_tvar_where
+        in
+        mk_tvar_where cx reason (fun tvar ->
+          Cache.(repos_cache := Repos_cache.add reason t tvar !repos_cache);
+          flow_opt cx ?trace (t, ReposLowerT (reason, UseT (UnknownUse, tvar)))
+        )
+
+Ambiguity 11: 
+| List0 ((t, todo), join) ->
+      let tool = Resolve (List (todo, Nel.one x, join)) in
+      rec_flow cx trace (t, ObjSpreadT (reason, tool, state, tout))
+    | List (todo, done_rev, join) ->
+      match todo with
+      | [] ->
+        let x = match join with
+        | Or -> Nel.cons x done_rev |> Nel.concat
+        | And -> merge (intersect2 reason) x done_rev
+        in
+        next cx trace reason state tout x
+      | t::todo ->
+        let done_rev = Nel.cons x done_rev in
+        let tool = Resolve (List (todo, done_rev, join)) in
+        rec_flow cx trace (t, ObjSpreadT (reason, tool, state, tout))

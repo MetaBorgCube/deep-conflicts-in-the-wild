@@ -1,0 +1,8 @@
+Ambiguity 1: 
+fmt,
+   fun () ->
+    Format.pp_print_flush fmt ();
+    let s = Buffer.contents b in
+    Buffer.reset b;
+    s
+  )

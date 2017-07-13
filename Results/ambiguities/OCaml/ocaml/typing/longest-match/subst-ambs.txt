@@ -1,0 +1,26 @@
+Ambiguity 1: 
+| _ ->
+              let dup =
+                s.for_saving || more.level = generic_level || static_row row ||
+                match more.desc with Tconstr _ -> true | _ -> false in
+              (* Various cases for the row variable *)
+              let more' =
+                match more.desc with
+                  Tsubst ty -> ty
+                | Tconstr _ | Tnil -> typexp s more
+                | Tunivar _ | Tvar _ ->
+                    save_desc more more.desc;
+                    if s.for_saving then newpersty (norm more.desc) else
+                    if dup && is_Tvar more then newgenty more.desc else more
+                | _ -> assert false
+              in
+              (* Register new type first for recursion *)
+              more.desc <- Tsubst(newgenty(Ttuple[more';ty']));
+              (* Return a new copy *)
+              let row =
+                copy_row (typexp s) true row (not dup) more' in
+              match row.row_name with
+                Some (p, tl) ->
+                  Tvariant {row with row_name = Some (type_path s p, tl)}
+              | None ->
+                  Tvariant row

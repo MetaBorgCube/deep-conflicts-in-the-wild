@@ -1,0 +1,13 @@
+Ambiguity 1: 
+| Some (non_vernac_search_end,next_sentence) ->
+        match from#forward_search ~limit:non_vernac_search_end "(*",from#forward_search ~limit:non_vernac_search_end "\"" with
+          | None,None ->
+              if Glib.Unichar.isspace next_sentence#char || next_sentence#compare next_sentence#forward_char == 0
+              then next_sentence else find_next_sentence next_sentence
+          | None,Some (_,string_search_start) -> find_next_sentence (find_string_end string_search_start)
+          | Some (_,comment_search_start),None -> find_next_sentence (find_comment_end comment_search_start)
+          | Some (_,comment_search_start),Some (_,string_search_start) ->
+              find_next_sentence (
+                if comment_search_start#compare string_search_start < 0
+                then find_comment_end comment_search_start
+                else find_string_end string_search_start)

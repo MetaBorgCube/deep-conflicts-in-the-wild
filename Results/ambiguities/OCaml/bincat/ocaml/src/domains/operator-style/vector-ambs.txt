@@ -1,0 +1,129 @@
+Ambiguity 1: 
+let n2 = Array.length v2 in
+	  if n <> n2 then
+	    L.abort (fun p -> p "map2 on vectors of different sizes (v1=%s(%i) v2=%s(%i)"
+	      (to_string v1) n (to_string v2) n2)
+	  else
+            let v = Array.make n V.top in
+            for i = 0 to n-1 do
+                v.(i) <- f v1.(i) v2.(i)
+            done;
+            v
+
+Ambiguity 2: 
+let n = Array.length v1 and lv2 = (Array.length v2) in
+          if n <> lv2 then
+	    L.abort (fun p -> p "code_add_sub vectors of different sizes (v1=%s(%i) v2=%s(%i))"
+	      (to_string v1) n (to_string v2) lv2)
+	  else
+            let v = Array.make n V.zero in
+            let carry_borrow = ref None in
+            for i = n-1 downto 0 do
+                let c =
+                    (* add the carry/borrow if present *)
+                    match !carry_borrow with
+                    | None -> v.(i) <- v1.(i); None
+                    | Some b' -> let b', c' = op v1.(i) b' in v.(i) <- b'; c'
+                in
+                (* compute the ith bit of the result with the ith bit of the operand *)
+                let b, c' = op v.(i) v2.(i) in
+                v.(i) <- b;
+                (* update the new carry/borrow *)
+                match c with
+                | Some _ -> carry_borrow := c
+                | None   -> carry_borrow := c' (* correct as we know that we cannot have both cpred = Some ... and c' = Some ... *)
+            done;
+            v
+
+Ambiguity 3: 
+let lv2 = Array.length v2 in
+          if lv1 <> lv2 then
+            L.abort (fun p -> p "lt_core : comparing vectors of different sizes (v1:%i, v2:%i)" lv1 lv2)
+	  else
+	    let rec rec_lt v1 v2 i =
+	      if i >= lv1 then final
+	      else
+		let nxt = V.lt_multibit_helper v1.(i) v2.(i) in
+		match nxt with
+		| Some b -> b
+		| None -> rec_lt v1 v2 (i+1)
+	    in let res = rec_lt v1 v2 0 in
+	       L.debug (fun p -> p "lt_core %s %s %s = %b"
+		 (to_string v1) (if final then "<=" else "<")
+		 (to_string v2) res);
+	       res
+
+Ambiguity 4: 
+let lv1 = (Array.length v1) and lv2 = (Array.length v2) in
+          if lv1 <> lv2 then
+	    L.abort (fun p -> p "logand vectors of different sizes (v1=%s(%i) v2=%s(%i))"
+	      (to_string v1) lv1 (to_string v2) lv2)
+	  else
+	    let res = map2 V.logand v1 v2 in
+	    L.debug (fun p -> p "logand(%s, %s)=%s"
+	      (to_string v1) (to_string v2) (to_string res));
+	    res
+
+Ambiguity 5: 
+let lv1 = (Array.length v1) and lv2 = (Array.length v2) in
+          if lv1 <> lv2 then
+	    L.abort (fun p -> p "logor vectors of different sizes (v1=%s(%i) v2=%s(%i))"
+			 (to_string v1) lv1 (to_string v2) lv2)
+	  else
+	    let res = map2 V.logor v1 v2 in
+	    L.debug (fun p -> p "logor(%s, %s)=%s"
+			     (to_string v1) (to_string v2) (to_string res));
+	    res
+
+Ambiguity 6: 
+L.debug (fun p -> p "truncate((%d)%s, %d)" sz (to_string v) new_sz);
+	  if sz < new_sz then
+            L.abort (fun p -> p "truncate cannont truncate v=(%d)%s to %d bits"
+	      sz (to_string v) new_sz)
+	  else
+	    let res = Array.make new_sz V.zero in
+	    for i = 0 to new_sz-1 do
+	      res.(i) <- v.(i+sz-new_sz)
+	    done;
+	    res
+
+Ambiguity 7: 
+L.debug (fun p -> p "zero_extend((%d)%s, %d)" sz (to_string v) new_sz);
+            if new_sz < sz then
+              L.abort (fun p -> p "zero_extend cannont extend v=(%d)%s to %d bits"
+		sz (to_string v) new_sz)
+            else
+              let o  = new_sz - sz              in
+              let new_v = Array.make new_sz V.zero in
+              for i = 0 to sz-1 do
+                new_v.(i+o) <- v.(i)
+              done;
+              new_v
+
+Ambiguity 8: 
+while (!msb1 < lv1) && (V.is_zero v2_ext.(!msb1)) do
+		msb1 := !msb1+1;
+	      done;
+	      if !msb1 = lv1 then
+		L.abort (fun p -> p "core_div((%d)%s, (%d)%s): Division by zero"
+		  (Array.length v1) (to_string v1)
+		  (Array.length v2) (to_string v2)
+		)
+	      else
+		let quo = Array.make lv1 V.zero in
+		let rem = ref v1 in 
+		for i = !msb1 downto 0 do
+		  let sv2 = ishl v2_ext i in
+		  if geq !rem sv2 then
+		    begin
+		      rem := sub !rem sv2;
+		      quo.(lv1-i-1) <- V.one;
+		    end
+		done;
+		rem := truncate !rem lv2;
+		L.debug (fun p -> p "core_div((%d)%s, (%d)%s) = (%d)%s rem=(%d)%s"
+				 (Array.length v1) (to_string v1)
+				 (Array.length v2) (to_string v2)
+				 (Array.length quo) (to_string quo)
+				 (Array.length !rem) (to_string !rem));
+		quo,!rem

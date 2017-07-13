@@ -1,0 +1,18 @@
+Ambiguity 1: 
+| [ "text" ; text ] ->
+               of_source cctxt text
+           | [ "file" ; path ] ->
+               read path
+           | _ ->
+               find cctxt s >>= function
+               | Ok v -> return v
+               | Error a_errs ->
+                   read s >>= function
+                   | Ok v -> return v
+                   | Error r_errs ->
+                       of_source cctxt s >>= function
+                       | Ok v -> return v
+                       | Error s_errs ->
+                           let all_errs =
+                             List.flatten [ a_errs ; r_errs ; s_errs ] in
+                           Lwt.return (Error all_errs)

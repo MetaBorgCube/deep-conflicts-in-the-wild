@@ -1,0 +1,13 @@
+Ambiguity 1: 
+| exception Not_found ->
+        match String.index s ':' with
+        | exception _ -> s, ""
+        | pos ->
+            match String.index_from s (pos+1) ':'  with
+            | exception _ ->
+                let addr = String.sub s 0 pos in
+                let port = String.sub s (pos + 1) (len - pos - 1) in
+                check_port port ;
+                addr, port
+            | _pos ->
+                invalid_arg "split_url_port: IPv6 addresses must be bracketed"

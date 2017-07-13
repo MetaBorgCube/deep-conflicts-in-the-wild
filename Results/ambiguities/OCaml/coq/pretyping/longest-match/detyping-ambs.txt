@@ -1,0 +1,18 @@
+Ambiguity 1: 
+| na::nal ->
+    match EConstr.kind sigma c with
+    | Case (ci,p,c,cl) when
+        eq_constr sigma c (mkRel (List.index Name.equal na (fst (snd e))))
+        && not (Int.equal (Array.length cl) 0)
+	&& (* don't contract if p dependent *)
+	computable sigma p (List.length ci.ci_pp_info.ind_tags) (* FIXME: can do better *) ->
+	let clauses = build_tree na isgoal e sigma ci cl in
+	List.flatten
+          (List.map (fun (pat,rhs) ->
+	      let lines = align_tree nal isgoal rhs sigma in
+	      List.map (fun (hd,rest) -> pat::hd,rest) lines)
+	    clauses)
+    | _ ->
+	let pat = PatVar(dl,update_name sigma na rhs) in
+	let mat = align_tree nal isgoal rhs sigma in
+	List.map (fun (hd,rest) -> pat::hd,rest) mat

@@ -1,0 +1,7 @@
+Ambiguity 1: 
+| _ ->
+               match state with
+               | Check_inited i ->
+                   if ndl_globals_inited() < i
+                   then raise(Error(Unavailable_unit name))
+               | Loaded -> ()

@@ -1,0 +1,17 @@
+Ambiguity 1: 
+| Terminal s ->
+	    distribute [GramConstrTerminal (CLexer.terminal s)] ll
+        | Break _ ->
+            ll
+        | SProdList (x,sl) ->
+            let tkl = List.flatten
+              (List.map (function Terminal s -> [CLexer.terminal s]
+                | Break _ -> []
+                | _ -> anomaly (Pp.str "Found a non terminal token in recursive notation separator")) sl) in
+	    match List.assoc x etyps with
+            | ETConstr typ -> expand_list_rule typ tkl x 1 0 [] ll
+            | ETBinder o ->
+		distribute
+                  [GramConstrNonTerminal (ETBinderList (o,tkl), Some x)] ll
+            | _ ->
+                error "Components of recursive patterns in notation must be terms or binders."

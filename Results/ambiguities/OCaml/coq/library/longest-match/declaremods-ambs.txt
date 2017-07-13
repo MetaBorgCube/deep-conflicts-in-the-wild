@@ -1,0 +1,5 @@
+Ambiguity 1: 
+| Ref (mp, sub) ->
+    match ModSubstObjs.get mp with
+      | (_,Objs o) -> Lib.subst_objects sub o
+      | _ -> assert false

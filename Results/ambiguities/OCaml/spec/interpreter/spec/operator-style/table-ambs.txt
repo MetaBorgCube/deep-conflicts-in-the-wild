@@ -1,0 +1,7 @@
+Ambiguity 1: 
+let new_size = Int32.add old_size delta in
+  if I32.gt_u old_size new_size then raise SizeOverflow else
+  if not (within_limits new_size tab.max) then raise SizeLimit else
+  let after = create' new_size in
+  Array.blit tab.content 0 after 0 (Array.length tab.content);
+  tab.content <- after

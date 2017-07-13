@@ -1,0 +1,7 @@
+Ambiguity 1: 
+check_dir dirname >>= fun () ->
+       let filename = filename cctxt in
+       let json = Data_encoding.Json.construct encoding list in
+       Data_encoding_ezjsonm.write_file filename json >>= function
+       | Error _ -> failwith "Json.write_file"
+       | Ok () -> return ()

@@ -1,0 +1,119 @@
+Ambiguity 1: 
+|(cst, params, (i,t)::q) -> match decomp sk with
+	| Some (el,sk') when EConstr.eq_constr sigma el t.(i) ->
+	  if i = pred (Array.length t)
+	  then aux sk' def (cst, params, q)
+	  else aux sk' def (cst, params, (succ i,t)::q)
+	| _ -> def
+
+Ambiguity 2: 
+| Cst_proj p -> 
+      match decomp sk with
+      | Some (hd, sk) -> mkProj (p, hd), sk
+      | None -> assert false
+
+Ambiguity 3: 
+| Some e ->
+        match reference with
+        | None -> bd
+        | Some r -> magicaly_constant_of_fixbody e sigma r bd names.(ind)
+
+Ambiguity 4: 
+| Some e ->
+          match reference with
+          | None -> bd
+          | Some r -> magicaly_constant_of_fixbody e sigma r bd names.(ind)
+
+Ambiguity 5: 
+| Some body ->
+          let body = EConstr.of_constr body in
+	   if not tactic_mode
+	   then whrec (if refold then Cst_stack.add_cst (mkConstU const) cst_l else cst_l)
+		      (body, stack)
+	   else (* Looks for ReductionBehaviour *)
+	     match ReductionBehaviour.get (Globnames.ConstRef c) with
+	     | None -> whrec (Cst_stack.add_cst (mkConstU const) cst_l) (body, stack)
+	     | Some (recargs, nargs, flags) ->
+		if (List.mem `ReductionNeverUnfold flags
+		    || (nargs > 0 && Stack.args_size stack < nargs))
+		then fold ()
+		else (* maybe unfolds *)
+		  if List.mem `ReductionDontExposeCase flags then
+		    let app_sk,sk = Stack.strip_app stack in
+		    let (tm',sk'),cst_l' =
+		      whrec (Cst_stack.add_cst (mkConstU const) cst_l) (body, app_sk)
+		    in
+		    let rec is_case x = match EConstr.kind sigma x with
+		      | Lambda (_,_, x) | LetIn (_,_,_, x) | Cast (x, _,_) -> is_case x
+		      | App (hd, _) -> is_case hd
+		      | Case _ -> true
+		      | _ -> false in
+		    if equal_stacks sigma (x, app_sk) (tm', sk')
+		       || Stack.will_expose_iota sk'
+		       || is_case tm'
+		      then fold ()
+		      else whrec cst_l' (tm', sk' @ sk)
+		  else match recargs with
+		  |[] -> (* if nargs has been specified *)
+			 (* CAUTION : the constant is NEVER refold
+                            (even when it hides a (co)fix) *)
+		    whrec cst_l (body, stack)
+		  |curr::remains -> match Stack.strip_n_app curr stack with
+		    | None -> fold ()
+		    | Some (bef,arg,s') ->
+		      whrec Cst_stack.empty 
+			(arg,Stack.Cst(Stack.Cst_const (fst const, u'),curr,remains,bef,cst_l)::s')
+
+Ambiguity 6: 
+| Some (recargs, nargs, flags) ->
+	   if (List.mem `ReductionNeverUnfold flags
+	       || (nargs > 0 && Stack.args_size stack < (nargs - (npars + 1))))
+	   then fold ()
+	   else
+	     let recargs = List.map_filter (fun x -> 
+	       let idx = x - npars in 
+		 if idx < 0 then None else Some idx) recargs
+	     in
+	       match recargs with
+	       |[] -> (* if nargs has been specified *)
+		(* CAUTION : the constant is NEVER refold
+                   (even when it hides a (co)fix) *)
+		 let stack' = (c, Stack.Proj (npars, arg, p, cst_l) :: stack) in
+		   whrec Cst_stack.empty(* cst_l *) stack'
+	       | curr::remains -> 
+		 if curr == 0 then (* Try to reduce the record argument *)
+		   whrec Cst_stack.empty 
+		     (c, Stack.Cst(Stack.Cst_proj p,curr,remains,Stack.empty,cst_l)::stack)
+		 else
+		   match Stack.strip_n_app curr stack with
+		   | None -> fold ()
+		   | Some (bef,arg,s') ->
+		     whrec Cst_stack.empty 
+		       (arg,Stack.Cst(Stack.Cst_proj p,curr,remains,
+				      Stack.append_app [|c|] bef,cst_l)::s')
+
+Ambiguity 7: 
+| Stack.Cst_proj p ->
+	      let pb = lookup_projection p env in
+	      let npars = pb.Declarations.proj_npars in
+	      let narg = pb.Declarations.proj_arg in
+	      let stack = s' @ (Stack.append_app [|x'|] s'') in
+		match Stack.strip_n_app 0 stack with
+		| None -> assert false
+		| Some (_,arg,s'') ->
+		  whrec Cst_stack.empty (arg, Stack.Proj (npars,narg,p,cst_l) :: s'')
+
+Ambiguity 8: 
+| next :: remains' -> match Stack.strip_n_app (next-curr-1) s'' with
+	    | None -> fold ()
+	    | Some (bef,arg,s''') ->
+	      whrec Cst_stack.empty
+		(arg,
+		 Stack.Cst (const,next,remains',s' @ (Stack.append_app [|x'|] bef),cst_l) :: s''')
+
+Ambiguity 9: 
+| _ ->
+	  let (h,l) = decompose_app_vect sigma c in
+	  match EConstr.kind sigma h with
+	    | Const cst -> beta_app sigma (unfold cst, l)
+	    | _ -> c

@@ -1,0 +1,25 @@
+Ambiguity 1: 
+| (u, strict)::todo, _ ->
+      if u.status = Visited || (u.status = WeakVisited && strict)
+      then loop to_revert todo next_todo
+      else
+        let to_revert =
+          if u.status = NoMark then u::to_revert else to_revert
+        in
+        u.status <- if strict then WeakVisited else Visited;
+        if try UMap.find v.univ u.ltle || not strict
+           with Not_found -> false
+        then raise (Found to_revert)
+        else
+          begin
+            let next_todo =
+              UMap.fold (fun u strictu next_todo ->
+                let strict = not strictu && strict in
+                let u = repr g u in
+                if u == v && not strict then raise (Found to_revert)
+                else if topo_compare u v = 1 then next_todo
+                else (u, strict)::next_todo)
+               u.ltle next_todo
+            in
+            loop to_revert todo next_todo
+          end

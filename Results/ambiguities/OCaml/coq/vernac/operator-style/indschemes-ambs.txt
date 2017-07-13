@@ -1,0 +1,8 @@
+Ambiguity 1: 
+(
+      if not (List.is_empty ischeme) then do_mutual_induction_scheme ischeme
+      else
+	let mind,l = get_common_underlying_mutual_inductive escheme in
+	declare_beq_scheme_with l mind;
+	declare_eq_decidability_scheme_with l mind
+    )

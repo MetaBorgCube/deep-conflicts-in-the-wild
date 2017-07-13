@@ -1,0 +1,9 @@
+Ambiguity 1: 
+fold_left f l accu >>= fun accu ->
+      f k v accu >>= fun accu ->
+      fold_left f r accu
+
+Ambiguity 2: 
+fold_right f r accu >>= fun accu ->
+      f k v accu >>= fun accu ->
+      fold_right f l accu

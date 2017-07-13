@@ -1,0 +1,11 @@
+Ambiguity 1: 
+| Some f1 ->
+    match f2 with
+    | None -> None
+    | Some f2 -> normalize (CList.filter_with f1 f2)
+
+Ambiguity 2: 
+| _ ->
+  match kind_of_term (fst (decompose_app t2)) with
+  | Evar (evk2,_) -> fst (evar_source evk2 evd)
+  | _ -> Loc.ghost

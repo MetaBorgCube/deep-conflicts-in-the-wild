@@ -1,0 +1,19 @@
+Ambiguity 1: 
+| ConstRef kn ->
+     let cb = Environ.lookup_constant kn env in
+     match cb.const_body with
+     | Undef _ | OpaqueDef _ -> None
+     | Def l_body ->
+        match lookup_typedef kn cb with
+        | Some _ as o -> o
+        | None ->
+           let typ = Typeops.type_of_constant_type env cb.const_type
+           (* FIXME not sure if we should instantiate univs here *) in
+	   match flag_of_type env typ with
+	   | Info,TypeScheme ->
+	      let body = Mod_subst.force_constr l_body in
+	      let s = type_sign env typ in
+	      let db = db_from_sign s in
+	      let t = extract_type_scheme env db body (List.length s)
+	      in add_typedef kn cb t; Some t
+	   | _ -> None

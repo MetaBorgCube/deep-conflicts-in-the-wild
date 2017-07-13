@@ -1,0 +1,17 @@
+Ambiguity 1: 
+| v :: vs ->
+  match f acc v with
+  | None -> None
+  | Some acc -> fold_left_opt f acc vs
+
+Ambiguity 2: 
+| v :: vs ->
+  match f acc v with
+  | false, acc -> acc
+  | true, acc -> fold_left_until f acc vs
+
+Ambiguity 3: 
+| v :: vs ->
+  match p acc v with
+  | false -> acc
+  | true -> fold_left_while p f (f acc v) vs

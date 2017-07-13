@@ -1,0 +1,11 @@
+Ambiguity 1: 
+if Int.equal n len && n > 0 then error (s ^ " is an invalid path.");
+    if n >= len then dirs else
+    let pos =
+      try
+	String.index_from s n '.'
+      with Not_found -> len
+    in
+    if Int.equal pos n then error (s ^ " is an invalid path.");
+    let dir = String.sub s n (pos-n) in
+    decoupe_dirs ((Id.of_string dir)::dirs) (pos+1)

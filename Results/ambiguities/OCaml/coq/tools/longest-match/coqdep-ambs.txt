@@ -1,0 +1,5 @@
+Ambiguity 1: 
+| None ->
+              match search_ml_known s with
+              | Some mldir -> (declare ".cmo" mldir s) :: acc
+              | None -> acc

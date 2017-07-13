@@ -1,0 +1,8 @@
+Ambiguity 1: 
+let cur_stamp = !scope_class_map in
+    if stamp == cur_stamp then scl
+    else
+      (* Recent changes in the Bind Scope base, we re-compute the scopes *)
+      let scl' = update_scopes cls scl in
+      arguments_scope := Refmap.add r (scl',cls,cur_stamp) !arguments_scope;
+      scl'

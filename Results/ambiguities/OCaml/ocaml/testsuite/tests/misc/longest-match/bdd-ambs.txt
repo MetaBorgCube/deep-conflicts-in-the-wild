@@ -1,0 +1,17 @@
+Ambiguity 1: 
+| n :: ns ->
+                    match n with
+                    | Node(l,v,_,h) ->
+                       let ind = hashVal (getId l) (getId h) v land newSz_1
+                       in
+                       newArr.(ind) <- (n :: newArr.(ind));
+                       copyBucket ns
+                    | _ -> assert false
+
+Ambiguity 2: 
+| n :: ns ->
+                        match n with
+                        | Node(l,v',id,h) ->
+                           if v = v' && idl = getId l && idh = getId h
+                           then n else lookup ns
+                        | _ -> assert false

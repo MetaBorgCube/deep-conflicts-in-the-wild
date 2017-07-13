@@ -1,0 +1,33 @@
+Ambiguity 1: 
+Context.reset_test_network
+    predecessor_context predecessor
+    timestamp >>= fun predecessor_context ->
+  Proto.begin_construction
+    ~predecessor_context
+    ~predecessor_timestamp
+    ~predecessor_fitness
+    ~predecessor_level
+    ~predecessor
+    ~timestamp
+  >>=? fun state ->
+  return (State { proto = (module Proto) ; state })
+
+Ambiguity 2: 
+Lwt_list.map_p
+    (fun (h, op) ->
+       match Proto.parse_operation h op with
+       | Error _ ->
+           (* the operation will never be validated in the
+              current context, it is silently ignored. It may be
+              reintroduced in the loop by the next `flush`. *)
+           Lwt.return_none
+       | Ok p -> Lwt.return (Some (h, p)))
+    ops >>= fun ops ->
+  let ops = Utils.unopt_list ops in
+  let ops =
+    if sort then
+      let compare (_, op1) (_, op2) = Proto.compare_operations op1 op2 in
+      List.sort compare ops
+    else ops in
+  apply_operations Proto.apply_operation state ~sort ops >>=? fun (state, r) ->
+  return (State { proto = (module Proto) ; state }, r)

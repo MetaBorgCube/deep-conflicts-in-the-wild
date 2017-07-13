@@ -1,0 +1,71 @@
+Ambiguity 1: 
+(if b then str "-" else mt()) ++
+      match c with
+        | SearchSubPattern p -> pr_constr_pattern_expr p
+        | SearchString (s,sc) -> qs s ++ pr_opt (fun sc -> str "%" ++ str sc) sc
+
+Ambiguity 2: 
+pr_opt (fun g -> Proof_global.pr_goal_selector g ++ str ":"++ spc()) gopt
+    ++
+      match a with
+      | SearchHead c -> keyword "SearchHead" ++ spc() ++ pr_p c ++ pr_in_out_modules b
+      | SearchPattern c -> keyword "SearchPattern" ++ spc() ++ pr_p c ++ pr_in_out_modules b
+      | SearchRewrite c -> keyword "SearchRewrite" ++ spc() ++ pr_p c ++ pr_in_out_modules b
+      | SearchAbout sl ->
+	 keyword "Search" ++ spc() ++ prlist_with_sep spc pr_search_about sl ++ pr_in_out_modules b
+
+Ambiguity 3: 
+keyword "Load"
+          ++ if f then
+              (spc() ++ keyword "Verbose" ++ spc())
+            else
+              spc() ++ qs s
+
+Ambiguity 4: 
+keyword "Arguments" ++ spc() ++
+              pr_smart_global q ++
+              let pr_s = function None -> str"" | Some (_,s) -> str "%" ++ str s in
+              let pr_if b x = if b then x else str "" in
+              let pr_br imp x = match imp with
+                | Vernacexpr.Implicit -> str "[" ++ x ++ str "]"
+                | Vernacexpr.MaximallyImplicit -> str "{" ++ x ++ str "}"
+                | Vernacexpr.NotImplicit -> x in
+              let rec print_arguments n l =
+                match n, l with
+                  | Some 0, l -> spc () ++ str"/" ++ print_arguments None l
+                  | _, [] -> mt()
+                  | n, { name = id; recarg_like = k;
+                         notation_scope = s;
+                         implicit_status = imp } :: tl ->
+                    spc() ++ pr_br imp (pr_if k (str"!") ++ pr_name id ++ pr_s s) ++
+                      print_arguments (Option.map pred n) tl
+              in
+              let rec print_implicits = function
+                | [] -> mt ()
+                | (name, impl) :: rest ->
+                   spc() ++ pr_br impl (pr_name name) ++ print_implicits rest
+              in
+              print_arguments nargs args ++
+                if not (List.is_empty more_implicits) then
+                  prlist (fun l -> str"," ++ print_implicits l) more_implicits
+                else (mt ()) ++
+                (if not (List.is_empty mods) then str" : " else str"") ++
+                  prlist_with_sep (fun () -> str", " ++ spc()) (function
+                    | `ReductionDontExposeCase -> keyword "simpl nomatch"
+                    | `ReductionNeverUnfold -> keyword "simpl never"
+                    | `DefaultImplicits -> keyword "default implicits"
+                    | `Rename -> keyword "rename"
+                    | `Assert -> keyword "assert"
+                    | `ExtraScopes -> keyword "extra scopes"
+                    | `ClearImplicits -> keyword "clear implicits"
+                    | `ClearScopes -> keyword "clear scopes")
+                  mods
+
+Ambiguity 5: 
+str"Generalizable Variable" ++
+              match g with
+                | None -> str "s none"
+                | Some [] -> str "s all"
+                | Some idl ->
+                  str (if List.length idl > 1 then "s " else " ") ++
+                    prlist_with_sep spc pr_lident idl

@@ -1,0 +1,26 @@
+Ambiguity 1: 
+let rec try_non_omega = function
+              (p,pss) :: rem ->
+                let ok = pressure_variants tdefs pss in
+                try_non_omega rem && ok
+            | [] -> true
+          in
+          if full_match true (tdefs=None) constrs then
+            try_non_omega constrs
+          else if tdefs = None then
+            pressure_variants None (filter_extra pss)
+          else
+            let full = full_match true true constrs in
+            let ok =
+              if full then try_non_omega constrs
+              else try_non_omega (filter_all q0 (mark_partial pss))
+            in
+            begin match constrs, tdefs with
+              ({pat_desc=Tpat_variant _} as p,_):: _, Some env ->
+                let row = row_of_pat p in
+                if Btype.row_fixed row
+                || pressure_variants None (filter_extra pss) then ()
+                else close_variant env row
+            | _ -> ()
+            end;
+            ok

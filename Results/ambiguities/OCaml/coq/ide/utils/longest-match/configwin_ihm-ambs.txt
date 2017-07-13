@@ -1,0 +1,11 @@
+Ambiguity 1: 
+| m :: qrows ->
+	    match l with
+	      [] -> ([],[])
+	    | [_] -> (l,[])
+	    | e1 :: e2 :: q when m = n + 1 ->
+		let newl, newrows = iter (n+1) qrows (e1 :: q) in
+		(e2 :: newl, n :: newrows)
+	    | e1 :: q ->
+		let newl, newrows = iter (n+1) selrows q in
+		(e1 ::  newl, newrows)

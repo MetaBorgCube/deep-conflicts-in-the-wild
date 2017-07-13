@@ -1,0 +1,34 @@
+Ambiguity 1: 
+Client_config.preparse_args argv cctxt >>= fun config ->
+       let cctxt = { cctxt with config } in
+       block_protocol cctxt Client_commands.(cctxt.config.block)
+       >>= fun version ->
+       let commands =
+         Client_generic_rpcs.commands @
+         Client_keys.commands () @
+         Client_protocols.commands () @
+         Client_helpers.commands () @
+         Client_commands.commands_for_version version in
+       Client_config.parse_args ~version
+         (Cli_entries.usage ~commands)
+         (Cli_entries.inline_dispatch commands)
+         argv cctxt >>= fun (command, config) ->
+       command Client_commands.({ cctxt with config }) >>= fun () ->
+       Lwt.return (Ok (result ()))
+
+Ambiguity 2: 
+() ->
+          Client_config.parse_args
+            ~extra:webclient_args
+            (Cli_entries.usage ~commands: [])
+            (fun () -> function
+               | `Arg arg -> raise (Arg.Bad ("unexpected argument " ^ arg))
+               | `End -> `Res (fun () -> Lwt.return ()))
+            Sys.argv Client_commands.ignore_context
+          >>= fun (_no_command, config) ->
+          Random.self_init () ;
+          Sodium.Random.stir () ;
+          (* TODO: add TLS? *)
+          http_proxy (`TCP (`Port Client_commands.(config.web_port)))
+          >>= fun _server ->
+          fst (Lwt.wait ())

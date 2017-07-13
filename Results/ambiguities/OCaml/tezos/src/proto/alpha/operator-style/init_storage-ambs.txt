@@ -1,0 +1,26 @@
+Ambiguity 1: 
+Roll_storage.init store >>=? fun store ->
+  Seed_storage.init store >>=? fun store ->
+  Contract_storage.init store >>=? fun store ->
+  Reward_storage.init store >>=? fun store ->
+  Bootstrap_storage.init store >>=? fun store ->
+  Roll_storage.freeze_rolls_for_cycle
+    store Cycle_repr.root >>=? fun store ->
+  Roll_storage.freeze_rolls_for_cycle
+    store Cycle_repr.(succ root) >>=? fun store ->
+  Vote_storage.init store >>=? fun store ->
+  return store
+
+Ambiguity 2: 
+Storage.is_first_block ctxt >>=? function
+  | true ->
+      Storage.set_sandboxed ctxt json >>= fun ctxt ->
+      return ctxt
+  | false ->
+      Storage.get_sandboxed ctxt >>=? function
+      | None ->
+          fail Unimplemented_sandbox_migration
+      | Some _ ->
+          (* FIXME GRGR fail if parameter changed! *)
+          (* failwith "Changing sandbox parameter is not yet implemented" *)
+          return ctxt

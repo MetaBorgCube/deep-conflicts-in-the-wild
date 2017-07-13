@@ -1,0 +1,20 @@
+Ambiguity 1: 
+begin fun pos r ->
+    try
+      let _ = List.find (fun x -> x.name = r.name) !rules in
+      raise (Exit_rule_error (sbprintf "Rule.add_rule: already exists: (%a)" print r))
+    with Not_found ->
+      match pos with
+      | `bottom -> rules := !rules @ [r]
+      | `top -> rules := r :: !rules
+      | `after s ->
+          rules :=
+            List.fold_right begin fun x acc ->
+              if x.name = s then x :: r :: acc else x :: acc
+            end !rules []
+      | `before s ->
+          rules :=
+            List.fold_right begin fun x acc ->
+              if x.name = s then r :: x :: acc else x :: acc
+            end !rules []
+  end

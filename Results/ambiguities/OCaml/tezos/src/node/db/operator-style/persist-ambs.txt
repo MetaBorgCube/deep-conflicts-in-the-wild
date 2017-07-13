@@ -1,0 +1,61 @@
+Ambiguity 1: 
+S.set c inited_key empty >>= fun c ->
+    read c >>= fun old_set ->
+    Lwt_list.fold_left_s
+      (fun c h -> S.del c (to_path h))
+      c Set.(elements (diff old_set set)) >>= fun c ->
+    Lwt_list.fold_left_s
+      (fun c h -> S.set c (to_path h) empty)
+      c Set.(elements (diff set old_set))
+
+Ambiguity 2: 
+clear c >>= fun c ->
+    S.set c inited_key empty >>= fun c ->
+    Lwt_list.fold_left_s
+      (fun c (k, b) -> S.set c (to_path k) (C.to_bytes b))
+      c (Map.bindings m)
+
+Ambiguity 3: 
+() -> f r.contents >>= function
+       | None -> Lwt.return false
+       | Some new_contents ->
+           r.contents <- new_contents ;
+           Lwt.return true
+
+Ambiguity 4: 
+() -> f r.contents >>= function
+       | (None, x) -> Lwt.return (false, x)
+       | (Some new_contents, x) ->
+           r.contents <- new_contents ;
+           Lwt.return (true, x)
+
+Ambiguity 5: 
+() ->
+             data >>= fun data ->
+             let state = `Inited data in
+             Table.add tbl hash { rdata ; state ; wakener } ;
+             worker_trigger () ;
+             Lwt.return_unit
+
+Ambiguity 6: 
+worker_loop () =
+        Lwt.pick [(worker_waiter () >|= fun () -> `Process);
+                  (cancelation () >|= fun () -> `Cancel)] >>= function
+        | `Cancel -> Lwt.return_unit
+        | `Process ->
+            begin
+              match pending_requests session with
+              | [] -> ()
+              | requests ->
+                  let get = fetch session
+                  and set k v = store session k v >>= fun _ -> Lwt.return_unit in
+                  let timeout = Scheduler.request gstate ~get ~set requests in
+                  if timeout > 0. then
+                    Lwt.ignore_result (Lwt_unix.sleep timeout >|= worker_trigger);
+            end;
+            worker_loop ()
+
+Ambiguity 7: 
+Store.list t [prefix] >>= fun prefixes ->
+          Lwt_list.map_p (fun prefix -> loop prefix ds) prefixes
+          >|= List.flatten

@@ -1,0 +1,31 @@
+Ambiguity 1: 
+| Ptr p ->
+    if seen.(p) then 0
+    else
+      let () = seen.(p) <- true in
+      match (!memory).(p) with
+      | Struct (tag, os) ->
+        let fold accu o = accu + 1 + init_size seen o in
+        let size = Array.fold_left fold 1 os in
+        let () = (!sizes).(p) <- size in
+        size
+      | String s ->
+        let size = 2 + (String.length s / ws) in
+        let () = (!sizes).(p) <- size in
+        size
+
+Ambiguity 2: 
+| Atm t -> BLOCK (t, [||])
+  | Fun _ -> OTHER
+  | Ptr p ->
+    match (!memory).(p) with
+    | Struct (tag, os) -> BLOCK (tag, os)
+    | String s -> STRING s
+
+Ambiguity 3: 
+let get_children v o pos =
+  try get_children v o pos
+  with Exit -> match Repr.repr o with
+  | BLOCK (_, os) -> Array.mapi (fun i o -> Any, o, i :: pos) os
+  | _ -> [||]
+

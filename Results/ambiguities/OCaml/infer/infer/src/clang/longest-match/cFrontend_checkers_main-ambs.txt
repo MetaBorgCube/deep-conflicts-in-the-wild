@@ -1,0 +1,21 @@
+Ambiguity 1: 
+| ObjCMethodDecl (_, _, mdi) ->
+      let context' = {context with
+                      CLintersContext.current_method = Some decl;
+                      CLintersContext.in_objc_static_factory_method =
+                        is_factory_method context decl} in
+      (match mdi.Clang_ast_t.omdi_body with
+       | Some stmt -> do_frontend_checks_stmt context' stmt
+       | None -> ())
+  | BlockDecl (_, block_decl_info) ->
+      let context' = {context with CLintersContext.current_method = Some decl } in
+      (match block_decl_info.Clang_ast_t.bdi_body with
+       | Some stmt -> do_frontend_checks_stmt context' stmt
+       | None -> ())
+  | ObjCImplementationDecl (_, _, decls, _, _) ->
+      let context' = {context with current_objc_impl = Some decl} in
+      List.iter ~f:(do_frontend_checks_decl context') decls
+  | _ -> match Clang_ast_proj.get_decl_context_tuple decl with
+    | Some (decls, _) ->
+        List.iter ~f:(do_frontend_checks_decl context) decls
+    | None -> ()

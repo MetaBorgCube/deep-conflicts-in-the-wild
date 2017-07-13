@@ -1,0 +1,8 @@
+Ambiguity 1: 
+if not (Int.Set.mem (i-k) !cache) then
+       let decl = Environ.lookup_rel i env in
+       if check_types then
+         (cache := Int.Set.add (i-k) !cache; occur_rec false acc (lift i (EConstr.of_constr (get_type decl))));
+       (match decl with
+        | LocalAssum _ -> ()
+        | LocalDef (_,b,_) -> cache := Int.Set.add (i-k) !cache; occur_rec false acc (lift i (EConstr.of_constr b)))

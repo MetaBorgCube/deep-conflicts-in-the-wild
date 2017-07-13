@@ -1,0 +1,46 @@
+Ambiguity 1: 
+| (v, text) :: q ->
+             bp b ".B \"%s" Odoc_messages.before;
+             bs b v;
+             bs b "\"\n";
+             self#man_of_text b text;
+             bs b "\n";
+             bs b "\n";
+             match q with
+               [] -> ()
+             | _ -> bs b linebreak ; iter q
+
+Ambiguity 2: 
+| (s, t) :: q ->
+              bs b ".B \"";
+              bs b Odoc_messages.raises;
+              bs b (" "^s^"\"\n");
+              self#man_of_text b t;
+              bs b "\n";
+              match q with
+                [] -> ()
+              | _ -> bs b linebreak; iter q
+
+Ambiguity 3: 
+| see :: q ->
+              bs b ".B \"";
+              bs b Odoc_messages.see_also;
+              bs b "\"\n";
+              bs b (self#str_man_of_see see);
+              bs b "\n";
+              match q with
+                [] -> ()
+              | _ -> bs b linebreak; iter q
+
+Ambiguity 4: 
+| h :: q ->
+            match acc2 with
+              [] -> f acc1 [h] q
+            | h2 :: q2 ->
+                if (name h) = (name h2) then
+                  if List.mem h acc2 then
+                    f acc1 acc2 q
+                  else
+                    f acc1 (acc2 @ [h]) q
+                else
+                  f (acc2 :: acc1) [h] q

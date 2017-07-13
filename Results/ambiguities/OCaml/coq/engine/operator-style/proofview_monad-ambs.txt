@@ -1,0 +1,5 @@
+Ambiguity 1: 
+raw_update (Trace.opn a) >>
+      t >>= fun a ->
+      raw_update Trace.close >>
+      return a

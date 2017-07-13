@@ -1,0 +1,7 @@
+Ambiguity 1: 
+| e :: el ->
+      emit_pushes el;
+      let (op, arg) = self#select_push e in
+      match self#emit_expr env arg with
+      | None -> ()
+      | Some r -> self#insert (Iop op) r [||]

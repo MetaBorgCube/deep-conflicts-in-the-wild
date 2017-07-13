@@ -1,0 +1,122 @@
+Ambiguity 1: 
+may_run_idle_tasks w =
+    if w.running_tasks = 0 && not w.running_idle then
+      match w.pending_idle with
+      | [] -> ()
+      | pending_idle ->
+          w.running_idle <- true ;
+          w.prevent_tasks <- false ;
+          w.pending_idle <- [] ;
+          Lwt.async (fun () ->
+              let pending_idle = List.rev pending_idle in
+              Lwt_list.iter_s (fun f -> f ()) pending_idle >>= fun () ->
+              w.running_idle <- false ;
+              let pending_tasks = List.rev w.pending_tasks in
+              w.pending_tasks <- [] ;
+              List.iter (fun u -> Lwt.wakeup u ()) pending_tasks ;
+              may_run_idle_tasks w ;
+              Lwt.return ())
+
+Ambiguity 2: 
+w.running_tasks <- w.running_tasks + 1 ;
+      wrap_error f >>= fun res ->
+      w.running_tasks <- w.running_tasks - 1 ;
+      may_run_idle_tasks w ;
+      unwrap_error res
+
+Ambiguity 3: 
+f () =
+      if !canceled then
+        Lwt.return ()
+      else
+        wrap_error f >>= fun res ->
+        wakeup_error u res ;
+        Lwt.return ()
+
+Ambiguity 4: 
+Lwt.async
+    (fun () ->
+       Lwt.catch run fail >>= fun () ->
+       LC.signal stop ();
+       Lwt.return ()) ;
+  waiter >>= fun () ->
+  log_info "%s worker ended" name ;
+  Lwt.return ()
+
+Ambiguity 5: 
+cmp x2 x3 >>= function
+            | x when x <= 0 -> Lwt.return [x1; x2; x3]
+            | _ -> cmp x1 x3 >|= function
+              | x when x <= 0 -> [x1; x3; x2]
+              | _ -> [x3; x1; x2]
+
+Ambiguity 6: 
+cmp x1 x3 >>= function
+            | x when x <= 0 -> Lwt.return [x2; x1; x3]
+            | _ -> cmp x2 x3 >|= function
+              | x when x <= 0 -> [x2; x3; x1]
+              | _ -> [x3; x2; x1]
+
+Ambiguity 7: 
+rev_sort n1 l >>= fun s1 ->
+       rev_sort n2 l2 >>= fun s2 ->
+       rev_merge_rev s1 s2 []
+
+Ambiguity 8: 
+cmp x2 x3 >>= function
+            | x when x > 0 -> Lwt.return [x1; x2; x3]
+            | _ ->
+                cmp x1 x3 >|= function
+                | x when x > 0 -> [x1; x3; x2]
+                | _ -> [x3; x1; x2]
+
+Ambiguity 9: 
+cmp x1 x3 >>= function
+            | x when x > 0 -> Lwt.return [x2; x1; x3]
+            | _ ->
+                cmp x2 x3 >|= function
+                | x when x > 0 -> [x2; x3; x1]
+                | _ -> [x3; x2; x1]
+
+Ambiguity 10: 
+sort n1 l >>= fun s1 ->
+        sort n2 l2 >>= fun s2 ->
+        rev_merge s1 s2 []
+
+Ambiguity 11: 
+Lwt_unix.file_exists dir >>= function
+  | false ->
+      create_dir (Filename.dirname dir) >>= fun () ->
+      Lwt_unix.mkdir dir perm
+  | true ->
+      Lwt_unix.stat dir >>= function
+      | {st_kind = S_DIR} -> Lwt.return_unit
+      | _ -> failwith "Not a directory"
+
+Ambiguity 12: 
+Lwt_unix.openfile name Unix.([O_TRUNC; O_CREAT; O_WRONLY]) perm >>= fun fd ->
+  Lwt_unix.write_string fd content 0 (String.length content) >>= fun _ ->
+  Lwt_unix.close fd
+
+Ambiguity 13: 
+Lwt.choose [
+    (t >|= fun () -> None) ;
+    (f canceler >|= fun x -> Some x)
+  ] >>= function
+  | Some x when Lwt.state t = Lwt.Sleep ->
+      Lwt.cancel t ;
+      Lwt.return x
+  | _ ->
+      Canceler.cancel canceler >>= fun () ->
+      fail Timeout
+
+Ambiguity 14: 
+() ->
+      Lwt_unix.openfile fn Unix.[O_CREAT ; O_WRONLY; O_TRUNC] 0o644 >>= fun fd ->
+      if close_on_exec then Lwt_unix.set_close_on_exec fd ;
+      Lwt_unix.lockf fd lock_command 0 >>= fun () ->
+      if unlink_on_exit then
+        Lwt_main.at_exit (fun () -> Lwt_unix.unlink fn) ;
+      let pid_str = string_of_int @@ Unix.getpid () in
+      Lwt_unix.write_string fd pid_str 0 (String.length pid_str) >>= fun _ ->
+      return ()

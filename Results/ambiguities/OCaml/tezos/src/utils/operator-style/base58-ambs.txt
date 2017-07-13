@@ -1,0 +1,7 @@
+Ambiguity 1: 
+loop s =
+    if s = Z.zero then 0 else
+    let s, r = Z.div_rem s zbase in
+    let i = loop s in
+    Bytes.set res i (to_char ~alphabet (Z.to_int r)) ;
+    i + 1

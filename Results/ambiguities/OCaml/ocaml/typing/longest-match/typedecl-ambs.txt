@@ -1,0 +1,22 @@
+Ambiguity 1: 
+| Some ret_type ->
+      match Ctype.repr ret_type with
+      | {desc=Tconstr (path, tyl, _)} ->
+          (* let tyl = List.map (Ctype.expand_head env) tyl in *)
+          let tyl = List.map Ctype.repr tyl in
+          let fvl = List.map (Ctype.free_variables ?env:None) tyl in
+          let _ =
+            List.fold_left2
+              (fun (fv1,fv2) ty (c,n,i) ->
+                match fv2 with [] -> assert false
+                | fv :: fv2 ->
+                    (* fv1 @ fv2 = free_variables of other parameters *)
+                    if (c||n) && constrained env (fv1 @ fv2) ty then
+                      raise (Error(loc, Varying_anonymous));
+                    (fv :: fv1, fv2))
+              ([], fvl) tyl required
+          in
+          compute_variance_type env check rloc
+            {decl with type_params = tyl; type_private = Private}
+            (add_false tl)
+      | _ -> assert false

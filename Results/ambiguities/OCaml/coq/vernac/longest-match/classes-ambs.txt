@@ -1,0 +1,43 @@
+Ambiguity 1: 
+| Some (Inr term) ->
+	    let c = interp_casted_constr_evars env' evars term cty in
+	    let c = EConstr.Unsafe.to_constr c in
+	      Some (Inr (c, subst))
+	| Some (Inl props) ->
+	    let get_id =
+	      function
+		| Ident id' -> id'
+		| Qualid (loc,id') -> (loc, snd (repr_qualid id'))
+	    in
+	    let props, rest =
+	      List.fold_left
+		(fun (props, rest) decl ->
+		  if is_local_assum decl then
+		    try
+		      let is_id (id', _) = match RelDecl.get_name decl, get_id id' with
+			| Name id, (_, id') -> Id.equal id id'
+			| Anonymous, _ -> false
+                      in
+		       let (loc_mid, c) =
+			 List.find is_id rest 
+		       in
+		       let rest' = 
+			 List.filter (fun v -> not (is_id v)) rest 
+		       in
+		       let (loc, mid) = get_id loc_mid in
+			 List.iter (fun (n, _, x) -> 
+				      if Name.equal n (Name mid) then
+					Option.iter (fun x -> Dumpglob.add_glob loc (ConstRef x)) x)
+			   k.cl_projs;
+			 c :: props, rest'
+		     with Not_found ->
+		       (CHole (Loc.ghost, None(* Some Evar_kinds.GoalEvar *), Misctypes.IntroAnonymous, None) :: props), rest
+		   else props, rest)
+		([], props) k.cl_props
+	    in
+              match rest with
+              | (n, _) :: _ ->
+		unbound_method env' k.cl_impl (get_id n)
+              | _ ->
+		Some (Inl (type_ctx_instance evars (push_rel_context ctx' env') 
+			     k.cl_props props subst))

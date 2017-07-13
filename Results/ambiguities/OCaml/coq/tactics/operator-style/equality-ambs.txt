@@ -1,0 +1,25 @@
+Ambiguity 1: 
+tac >>= fun () ->
+    Proofview.Goal.goals >>= fun gls ->
+    let check accu gl' =
+      gl' >>= fun gl' ->
+      let accu = accu || Goal.V82.same_goal sigma ev (project gl') (goal gl') in
+      Proofview.tclUNIT accu
+    in
+    Proofview.Monad.List.fold_left check false gls >>= fun has_same ->
+    if has_same then
+      tclZEROMSG (str"Tactic generated a subgoal identical to the original goal.")
+    else
+      Proofview.tclUNIT ()
+
+Ambiguity 2: 
+Tacticals.New.pf_constr_of_global sym >>= fun sym ->
+    Tacticals.New.pf_constr_of_global e >>= fun e ->
+    let eq = applist (e, [t1;c1;c2]) in
+    tclTHENLAST
+      (replace_core clause l2r eq)
+      (tclFIRST
+         [assumption;
+          tclTHEN (apply sym) assumption;
+          try_prove_eq
+         ])

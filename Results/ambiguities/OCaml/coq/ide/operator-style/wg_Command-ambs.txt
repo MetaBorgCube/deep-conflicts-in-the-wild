@@ -1,0 +1,25 @@
+Ambiguity 1: 
+let arg = entry#text in
+      if Str.string_match (Str.regexp "^ *$") (com^arg) 0 then () else
+      let phrase =
+        if Str.string_match (Str.regexp "\\. *$") com 0 then com
+        else com ^ " " ^ arg ^" . "
+      in
+      let process =
+        (* We need to adapt this to route_id and redirect to the result buffer below *)
+        coqops#raw_coq_query phrase
+        (*
+	Coq.bind (Coq.query (phrase,sid)) (function
+          | Interface.Fail (_,l,str) ->
+            let width = Ideutils.textview_width result in
+            Ideutils.insert_xml result#buffer (Richpp.richpp_of_pp width str);
+            notebook#set_page ~tab_label:(new_tab_lbl "Error") frame#coerce;
+	    Coq.return ()
+          | Interface.Good res ->
+            result#buffer#insert res;
+            notebook#set_page ~tab_label:(new_tab_lbl arg) frame#coerce;
+	    Coq.return ())
+         *)
+      in
+      result#buffer#set_text ("Result for command " ^ phrase ^ ":\n");
+      Coq.try_grab coqtop process ignore

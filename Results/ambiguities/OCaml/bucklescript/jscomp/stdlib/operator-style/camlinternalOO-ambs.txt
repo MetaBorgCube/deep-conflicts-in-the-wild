@@ -1,0 +1,21 @@
+Ambiguity 1: 
+create_table public_methods =
+  if public_methods == magic 0 then new_table [||] else
+  (* [public_methods] must be in ascending order for bytecode *)
+  let tags = Array.map public_method_label public_methods in
+  let table = new_table tags in
+  Array.iteri
+    (fun i met ->
+      let lab = i*2+2 in
+      table.methods_by_name  <- Meths.add met lab table.methods_by_name;
+      table.methods_by_label <- Labs.add lab true table.methods_by_label)
+    public_methods;
+  table
+
+Ambiguity 2: 
+lookup_key tables =
+    if tables.key == key then lookup_keys (i-1) keys tables.data else
+    if tables.next <> Empty then lookup_key (mut tables.next) else
+    let next = Cons (key, Empty, Empty) in
+    tables.next <- next;
+    build_path (i-1) keys (mut next)

@@ -1,0 +1,17 @@
+Ambiguity 1: 
+| (t1, Empty) -> Empty
+    | (Node(_, l1, v1, r1, _), t2) ->
+        match split v1 t2 with
+          (l2, false, r2) ->
+            concat (inter l1 l2) (inter r1 r2)
+        | (l2, true, r2) ->
+            join (inter l1 l2) v1 (inter r1 r2)
+
+Ambiguity 2: 
+| (t1, Empty) -> t1
+    | (Node(_, l1, v1, r1, _), t2) ->
+        match split v1 t2 with
+          (l2, false, r2) ->
+            join (diff l1 l2) v1 (diff r1 r2)
+        | (l2, true, r2) ->
+            concat (diff l1 l2) (diff r1 r2)

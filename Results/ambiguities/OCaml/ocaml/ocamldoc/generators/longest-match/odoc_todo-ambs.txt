@@ -1,0 +1,56 @@
+Ambiguity 1: 
+| Some i ->
+          let l =
+            List.fold_left
+              (fun acc (t, text) ->
+                 match t with
+                   "todo" ->
+                     begin
+                       match text with
+                         (Odoc_info.Code s) :: q ->
+                           (
+                            try
+                              let n = int_of_string s in
+                              let head =
+                                Odoc_info.Code (Printf.sprintf "[%d] " n)
+                              in
+                              (Some n, head::q) :: acc
+                            with _ -> (None, text) :: acc
+                           )
+                       | _ -> (None, text) :: acc
+
+                     end
+                 | _ -> acc
+              )
+              []
+              i.i_custom
+          in
+          match l with
+            [] -> ()
+          | _ ->
+              let l = List.sort
+                (fun a b ->
+                   match a, b with
+                     (None, _), _ -> -1
+                   | _, (None, _) -> 1
+                   | (Some n1, _), (Some n2, _) -> compare n1 n2
+                )
+                l
+              in
+              p b "<pre><a href=\"%s\">%s</a></pre><div class=\"info\">"
+                target name;
+              let col = function
+                None -> "#000000"
+              | Some 1 -> "#FF0000"
+              | Some 2 -> "#AA5555"
+              | Some 3 -> "#44BB00"
+              | Some n -> Printf.sprintf "#%2x0000" (0xAA - (n * 0x10))
+              in
+              List.iter
+                (fun (n, e) ->
+                   Printf.bprintf b "<span style=\"color: %s\">" (col n);
+                   html#html_of_text b e;
+                   p b "</span><br/>\n";
+                )
+                l;
+              p b "</div>"

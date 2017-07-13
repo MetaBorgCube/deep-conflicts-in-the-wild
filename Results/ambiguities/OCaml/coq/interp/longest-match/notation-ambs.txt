@@ -1,0 +1,25 @@
+Ambiguity 1: 
+| Some scope ->
+      match (String.Map.find scope !scope_map).delimiters with
+	| Some key -> Some (Some scope, Some key)
+	| None -> None
+
+Ambiguity 2: 
+| Some cl ->
+        match subst_scope_class subst cl with
+        | Some cl'  as ocl' when cl' != cl -> ocl'
+        | _ -> ocl
+
+Ambiguity 3: 
+| [] -> error_notation_not_reference loc ntn
+  | refs ->
+      let f (ntn,sc,ref) =
+        let def = find_default ntn !scope_stack in
+        match def with
+        | None -> false
+        | Some sc' -> String.equal sc sc'
+      in
+      match List.filter f refs with
+      | [_,_,ref] -> ref
+      | [] -> error_notation_not_reference loc ntn
+      | _ -> error_ambiguous_notation loc ntn

@@ -1,0 +1,106 @@
+Ambiguity 1: 
+| Evar ev ->
+        let ty = get_type_of env !evdref t in
+	let ty = Evarutil.evd_comb1 (refresh_universes (Some false) env) evdref ty in
+        let inst =
+	  List.map_i
+	    (fun i _ ->
+              try list_assoc_in_triple i subst0 with Not_found -> mkRel i)
+              1 (rel_context env) in
+        let ev' = e_new_evar env evdref ~src ty in
+        begin match solve_simple_eqn (evar_conv_x full_transparent_state) env !evdref (None,ev,substl inst ev') with
+        | Success evd -> evdref := evd
+        | UnifFailure _ -> assert false
+        end;
+        ev'
+    | _ ->
+    let good = List.filter (fun (_,u,_) -> is_conv_leq env !evdref t u) subst in
+    match good with
+    | [] ->
+      map_constr_with_full_binders !evdref push_binder aux x t
+    | (_, _, u) :: _ -> (* u is in extenv *)
+      let vl = List.map pi1 good in
+      let ty = 
+	let ty = get_type_of env !evdref t in
+	  Evarutil.evd_comb1 (refresh_universes (Some false) env) evdref ty
+      in
+      let ty = lift (-k) (aux x ty) in
+      let depvl = free_rels !evdref ty in
+      let inst =
+	List.map_i
+	  (fun i _ -> if Int.List.mem i vl then u else mkRel i) 1
+	  (rel_context extenv) in
+      let rel_filter =
+	List.map (fun a -> not (isRel !evdref a) || dependent !evdref a u
+                           || Int.Set.mem (destRel !evdref a) depvl) inst in
+      let named_filter =
+	List.map (fun d -> local_occur_var !evdref (NamedDecl.get_id d) u)
+	  (named_context extenv) in
+      let filter = Filter.make (rel_filter @ named_filter) in
+      let candidates = u :: List.map mkRel vl in
+      let ev = e_new_evar extenv evdref ~src ~filter ~candidates ty in
+      lift k ev
+
+Ambiguity 2: 
+| PatCstr (l,((_, i) as cstr),args,alias) ->
+	let cind = inductive_of_constructor cstr in
+	let IndType (indf, _) = 
+	  try find_rectype env ( !evdref) (lift (-(List.length realargs)) ty)
+	  with Not_found -> error_case_not_inductive env !evdref
+	    {uj_val = ty; uj_type = Typing.unsafe_type_of env !evdref ty}
+	in
+	let (ind,u), params = dest_ind_family indf in
+	let params = List.map EConstr.of_constr params in
+	if not (eq_ind ind cind) then error_bad_constructor ~loc:l env cstr ind;
+	let cstrs = get_constructors env indf in
+	let ci = cstrs.(i-1) in
+	let nb_args_constr = ci.cs_nargs in
+	assert (Int.equal nb_args_constr (List.length args));
+	let patargs, args, sign, env, n, m, avoid =
+	  List.fold_right2
+	    (fun decl ua (patargs, args, sign, env, n, m, avoid)  ->
+               let t = EConstr.of_constr (RelDecl.get_type decl) in
+	       let pat', sign', arg', typ', argtypargs, n', avoid =
+		 let liftt = liftn (List.length sign) (succ (List.length args)) t in
+		   typ env (substl args liftt, []) ua avoid
+	       in
+	       let args' = arg' :: List.map (lift n') args in
+	       let env' = push_rel_context sign' env in
+		 (pat' :: patargs, args', sign' @ sign, env', n' + n, succ m, avoid))
+	    ci.cs_args (List.rev args) ([], [], [], env, 0, 0, avoid)
+	in
+	let args = List.rev args in
+	let patargs = List.rev patargs in
+	let pat' = PatCstr (l, cstr, patargs, alias) in
+	let cstr = mkConstructU (on_snd EInstance.make ci.cs_cstr) in
+	let app = applist (cstr, List.map (lift (List.length sign)) params) in
+	let app = applist (app, args) in
+	let apptype = Retyping.get_type_of env ( !evdref) app in
+	let IndType (indf, realargs) = find_rectype env (!evdref) apptype in
+	  match alias with
+	      Anonymous ->
+		pat', sign, app, apptype, realargs, n, avoid
+	    | Name id ->
+		let sign = LocalAssum (alias, lift m ty) :: sign in
+		let avoid = id :: avoid in
+		let sign, i, avoid =
+		  try
+		    let env = push_rel_context sign env in
+		    evdref := the_conv_x_leq (push_rel_context sign env)
+		      (lift (succ m) ty) (lift 1 apptype) !evdref;
+		    let eq_t = mk_eq evdref (lift (succ m) ty)
+		      (mkRel 1) (* alias *)
+		      (lift 1 app) (* aliased term *)
+		    in
+		    let neq = eq_id avoid id in
+		      LocalDef (Name neq, mkRel 0, eq_t) :: sign, 2, neq :: avoid
+		  with Reduction.NotConvertible -> sign, 1, avoid
+		in
+		  (* Mark the equality as a hole *)
+		  pat', sign, lift i app, lift i apptype, realargs, n + i, avoid
+
+Ambiguity 3: 
+| _ ->
+	    match RelDecl.get_name decl with
+		Anonymous -> invalid_arg "vars_of_ctx"
+	      | Name n -> n, GVar (Loc.ghost, n) :: vars

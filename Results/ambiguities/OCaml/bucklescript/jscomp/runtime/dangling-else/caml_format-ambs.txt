@@ -1,0 +1,7 @@
+Ambiguity 1: 
+if signedconv then 
+    if sign < 0 then 
+      buffer := !buffer ^ "-"
+    else if signstyle <> "-" then 
+      buffer := !buffer ^ signstyle
+    else ()

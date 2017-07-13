@@ -1,0 +1,12 @@
+Ambiguity 1: 
+method node_color s =
+      try Some (List.assoc s loc_colors)
+      with
+        Not_found ->
+          match self#get_one_color with
+            None -> None
+          | Some c ->
+              loc_colors <- (s, c) :: loc_colors ;
+              Some c
+
+    

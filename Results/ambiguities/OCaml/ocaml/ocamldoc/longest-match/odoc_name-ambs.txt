@@ -1,0 +1,43 @@
+Ambiguity 1: 
+| Some first ->
+      let rec iter_last n =
+        if n <= first then
+          None
+        else
+          match s.[n] with
+            ' ' | '\t' | '\n' | '\r' -> iter_last (n-1)
+          | _ -> Some n
+      in
+      match iter_last (len-1) with
+        None -> String.sub s first 1
+      | Some last -> String.sub s first ((last-first)+1)
+
+Ambiguity 2: 
+| s ->
+      let len = String.length s in
+      match s.[len-1] with
+        ')' ->
+          (
+           let j = ref 0 in
+           let buf = [|Buffer.create len ; Buffer.create len |] in
+           for i = 0 to len - 1 do
+             match s.[i] with
+               '.' when !j = 0 ->
+                 if i < len - 1 then
+                   match s.[i+1] with
+                     '(' ->
+                       j := 1
+                   | _ ->
+                       Buffer.add_char buf.(!j) '.'
+                 else
+                   Buffer.add_char buf.(!j) s.[i]
+             | c ->
+                 Buffer.add_char buf.(!j) c
+           done;
+           (Buffer.contents buf.(0), Buffer.contents buf.(1))
+          )
+      | _ ->
+          match List.rev (Str.split (Str.regexp_string ".") s) with
+            [] -> ("", "")
+          | h :: q ->
+              (String.concat "." (List.rev q), h)

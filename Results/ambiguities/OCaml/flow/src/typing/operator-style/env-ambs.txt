@@ -1,0 +1,26 @@
+Ambiguity 1: 
+merge_specific cx loc name (specific0, general0) specific1 specific2 =
+    (** if both children are unchanged, or 1 child is unchanged and the other
+        is bottom (EmptyT), then we can avoid creating a merged specific *)
+    if (specific0 = specific1 && (specific0 = specific2 || is_bot specific2))
+    || (specific0 = specific2 && is_bot specific1)
+    then specific0
+    (* child has reverted to original - shortcut *)
+    else if specific1 = general0 || specific2 = general0
+    then general0
+    (* general case *)
+    else
+      let tvar = create_union cx loc name specific1 specific2 in
+      Flow_js.flow cx (tvar, UseT (Internal MergeEnv, general0));
+      tvar
+
+Ambiguity 2: 
+widened cx loc name specific general =
+    if specific = general
+    then None
+    else
+      let reason = mk_reason (RIdentifier name) loc in
+      let tvar = Flow_js.mk_tvar cx reason in
+      Flow_js.flow cx (specific, UseT (Internal WidenEnv, tvar));
+      Flow_js.flow cx (tvar, UseT (Internal WidenEnv, general));
+      Some tvar

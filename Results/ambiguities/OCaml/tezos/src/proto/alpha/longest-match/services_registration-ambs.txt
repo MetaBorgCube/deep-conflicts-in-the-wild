@@ -1,0 +1,25 @@
+Ambiguity 1: 
+| Some (shell, contents) ->
+           let operation = { hash ; shell ; contents ; signature } in
+           let level = Tezos_context.Level.current ctxt in
+           Mining.mining_priorities ctxt level >>=? fun (Misc.LCons (miner_pkh, _)) ->
+           let miner_contract = Contract.default_contract miner_pkh in
+           let block_prio = 0 in
+           Apply.apply_operation
+             ctxt (Some miner_contract) pred_block block_prio operation
+           >>=? function
+           | (_ctxt, _, Some script_err) -> Lwt.return (Error script_err)
+           | (_ctxt, contracts, None) -> Lwt.return (Ok contracts)
+
+Ambiguity 2: 
+| None ->
+          match Tez.of_cents 100_00L with
+          | Some tez -> tez
+          | None -> Tez.zero
+
+Ambiguity 3: 
+| Some public_key ->
+      let hash = Ed25519.Public_key.hash public_key in
+      Public_key.get_option ctxt hash >>=? function
+      | None -> return (Some public_key)
+      | Some _ -> return None

@@ -1,0 +1,22 @@
+Ambiguity 1: 
+sigma, term =
+    if lbind == NoBindings then
+      let sigma = Typeclasses.resolve_typeclasses env sigma in
+      sigma, nf_evar sigma c
+    else
+      let clause = make_clenv_binding env sigma (c,Retyping.get_type_of env sigma c) lbind in
+      let flags = { (default_unify_flags ()) with resolve_evars = true } in
+      let clause = clenv_unify_meta_types ~flags clause in
+      let (thd,tstack) = whd_nored_stack clause.evd (clenv_value clause) in
+      let rec chk = function
+      | [] -> []
+      | t::l -> if occur_meta clause.evd t then [] else t :: chk l
+      in
+      let tstack = chk tstack in
+      let term = applist(thd,List.map (nf_evar clause.evd) tstack) in
+      if occur_meta clause.evd term then
+	user_err  (str "Cannot infer an instance for " ++
+
+          pr_name (meta_name clause.evd (List.hd (collect_metas clause.evd term))) ++
+	  str ".");
+      clause.evd, term

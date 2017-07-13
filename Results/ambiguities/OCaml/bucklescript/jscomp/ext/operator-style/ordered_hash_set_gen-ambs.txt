@@ -1,0 +1,11 @@
+Ambiguity 1: 
+to_sorted_array h = 
+  if h.size = 0 then [||]
+  else 
+    let v = choose_exn h in 
+    let arr = Array.make h.size v in
+    let d = h.data in 
+    for i = 0 to h.data_mask do 
+      set_bucket  arr (Array.unsafe_get d i)
+    done;
+    arr

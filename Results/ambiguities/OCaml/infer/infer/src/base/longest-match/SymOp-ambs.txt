@@ -1,0 +1,13 @@
+Ambiguity 1: 
+| exception (Analysis_failure_exe _ as f_exn) ->
+      if not fail_early then
+        (try g () with _ -> ());
+      raise f_exn
+  | exception f_exn ->
+      match g () with
+      | () ->
+          raise f_exn
+      | exception (Analysis_failure_exe _ as g_exn) ->
+          raise g_exn
+      | exception _ ->
+          raise f_exn

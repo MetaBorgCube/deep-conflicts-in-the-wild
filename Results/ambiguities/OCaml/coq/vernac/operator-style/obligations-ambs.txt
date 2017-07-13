@@ -1,0 +1,56 @@
+Ambiguity 1: 
+| Proved (opq, id, proof) ->
+    if not !shrink_obligations then apply_terminator term pf
+    else
+      let (_, (entry, uctx, _)) = Pfedit.cook_this_proof proof in
+      let env = Global.env () in
+      let entry = Safe_typing.inline_private_constants_in_definition_entry env entry in
+      let ty = entry.Entries.const_entry_type in
+      let (body, cstr), eff = Future.force entry.Entries.const_entry_body in
+      assert(Safe_typing.empty_private_constants = eff);
+      let sigma = Evd.from_ctx (fst uctx) in
+      let sigma = Evd.merge_context_set ~sideff:true Evd.univ_rigid sigma cstr in
+      Inductiveops.control_only_guard (Global.env ()) body;
+      (** Declare the obligation ourselves and drop the hook *)
+      let prg = get_info (ProgMap.find name !from_prg) in
+      let ctx = Evd.evar_universe_context sigma in
+      let prg = { prg with prg_ctx = ctx } in
+      let obls, rem = prg.prg_obligations in
+      let obl = obls.(num) in
+      let status =
+        match obl.obl_status, opq with
+        | (_, Evar_kinds.Expand), Vernacexpr.Opaque _ -> err_not_transp ()
+        | (true, _), Vernacexpr.Opaque _ -> err_not_transp ()
+        | (false, _), Vernacexpr.Opaque _ -> Evar_kinds.Define true
+        | (_, Evar_kinds.Define true), Vernacexpr.Transparent -> Evar_kinds.Define false
+        | (_, status), Vernacexpr.Transparent -> status
+      in
+      let obl = { obl with obl_status = false, status } in
+      let uctx = Evd.evar_context_universe_context ctx in
+      let (_, obl) = declare_obligation prg obl body ty uctx in
+      let obls = Array.copy obls in
+      let _ = obls.(num) <- obl in
+      try
+      ignore (update_obls prg obls (pred rem));
+      if pred rem > 0 then
+        begin
+	  let deps = dependencies obls num in
+	  if not (Int.Set.is_empty deps) then
+	    ignore (auto (Some name) None deps)
+	end
+      with e when CErrors.noncritical e ->
+        let e = CErrors.push e in
+        pperror (CErrors.iprint (ExplainErr.process_vernac_interp_error e))
+
+
+
+Ambiguity 2: 
+i x ->
+      if p i then
+        match solve_obligation_by_tac !prgref obls' i tac with
+	| None -> ()
+ 	| Some prg' ->
+	   prgref := prg';
+	   let deps = dependencies obls i in
+ 	   (set := Int.Set.union !set deps;
+ 	    decr rem)

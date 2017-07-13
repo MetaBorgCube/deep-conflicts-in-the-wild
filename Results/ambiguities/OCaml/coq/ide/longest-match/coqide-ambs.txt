@@ -1,0 +1,16 @@
+Ambiguity 1: 
+|Some the_file ->
+    let get_args f = Project_file.args_from_project f
+      !custom_project_files project_file_name#get
+    in
+    match read_project#get with
+      |Ignore_args -> "", !sup_args
+      |Append_args ->
+         let fname, args = get_args the_file in fname, args @ !sup_args
+      |Subst_args -> get_args the_file
+
+Ambiguity 2: 
+| sn :: sessions ->
+        match sn.fileops#filename with
+	  | Some fn when is_f fn -> notebook#goto_page i; true
+          | _ -> search_f (i+1) sessions

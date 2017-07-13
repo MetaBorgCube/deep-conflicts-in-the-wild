@@ -1,0 +1,27 @@
+Ambiguity 1: 
+let get_rel env id i =
+  if i <= env.env_bound then
+    List.nth env.env_rel (i-1)
+  else 
+    let i = i - env.env_bound in
+    try Int.List.assoc i !(env.env_urel)
+    with Not_found ->
+      let local = MLlocal (fresh_lname id) in
+      env.env_urel := (i,local) :: !(env.env_urel);
+      local
+
+
+
+Ambiguity 2: 
+| Some u -> 1, let t = Array.make (size + 1) dummy_lname in t.(0) <- u; t
+
+Ambiguity 3: 
+| Some u -> 1, let t = Array.make (size + 1) (MLint 0) in t.(0) <- MLlocal u; t
+
+Ambiguity 4: 
+(len > 0 && 
+	  Int.equal (Array.length args) len && 
+	  let r = ref true and i = ref 0 in
+	  (* we test all arguments excepted the last *)
+	  while !i < len - 1  && !r do r := can_subst args.(!i); incr i done;
+	  !r)

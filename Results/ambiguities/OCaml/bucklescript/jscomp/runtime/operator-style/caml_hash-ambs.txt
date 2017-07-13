@@ -1,0 +1,63 @@
+Ambiguity 1: 
+let hash = ref seed in 
+  if Js.typeof obj = "number" then
+    begin 
+      let u = (Nativeint.of_float (Obj.magic obj)) in
+      hash := mix !hash (u +~ u +~ 1n) ;
+      final_mix !hash
+    end
+  else if Js.typeof obj = "string" then 
+    begin 
+      hash := caml_hash_mix_string !hash (Obj.magic obj : string);
+      final_mix !hash
+    end
+    (* TODO: hash [null] [undefined] as well *)
+  else 
+
+    let queue = Caml_queue.create () in 
+    let num = ref count in 
+    let () = 
+      Caml_queue.push obj queue; 
+      decr num 
+    in 
+    while not @@ Caml_queue.is_empty queue && !num > 0 do
+      let obj = Caml_queue.unsafe_pop queue in 
+      if Js.typeof obj = "number" then
+        begin 
+          let u = Nativeint.of_float (Obj.magic obj) in
+          hash := mix !hash (u +~ u +~ 1n) ;
+          decr num ;
+        end
+      else if Js.typeof obj = "string" then 
+        begin 
+          hash := caml_hash_mix_string !hash (Obj.magic obj : string);
+          decr num 
+        end
+      else if Js.typeof obj = "boolean" then 
+        ()
+      else if Js.typeof obj = "undefined" then 
+        ()
+      else if Js.typeof obj = "symbol" then 
+        assert false (* TODO *)
+      else if Js.typeof obj = "function" then
+        () 
+      else 
+        let size = Bs_obj.size_of_any obj in 
+        match Js_undefined.to_opt size with
+        | None -> ()
+        | Some size -> 
+          let obj_tag = Obj.tag obj in
+          let tag = (size lsl 10) lor obj_tag in 
+          if tag = 248 (* Obj.object_tag*) then 
+            hash := mix !hash (Nativeint.of_int (Oo.id (Obj.magic obj)))
+          else 
+            begin 
+              hash := mix !hash (Nativeint.of_int tag) ;
+              let block = 
+                let v = size - 1 in if v <  !num then v else !num in 
+              for i = 0 to block do
+                Caml_queue.push (Obj.field obj i ) queue
+              done 
+            end
+    done;
+    final_mix !hash

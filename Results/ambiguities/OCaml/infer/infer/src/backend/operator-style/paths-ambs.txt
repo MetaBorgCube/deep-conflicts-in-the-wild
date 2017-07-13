@@ -1,0 +1,12 @@
+Ambiguity 1: 
+add_delayed path =
+      if not (path_seen path) (* avoid exponential blowup *)
+      then match path with (* build a map from delayed paths to a unique number *)
+        | Pstart _ -> ()
+        | Pnode (_, _, _, p, _, _) | Pcall(p, _, ExecSkipped _, _) -> add_delayed p
+        | Pjoin (p1, p2, _) | Pcall(p1, _, ExecCompleted p2, _) ->
+            (* delay paths occurring in a join *)
+            add_delayed p1;
+            add_delayed p2;
+            add_path p1;
+            add_path p2

@@ -1,0 +1,23 @@
+Ambiguity 1: 
+| Cons(k1, d1, rest1) ->
+      if compare key k1 = 0 then d1 else
+      match rest1 with
+      | Empty -> raise Not_found
+      | Cons(k2, d2, rest2) ->
+          if compare key k2 = 0 then d2 else
+          match rest2 with
+          | Empty -> raise Not_found
+          | Cons(k3, d3, rest3) ->
+              if compare key k3 = 0 then d3 else find_rec key rest3
+
+Ambiguity 2: 
+| Cons(k1, d1, rest1) ->
+          if H.equal key k1 then d1 else
+          match rest1 with
+          | Empty -> raise Not_found
+          | Cons(k2, d2, rest2) ->
+              if H.equal key k2 then d2 else
+              match rest2 with
+              | Empty -> raise Not_found
+              | Cons(k3, d3, rest3) ->
+                  if H.equal key k3 then d3 else find_rec key rest3

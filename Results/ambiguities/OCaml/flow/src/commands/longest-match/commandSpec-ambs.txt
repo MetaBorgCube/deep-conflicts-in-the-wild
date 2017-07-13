@@ -1,0 +1,6 @@
+Ambiguity 1: 
+| value -> match arg_type.parse value with
+      | None -> raise (Failed_to_parse (Utils_js.spf
+          "wrong type for required argument%s"
+          (match value with Some [x] -> ": " ^ x | _ -> "")))
+      | Some result -> result

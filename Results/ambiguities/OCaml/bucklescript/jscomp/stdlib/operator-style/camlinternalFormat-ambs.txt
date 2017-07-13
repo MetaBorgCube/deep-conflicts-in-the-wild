@@ -1,0 +1,41 @@
+Ambiguity 1: 
+let width, padty =
+    abs width,
+    (* while literal padding widths are always non-negative,
+       dynamically-set widths (Arg_padding, eg. %*d) may be negative;
+       we interpret those as specifying a padding-to-the-left; this
+       means that '0' may get dropped even if it was explicitly set,
+       but:
+       - this is what the legacy implementation does, and
+         we preserve compatibility if possible
+       - we could only signal this issue by failing at runtime,
+         which is not very nice... *)
+    if width < 0 then Left else padty in
+  if width <= len then str else
+    let res = Bytes.make width (if padty = Zeros then '0' else ' ') in
+    begin match padty with
+    | Left  -> String.blit str 0 res 0 len
+    | Right -> String.blit str 0 res (width - len) len
+    | Zeros when len > 0 && (str.[0] = '+' || str.[0] = '-' || str.[0] = ' ') ->
+      Bytes.set res 0 str.[0];
+      String.blit str 1 res (width - len + 1) (len - 1)
+    | Zeros when len > 1 && str.[0] = '0' && (str.[1] = 'x' || str.[1] = 'X') ->
+      Bytes.set res 1 str.[1];
+      String.blit str 2 res (width - len + 2) (len - 2)
+    | Zeros ->
+      String.blit str 0 res (width - len) len
+    end;
+    Bytes.unsafe_to_string res
+
+Ambiguity 2: 
+format_of_fconv fconv prec =
+  if fconv = Float_F then "%.12g" else
+    let prec = abs prec in
+    let symb = char_of_fconv fconv in
+    let buf = buffer_create 16 in
+    buffer_add_char buf '%';
+    bprint_fconv_flag buf fconv;
+    buffer_add_char buf '.';
+    buffer_add_string buf (string_of_int prec);
+    buffer_add_char buf symb;
+    buffer_contents buf

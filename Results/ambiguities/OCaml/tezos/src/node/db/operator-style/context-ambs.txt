@@ -1,0 +1,111 @@
+Ambiguity 1: 
+Lwt_utils.Idle_waiter.task w @@ fun () ->
+      remove t k >>= fun t ->
+      Lwt.return (t, w)
+
+Ambiguity 2: 
+Lwt_utils.Idle_waiter.task w @@ fun () ->
+      remove_rec t k >>= fun t ->
+      Lwt.return (t, w)
+
+Ambiguity 3: 
+Lwt_utils.Idle_waiter.task w @@ fun () ->
+      update t k v >>= fun t ->
+      Lwt.return (t, w)
+
+Ambiguity 4: 
+Lwt_utils.Idle_waiter.task w @@ fun () ->
+      Lwt_list.map_p (list t) k >|= List.flatten
+
+Ambiguity 5: 
+GitStore.of_branch_id
+    Irmin.Task.none (Block_hash.to_b58check key) repo >>= fun t ->
+  let store = t () in
+  GitStore.read store current_protocol_key >>= function
+  | Some _ ->
+      Lwt.return true
+  | None ->
+      Lwt.return false
+
+Ambiguity 6: 
+lwt_debug "-> Context.checkout %a"
+    Block_hash.pp_short key >>= fun () ->
+  exists index key >>= fun exists ->
+  if not exists then
+    Lwt.return None
+  else
+    GitStore.of_branch_id
+      Irmin.Task.none (Block_hash.to_b58check key) index.repo >>= fun t ->
+    let store = t () in
+    GitStore.FunView.of_path store [] >>= fun view ->
+    let view = (view, index.repack_scheduler) in
+    let ctxt = { index ; store ; view } in
+    index.patch_context ctxt >>= fun ctxt ->
+    lwt_debug "<- Context.checkout %a OK"
+      Block_hash.pp_short key >>= fun () ->
+    Lwt.return (Some ctxt)
+
+Ambiguity 7: 
+lwt_debug "-> Context.exists %a"
+    Block_hash.pp_short key >>= fun () ->
+  exists index key >>= fun exists ->
+  lwt_debug "<- Context.exists %a %B"
+    Block_hash.pp_short key exists >>= fun () ->
+  Lwt.return exists
+
+Ambiguity 8: 
+let task = Irmin.Task.create ~date:(Time.to_seconds time) ~owner:"Tezos" in
+  GitStore.clone task context.store (Block_hash.to_b58check key) >>= function
+  | `Empty_head -> Lwt.fail (Empty_head key)
+  | `Duplicated_branch -> Lwt.fail (Preexistent_context key)
+  | `Ok store ->
+      GitStore.FunView.update_path
+        (store message) [] context.view >>= fun () ->
+     context.index.commits <- context.index.commits + 1 ;
+     if context.index.commits mod 200 = 0 then
+       Lwt_utils.Idle_waiter.force_idle
+         context.index.repack_scheduler
+         (fun () ->
+            lwt_debug "begin git repack" >>= fun () ->
+            let command =
+              "git",
+              [| "git" ; "-C" ; context.index.path ;
+                 "repack" ; "-a" ; "-d" |] in
+            let t0 = Unix.gettimeofday () in
+            Lwt_process.exec
+              ~stdout: `Dev_null ~stderr: `Dev_null
+              command >>= fun res ->
+            let dt = Unix.gettimeofday () -. t0 in
+            match res with
+            | WEXITED 0 ->
+                lwt_log_notice "git repack complete in %0.2f sec" dt
+            | WEXITED code | WSTOPPED code | WSIGNALED code ->
+                lwt_log_error "git repack failed with code %d after  %0.2f sec"
+                  code dt) >>= fun () ->
+       Lwt.return ()
+     else
+       Lwt.return ()
+
+Ambiguity 9: 
+GitStore.of_branch_id
+    task (Block_hash.to_b58check block)
+    index.repo >>= fun t ->
+  let store = t "Genesis" in
+  GitStore.FunView.of_path store [] >>= fun view ->
+  let view = (view, index.repack_scheduler) in
+  let ctxt = { index ; store ; view } in
+  set_protocol ctxt protocol >>= fun ctxt ->
+  set_test_network ctxt Not_running >>= fun ctxt ->
+  index.patch_context ctxt >>= fun ctxt ->
+  GitStore.FunView.update_path ctxt.store [] ctxt.view >>= fun () ->
+  Lwt.return ctxt
+
+Ambiguity 10: 
+GitStore.clone task ctxt.store (Block_hash.to_b58check genesis) >>= function
+  | `Empty_head -> fail (Exn (Empty_head genesis))
+  | `Duplicated_branch -> fail (Exn (Preexistent_context genesis))
+  | `Ok store ->
+      let msg =
+        Format.asprintf "Forking testnet: %a." Net_id.pp_short net_id in
+      GitStore.FunView.update_path (store msg) [] ctxt.view >>= fun () ->
+      return (net_id, genesis)

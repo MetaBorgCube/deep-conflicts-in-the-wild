@@ -1,0 +1,6 @@
+Ambiguity 1: 
+| Value v ->
+      match v.kind with
+      | Const _ -> true
+      | Let _ -> true
+      | _ -> false

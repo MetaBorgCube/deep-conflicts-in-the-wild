@@ -1,0 +1,9 @@
+Ambiguity 1: 
+| `Continue (last_known_step_at_level_zero_opt, line_opt) ->
+        let last_known_step_at_level_zero_opt' =
+          if Int.equal step.lt_level 0 then Some step
+          else last_known_step_at_level_zero_opt in
+        match last_known_step_at_level_zero_opt' with
+        | Some step_zero when contains_exception step ->
+            `Stop (last_known_step_at_level_zero_opt', Some step_zero.lt_loc.line)
+        | _ -> `Continue (last_known_step_at_level_zero_opt', line_opt)

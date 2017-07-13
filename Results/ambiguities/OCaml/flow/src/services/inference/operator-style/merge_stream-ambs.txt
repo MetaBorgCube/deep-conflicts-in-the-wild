@@ -1,0 +1,8 @@
+Ambiguity 1: 
+take n =
+  if n = 0 then []
+  else match !stream with
+  | [] -> assert false
+  | x::rest ->
+      stream := rest;
+      x::(take (n-1))

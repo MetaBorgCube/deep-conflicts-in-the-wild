@@ -1,0 +1,40 @@
+Ambiguity 1: 
+| Some ident ->
+      match matcher ident with
+      | [] -> error ("Unknown " ^ name ^ ".")
+      | [a] -> action a ppf lexbuf
+      | _ -> error ("Ambiguous " ^ name ^ ".")
+
+Ambiguity 2: 
+| Some x ->
+        match matching_instructions x with
+        | [ {instr_name = ("set" | "show" as i_full)} ] ->
+            if x = i_full then begin
+              match identifier_or_eol Lexer.lexeme lexbuf with
+              | Some ident ->
+                  begin match matching_variables ident with
+                  | [v] -> if v.var_name = ident then [] else [v.var_name]
+                  | l   -> List.map (fun v -> v.var_name) l
+                  end
+              | None ->
+                  List.map (fun v -> v.var_name) !variable_list
+            end
+            else [i_full]
+        | [ {instr_name = "info"} ] ->
+            if x = "info" then begin
+              match identifier_or_eol Lexer.lexeme lexbuf with
+              | Some ident ->
+                  begin match matching_infos ident with
+                  | [i] -> if i.info_name = ident then [] else [i.info_name]
+                  | l   -> List.map (fun i -> i.info_name) l
+                  end
+              | None ->
+                  List.map (fun i -> i.info_name) !info_list
+            end
+            else ["info"]
+        | [ {instr_name = "help"} ] ->
+            if x = "help" then match_list lexbuf else ["help"]
+        | [ i ] ->
+            if x = i.instr_name then [] else [i.instr_name]
+        | l ->
+            List.map (fun i -> i.instr_name) l

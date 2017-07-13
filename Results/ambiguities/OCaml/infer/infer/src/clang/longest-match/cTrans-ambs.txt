@@ -1,0 +1,24 @@
+Ambiguity 1: 
+| None ->
+             match prev_enum_constant_opt with
+             | Some prev_constant_pointer ->
+                 let previous_exp = get_enum_constant_expr context prev_constant_pointer in
+                 CArithmetic_trans.sil_const_plus_one previous_exp
+             | None -> zero
+
+Ambiguity 2: 
+| stmt :: rest ->
+        let rest_stmts_res_trans = initListExpr_initializers_trans trans_state var_exp (n + 1) rest
+            typ is_dyn_array stmt_info in
+        match stmt with
+        | Clang_ast_t.InitListExpr (_ , stmts , _) ->
+            let inside_stmts_res_trans = initListExpr_initializers_trans trans_state var_exp_inside
+                0 stmts typ_inside is_dyn_array stmt_info in
+            inside_stmts_res_trans @ rest_stmts_res_trans
+        | _ ->
+            let stmt_res_trans = if is_dyn_array then
+                let init_stmt_info = { stmt_info with
+                                       Clang_ast_t.si_pointer = CAst_utils.get_fresh_pointer () } in
+                init_expr_trans trans_state' (var_exp_inside, typ_inside) init_stmt_info (Some stmt)
+              else instruction trans_state' stmt in
+            stmt_res_trans :: rest_stmts_res_trans

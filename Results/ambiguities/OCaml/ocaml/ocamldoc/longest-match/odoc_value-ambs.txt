@@ -1,0 +1,5 @@
+Ambiguity 1: 
+| _ ->
+        match s.[0] with
+          '?' -> String.sub s 1 ((String.length s) - 1)
+        | _ -> s

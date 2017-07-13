@@ -1,0 +1,8 @@
+Ambiguity 1: 
+aux s ith offset = 
+    if offset >= size then 
+      ()
+    else 
+      let next_tab = String.index_from s offset '\t'  in 
+      return_arr.(ith) <- String.sub s offset (next_tab - offset) ; 
+      aux s (ith + 1) (next_tab + 1)

@@ -1,0 +1,8 @@
+Ambiguity 1: 
+to_sorted_array h = 
+  if h.size = 0 then [||]
+  else 
+    let v = choose h in 
+    let arr = Array.make h.size v in
+    iter (fun k _ i -> Array.unsafe_set arr i k) h;
+    arr

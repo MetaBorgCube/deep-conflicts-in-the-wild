@@ -1,0 +1,18 @@
+Ambiguity 1: 
+interp_instance loc evd ~len l =
+  if len != List.length l then
+    user_err ~loc ~hdr:"pretype"
+      (str "Universe instance should have length " ++ int len)
+  else
+    let evd, l' =
+      List.fold_left
+        (fun (evd, univs) l ->
+	  let evd, l = interp_glob_level loc evd l in
+	  (evd, l :: univs)) (evd, [])
+        l
+    in
+    if List.exists (fun l -> Univ.Level.is_prop l) l' then
+      user_err ~loc ~hdr:"pretype"
+	(str "Universe instances cannot contain Prop, polymorphic" ++
+	   str " universe instances must be greater or equal to Set.");
+    evd, Some (Univ.Instance.of_array (Array.of_list (List.rev l')))

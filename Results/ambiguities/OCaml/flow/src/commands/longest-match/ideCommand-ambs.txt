@@ -1,0 +1,13 @@
+Ambiguity 1: 
+| Some message ->
+          let obj = JsonRpc.parse_json_rpc_response message in
+          match obj with
+            | JsonRpc.Obj ("subscribeToDiagnostics", _) ->
+                prerr_endline "received subscribe request";
+                Some Prot.Subscribe
+            | JsonRpc.Obj (method_name, _) ->
+                prerr_endline ("unrecognized method: " ^ method_name);
+                None
+            | JsonRpc.Malformed err ->
+                prerr_endline ("Received a malformed message: " ^ err);
+                None

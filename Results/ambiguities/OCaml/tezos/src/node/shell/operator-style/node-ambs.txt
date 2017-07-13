@@ -1,0 +1,281 @@
+Ambiguity 1: 
+Updater.compile hash proto >>= function
+    | false ->
+        failwith
+          "Compilation failed (%a)"
+          Protocol_hash.pp_short hash
+    | true ->
+        State.Protocol.store state hash proto >>= function
+        | false ->
+            failwith
+              "Previously registred protocol (%a)"
+              Protocol_hash.pp_short hash
+        | true -> return ()
+
+Ambiguity 2: 
+| Some (config, limits) ->
+      lwt_log_notice "bootstraping network..." >>= fun () ->
+      P2p.create
+        ~config ~limits
+        Distributed_db_metadata.cfg
+        Distributed_db_message.cfg >>= fun p2p ->
+      Lwt.async (fun () -> P2p.maintain p2p) ;
+      Lwt.return p2p
+
+Ambiguity 3: 
+init_p2p net_params >>= fun p2p ->
+  State.read
+    ~store_root ~context_root ?patch_context () >>=? fun state ->
+  let distributed_db = Distributed_db.create state p2p in
+  let validator =
+    Validator.create_worker ?max_ttl state distributed_db in
+  may_create_net state genesis >>= fun mainnet_net ->
+  Validator.activate validator mainnet_net >>= fun mainnet_validator ->
+  let mainnet_db = Validator.net_db mainnet_validator in
+  let shutdown () =
+    P2p.shutdown p2p >>= fun () ->
+    Validator.shutdown validator >>= fun () ->
+    Lwt.return_unit
+  in
+  return {
+    state ;
+    distributed_db ;
+    validator ;
+    mainnet_db ;
+    mainnet_net ;
+    mainnet_validator ;
+    inject_block = inject_block validator ;
+    inject_operation = inject_operation validator ;
+    inject_protocol = inject_protocol state ;
+    p2p ;
+    shutdown ;
+  }
+
+Ambiguity 4: 
+Distributed_db.read_block node.distributed_db h >>= function
+    | None -> Lwt.return_none
+    | Some (_net_db, block) ->
+        State.Net.get node.state block.shell.net_id >>= function
+        | Error _ -> Lwt.return_none
+        | Ok net ->
+            State.Valid_block.read_exn net h >>= fun block ->
+            Lwt.return (Some block)
+
+Ambiguity 5: 
+Distributed_db.read_block_exn
+      node.distributed_db h >>= fun (net_db, _block) ->
+    let net = Distributed_db.state net_db in
+    State.Valid_block.read_exn net h >>= fun block ->
+    Lwt.return block
+
+Ambiguity 6: 
+State.Valid_block.Current.head net_state >>= fun head ->
+        get_pred net_db n head >>= convert
+
+Ambiguity 7: 
+State.Valid_block.Current.head net_state >>= fun head ->
+        Prevalidator.context pv >>= function
+        | Error _ -> Lwt.fail Not_found
+        | Ok { context ; fitness } ->
+            Context.get_protocol context >>= fun protocol ->
+            Context.get_test_network context >>= fun test_network ->
+            let proto_level =
+              if Protocol_hash.equal protocol head.protocol_hash then
+                head.proto_level
+              else
+                ((head.proto_level + 1) mod 256) in
+            let operations =
+              let pv_result, _ = Prevalidator.operations pv in
+              [ pv_result.applied ] in
+            Lwt.return
+              { hash = prevalidation_hash ;
+                level = Int32.succ head.level ;
+                proto_level ;
+                predecessor = head.hash ;
+                fitness ;
+                timestamp = Prevalidator.timestamp pv ;
+                protocol ;
+                operations_hash =
+                  Operation_list_list_hash.compute
+                    (List.map Operation_list_hash.compute operations) ;
+                operations = Some operations ;
+                data = MBytes.of_string "" ;
+                net_id = head.net_id ;
+                test_network ;
+              }
+
+Ambiguity 8: 
+State.Valid_block.Current.head net_state >>= fun head ->
+        get_pred net_db n head >>= fun block ->
+        Lwt.return (Some (rpc_context block))
+
+Ambiguity 9: 
+State.Valid_block.Current.head net_state >>= fun head ->
+        Prevalidator.context pv >>= function
+        | Error _ -> Lwt.fail Not_found
+        | Ok { context ; fitness } ->
+            Context.get_protocol context >>= fun protocol ->
+            let proto_level =
+              if Protocol_hash.equal protocol head.protocol_hash then
+                head.proto_level
+              else
+                ((head.proto_level + 1) mod 256) in
+            let operation_hashes =
+              let pv_result, _ = Prevalidator.operations pv in
+              [ pv_result.applied ] in
+            let operations_hash =
+              Operation_list_list_hash.compute
+                (List.map Operation_list_hash.compute operation_hashes) in
+            Lwt.return (Some {
+                Updater.block_hash = prevalidation_hash ;
+                block_header = {
+                  shell = {
+                    net_id = head.net_id ;
+                    level = Int32.succ head.level ;
+                    proto_level ;
+                    predecessor = head.hash ;
+                    timestamp = Prevalidator.timestamp pv ;
+                    operations_hash ;
+                    fitness ;
+                  } ;
+                  proto = MBytes.create 0 ;
+                } ;
+                operation_hashes = (fun () -> Lwt.return operation_hashes) ;
+                operations = begin fun () ->
+                  Lwt_list.map_p
+                    (Lwt_list.map_p
+                         (Distributed_db.Operation.read_exn net_db))
+                    operation_hashes
+                end ;
+                context ;
+              })
+
+Ambiguity 10: 
+State.Valid_block.Current.head net_state >>= fun head ->
+        get_pred net_db n head >>= fun { operation_hashes } ->
+        Lazy.force operation_hashes
+
+Ambiguity 11: 
+State.Valid_block.Current.head net_state >>= fun head ->
+        get_pred net_db n head >>= fun b ->
+        Prevalidator.pending ~block:b prevalidator >|= fun ops ->
+        Prevalidation.empty_result, ops
+
+Ambiguity 12: 
+State.Valid_block.Current.genesis net >>= fun b ->
+        let validator = get_validator node `Genesis in
+        let prevalidator = Validator.prevalidator validator in
+        Prevalidator.pending ~block:b prevalidator >|= fun ops ->
+        Prevalidation.empty_result, ops
+
+Ambiguity 13: 
+begin
+        get_validator_per_hash node h >>= function
+        | None ->
+            Lwt.return (Prevalidation.empty_result, Operation_hash.Set.empty)
+        | Some (validator, net_db) ->
+            let net_state = Distributed_db.state net_db in
+            let prevalidator = Validator.prevalidator validator in
+            State.Valid_block.read_exn net_state h >>= fun block ->
+            Prevalidator.pending ~block prevalidator >|= fun ops ->
+            Prevalidation.empty_result, ops
+
+Ambiguity 14: 
+begin
+      match block with
+      | `Genesis ->
+          let net = node.mainnet_net in
+          State.Valid_block.Current.genesis net >>= return
+      | ( `Head 0 | `Prevalidation
+        | `Test_head 0 | `Test_prevalidation ) as block ->
+          let validator = get_validator node block in
+          let net_state = Validator.net_state validator in
+          State.Valid_block.Current.head net_state >>= return
+      | `Head n | `Test_head n as block -> begin
+          let validator = get_validator node block in
+          let net_state = Validator.net_state validator in
+          let net_db = Validator.net_db validator in
+          State.Valid_block.Current.head net_state >>= fun head ->
+          get_pred net_db n head >>= return
+        end
+      | `Hash hash ->
+          read_valid_block node hash >>= function
+          | None -> Lwt.return (error_exn Not_found)
+          | Some data -> return data
+    end >>=? fun predecessor ->
+    let net_db = Validator.net_db node.mainnet_validator in
+    map_p
+      (fun h ->
+         Distributed_db.Operation.read net_db h >>= function
+         | None -> failwith "Unknown operation %a" Operation_hash.pp h
+         | Some po -> return (h, po))
+      ops >>=? fun rops ->
+    Prevalidation.start_prevalidation
+      ~predecessor ~timestamp >>=? fun validation_state ->
+    Prevalidation.prevalidate
+      validation_state ~sort rops >>=? fun (validation_state, r) ->
+    Prevalidation.end_prevalidation validation_state >>=? fun { fitness } ->
+    return (fitness, { r with applied = List.rev r.applied })
+
+Ambiguity 15: 
+get_rpc_context node block >>= function
+        | None -> Lwt.fail Not_found
+        | Some { context = ctxt } ->
+            Context.get_protocol ctxt >>= fun protocol_hash ->
+            let (module Proto) = Updater.get_exn protocol_hash in
+            Base58.complete str >>= fun l1 ->
+            Proto.complete_b58prefix ctxt str >>= fun l2 ->
+            Lwt.return (l1 @ l2)
+
+Ambiguity 16: 
+get_rpc_context node block >>= function
+    | None -> Lwt.return None
+    | Some rpc_context ->
+        Context.get_protocol rpc_context.context >>= fun protocol_hash ->
+        let (module Proto) = Updater.get_exn protocol_hash in
+        let dir = RPC.map (fun () -> rpc_context) Proto.rpc_services in
+        Lwt.return (Some (RPC.map (fun _ -> ()) dir))
+
+Ambiguity 17: 
+State.Valid_block.known_heads node.mainnet_net >>= fun heads ->
+    begin
+      match Validator.test_validator node.mainnet_validator with
+      | None -> Lwt.return_nil
+      | Some (_, net_db) ->
+          State.Valid_block.known_heads (Distributed_db.state net_db)
+    end >>= fun test_heads ->
+    Lwt_list.fold_left_s
+      (fun map block ->
+         convert block >|= fun bi ->
+         Block_hash.Map.add
+           block.State.Valid_block.hash bi map)
+      Block_hash.Map.empty (test_heads @ heads)
+
+Ambiguity 18: 
+State.Valid_block.read_exn state hash >>= fun block ->
+        convert block >>= fun bi ->
+        if Block_hash.equal bi.predecessor hash then
+          Lwt.return (List.rev (bi :: acc))
+        else begin
+          if len = 0
+             || Block_hash.Set.mem hash ignored then
+            Lwt.return (List.rev acc)
+        else
+          loop (bi :: acc) (len-1) bi.predecessor
+        end
+
+Ambiguity 19: 
+Distributed_db.read_block_exn
+           node.distributed_db head >>= fun (net_db, _block) ->
+         let net_state = Distributed_db.state net_db in
+         predecessors_bi net_state ignored len head >>= fun predecessors ->
+         let ignored =
+           List.fold_right
+             (fun x s -> Block_hash.Set.add x.hash s)
+             predecessors ignored in
+         Lwt.return (ignored, predecessors :: acc)
+
+Ambiguity 20: 
+Validator.get node.validator net_id >>=? fun net_v ->
+    Validator.fetch_block net_v block >>=? fun _ ->
+    return ()

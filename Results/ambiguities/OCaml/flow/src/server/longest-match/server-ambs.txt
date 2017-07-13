@@ -1,0 +1,11 @@
+Ambiguity 1: 
+| ServerProt.FileName file_path ->
+              let src_file = Loc.SourceFile file_path in
+              (* TODO: Use InfoHeap as the definitive way to detect @flow vs
+               * non-@flow
+               *)
+              match cache#read_safe ~audit:Expensive.warn src_file with
+              | None ->
+                (flow_files, cxs, src_file::non_flow_files, error)
+              | Some cx ->
+                (src_file::flow_files, cx::cxs, non_flow_files, error)

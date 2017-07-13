@@ -1,0 +1,4 @@
+Ambiguity 1: 
+| Some d -> match sw with
+        | []|[_] -> count d
+        | _ -> count d; count d

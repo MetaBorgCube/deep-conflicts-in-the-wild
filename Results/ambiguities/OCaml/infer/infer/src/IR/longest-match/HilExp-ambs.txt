@@ -1,0 +1,31 @@
+Ambiguity 1: 
+| UnOp (op, e, typ_opt) ->
+      UnaryOperator (op, of_sil ~f_resolve_id e typ, typ_opt)
+  | BinOp (op, e0, e1) ->
+      BinaryOperator (op, of_sil ~f_resolve_id e0 typ, of_sil ~f_resolve_id e1 typ)
+  | Exn e ->
+      Exception (of_sil ~f_resolve_id e typ)
+  | Const c ->
+      Constant c
+  | Cast (cast_typ, e) ->
+      Cast (cast_typ, of_sil ~f_resolve_id e typ)
+  | Sizeof {typ; dynamic_length} ->
+      Sizeof (typ, Option.map ~f:(fun e -> of_sil ~f_resolve_id e typ) dynamic_length)
+  | Closure closure ->
+      let environment =
+        List.map
+          ~f:(fun (value, pvar, typ) ->
+              AccessPath.base_of_pvar pvar typ, of_sil ~f_resolve_id value typ)
+          closure.captured_vars in
+      Closure (closure.name, environment)
+  | Lindex (Const (Cstr _), index_exp) ->
+      (* indexed string literal (e.g., "foo"[1]). represent this by introducing a dummy variable
+         for the string literal. if you actually need to see the value of the string literal in the
+         analysis, you should probably be using SIL *)
+      of_sil ~f_resolve_id (Exp.Lindex (Var (Ident.create_none ()), index_exp)) typ
+  | Lvar _ | Lfield _ | Lindex _ ->
+      match AccessPath.of_lhs_exp exp typ ~f_resolve_id with
+      | Some access_path ->
+          AccessPath access_path
+      | None ->
+          failwithf "Couldn't convert var/field/index expression %a to access path" Exp.pp exp

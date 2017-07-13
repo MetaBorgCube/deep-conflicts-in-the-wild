@@ -1,0 +1,68 @@
+Ambiguity 1: 
+Context.get c key >>= function
+    | None ->
+        let msg =
+          "cannot set undefined " ^ P.name ^ " key " ^ key_to_string k in
+        fail (Storage_error msg)
+    | Some old ->
+        let bytes = P.to_bytes v in
+        if MBytes.(old = bytes) then
+          return { s with context = c }
+        else
+          Context.set c key (P.to_bytes v) >>= fun c ->
+          return { s with context = c }
+
+Ambiguity 2: 
+Context.get c key >>=
+      function
+      | Some _ ->
+          let msg
+            = "cannot init existing " ^ P.name ^ " key " ^ key_to_string k in
+          fail (Storage_error msg)
+      | None ->
+          Context.set c key (P.to_bytes v) >>= fun c ->
+          return { s with context = c }
+
+Ambiguity 3: 
+HashTbl.mem c hash >>= function
+    | true ->
+        return { s with context = c }
+    | false ->
+        HashTbl.set c hash data >>= fun c ->
+        return { s with context = c }
+
+Ambiguity 4: 
+HashTbl.mem c hash >>= function
+    | false ->
+        return { s with context = c }
+    | true ->
+        HashTbl.del c hash >>= fun c ->
+        return { s with context = c }
+
+Ambiguity 5: 
+HashTbl.get c k >>= function
+    | None ->
+        let msg =
+          "cannot set undefined " ^ P.name ^ " key " ^ key_to_string k in
+        fail (Storage_error msg)
+    | Some _ ->
+        HashTbl.set c k v >>= fun c ->
+        return { s with context = c }
+
+Ambiguity 6: 
+HashTbl.get c k >>=
+      function
+      | Some _ ->
+          let msg
+            = "cannot init existing " ^ P.name ^ " key " ^ key_to_string k in
+          fail (Storage_error msg)
+      | None ->
+          HashTbl.set c k v >>= fun c ->
+          return { s with context = c }
+
+Ambiguity 7: 
+Lwt_list.map_p (fun resolve -> resolve c m) resolvers >|= fun hs ->
+        List.fold_left
+          (fun acc hs -> List.fold_left (fun acc h -> Set.add h acc) acc hs)
+          Set.empty hs |>
+        Set.elements

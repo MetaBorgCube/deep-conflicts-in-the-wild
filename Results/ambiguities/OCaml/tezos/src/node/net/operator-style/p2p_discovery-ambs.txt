@@ -1,0 +1,16 @@
+Ambiguity 1: 
+Lwt.catch
+      (fun () ->
+         Lwt_bytes.sendto sock buf 0 Message.length [] saddr >>= fun _nb_sent ->
+         Lwt.return_unit)
+        (fun exn ->
+          lwt_debug "(%a) error broadcasting a discovery request: %a"
+            Peer_id.pp my_peer_id Error_monad.pp (Exn exn)) >>= fun () ->
+    Lwt.pick
+      [ (Lwt_unix.sleep delay >>= fun () -> Lwt.return (Some (delay, n + 1))) ;
+        (cancelation () >>= fun () -> Lwt.return_none) ;
+        (Lwt_condition.wait restart >>= fun () -> Lwt.return (Some (0.1, 0))) ]
+    >>= function
+    | Some (delay, n) when n = 10 -> loop delay 9
+    | Some (delay, n) -> loop (delay *. 2.) n
+    | None -> Lwt.return_unit

@@ -1,0 +1,60 @@
+Ambiguity 1: 
+begin
+    match src_sk with
+    | None ->
+        Client_keys.get_key cctxt delegate >>=? fun (_, _, src_sk) ->
+        return src_sk
+    | Some sk -> return sk
+  end >>=? fun src_sk ->
+  Client_proto_rpcs.Context.level cctxt.rpc_config block >>=? fun level ->
+  let level = Raw_level.succ level.level in
+  let seed_nonce = Client_mining_forge.generate_seed_nonce () in
+  Client_mining_forge.forge_block cctxt.rpc_config
+    ~timestamp:(Time.now ())
+    ?force
+    ~seed_nonce ~src_sk block
+    ~priority:(`Auto (delegate, max_priority)) () >>=? fun block_hash ->
+  Client_mining_forge.State.record_block cctxt level block_hash seed_nonce
+  |> trace_exn (Failure "Error while recording block") >>=? fun () ->
+  cctxt.message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->
+  return ()
+
+Ambiguity 2: 
+Client_keys.get_key cctxt delegate >>=? fun (_src_name, src_pk, src_sk) ->
+  Client_mining_endorsement.forge_endorsement cctxt
+    cctxt.config.block ?force ?max_priority ~src_sk src_pk >>=? fun oph ->
+  cctxt.answer "Operation successfully injected in the node." >>= fun () ->
+  cctxt.answer "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
+  return ()
+
+Ambiguity 3: 
+Client_mining_revelation.forge_seed_nonce_revelation cctxt
+    block ?force nonces >>=? fun () ->
+  Client_proto_nonces.dels cctxt (List.map fst blocks) >>=? fun () ->
+  return ()
+
+Ambiguity 4: 
+Lwt_list.filter_map_p
+    (fun hash ->
+       Lwt.catch
+         (fun () ->
+            Client_mining_blocks.info cctxt.rpc_config (`Hash hash) >>= function
+            | Ok bi -> Lwt.return (Some bi)
+            | Error _ ->
+                Lwt.fail Not_found)
+         (fun _ ->
+            cctxt.warning
+              "Cannot find block %a in the chain. (ignoring)@."
+              Block_hash.pp_short hash >>= fun () ->
+            Lwt.return_none))
+    block_hashes >>= fun block_infos ->
+  map_filter_s (fun (bi : Client_mining_blocks.block_info) ->
+      Client_proto_nonces.find cctxt bi.hash >>= function
+      | None ->
+          cctxt.warning "Cannot find nonces for block %a (ignoring)@."
+            Block_hash.pp_short bi.hash >>= fun () ->
+          return None
+      | Some nonce ->
+          return (Some (bi.hash, (bi.level.level, nonce))))
+    block_infos >>=? fun blocks ->
+  do_reveal cctxt ?force cctxt.config.block blocks

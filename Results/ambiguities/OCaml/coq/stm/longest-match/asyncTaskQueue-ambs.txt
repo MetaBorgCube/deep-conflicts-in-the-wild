@@ -1,0 +1,28 @@
+Ambiguity 1: 
+| Some req ->
+      try
+        get_exec_token ();
+        marshal_request oc (Request req);
+        let rec continue () =
+          match unmarshal_response ic with
+          | RespGetCounterNewUnivLevel ->
+              marshal_more_data oc (MoreDataUnivLevel (more_univs 10));
+              continue ()
+          | RespFeedback fbk -> T.forward_feedback fbk; continue ()
+          | Response resp ->
+              match T.use_response !worker_age task resp with
+              | `End -> raise Die
+              | `Stay(competence, new_tasks) ->
+                   last_task := None;
+                   giveback_exec_token ();
+                   worker_age := `Old competence;
+                   add_tasks new_tasks
+        in
+          continue ()
+      with
+      | (Sys_error _|Invalid_argument _|End_of_file|Die) as e ->
+          raise e (* we pass the exception to the external handler *)
+      | MarshalError s -> T.on_marshal_error s task; raise Die
+      | e ->
+          stm_pr_err Pp.(seq [str "Uncaught exception in worker manager: "; print e]);
+          flush_all (); raise Die

@@ -1,0 +1,90 @@
+Ambiguity 1: 
+| Some origin ->
+      match find_matching_origin cors_allowed_origins origin with
+      | None -> cors_headers
+      | Some allowed_origin ->
+          Cohttp.Header.add_multi cors_headers
+            "Access-Control-Allow-Origin" [allowed_origin]
+
+Ambiguity 2: 
+| None ->
+             let existing_methods () =
+               let supported_meths =
+                 [ `OPTIONS ; `POST ; `PUT ; `PATCH ; `DELETE ; `GET ; `HEAD ] in
+               Lwt_list.filter_map_p
+                 (fun meth ->
+                    Lwt.catch
+                      (fun () ->
+                         lookup root ~meth () path >>= fun _handler ->
+                         Lwt.return_some meth)
+                      (function Not_found | Cannot_parse _ -> Lwt.return_none
+                              | exn -> Lwt.fail exn))
+                 supported_meths >>= function
+               | [] -> Lwt.fail Not_found (* No handler at all -> 404 *)
+               | meths -> Lwt.return meths in
+             Lwt.catch
+               (fun () ->
+                  lookup root ~meth:req.meth () path >>= fun handler ->
+                  Lwt.return_some handler)
+               (function Not_found | Cannot_parse _ -> Lwt.return_none
+                       | exn -> Lwt.fail exn) >>= function
+             | None ->
+                 begin
+                   (* Default OPTIONS handler for CORS preflight *)
+                   if req.meth = `OPTIONS && origin_header <> None then
+                     match Cohttp.Header.get req_headers
+                             "Access-Control-Request-Method" with
+                     | Some meth ->
+                         let meth = Cohttp.Code.method_of_string meth in
+                         lookup root ~meth () path >>= fun _handler ->
+                         (* unless [lookup] failed with [Not_found] -> 404 *)
+                         Lwt.return [ meth ]
+                     | None -> existing_methods ()
+                   else
+                     existing_methods () >>= fun allowed ->
+                     Lwt.fail (Invalid_method { allowed })
+                 end >>= fun cors_allowed_meths ->
+                 lwt_log_info "(%s) RPC preflight"
+                   (Cohttp.Connection.to_string con) >>= fun () ->
+                 let headers =
+                   Cohttp.Header.add_multi
+                     (Cohttp.Header.init ())
+                     "Access-Control-Allow-Methods"
+                     (List.map Cohttp.Code.string_of_method cors_allowed_meths) in
+                 answer_with_cors_headers ~headers `OK
+             | Some handler ->
+                 begin match req.meth with
+                   | `POST
+                   | `PUT
+                   | `PATCH
+                   | `DELETE -> begin
+                       Cohttp_lwt_body.to_string body >>= fun body ->
+                       match Data_encoding_ezjsonm.from_string body with
+                       | Error msg -> Lwt.fail (Cannot_parse_body msg)
+                       | Ok body -> Lwt.return (Some body)
+                     end
+                   | `GET
+                   | `HEAD
+                   | `OPTIONS -> Lwt.return None
+                   | _ ->
+                       existing_methods () >>= fun allowed ->
+                       Lwt.fail (Invalid_method { allowed })
+                 end >>= fun body ->
+                 handler body >>= fun { Answer.code ; body } ->
+                 let body = match body with
+                   | Empty ->
+                       Cohttp_lwt_body.empty
+                   | Single json ->
+                       Cohttp_lwt_body.of_string (Data_encoding_ezjsonm.to_string json)
+                   | Stream s ->
+                       let stream =
+                         create_stream io con Data_encoding_ezjsonm.to_string s in
+                       Cohttp_lwt_body.of_stream stream in
+                 lwt_log_info "(%s) RPC %s"
+                   (Cohttp.Connection.to_string con)
+                   (if Cohttp.Code.is_error code
+                    then "failed"
+                    else "success") >>= fun () ->
+                 let headers =
+                   Cohttp.Header.init_with "Content-Type" "application/json" in
+                 answer_with_cors_headers ~headers ~body (`Code code)

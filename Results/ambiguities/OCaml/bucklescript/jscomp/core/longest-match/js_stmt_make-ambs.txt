@@ -1,0 +1,15 @@
+Ambiguity 1: 
+| _ -> 
+    match declaration with 
+    | Some (kind, did) -> 
+      block [declare_variable ?comment ~kind did ;
+             { statement_desc = J.Int_switch (e,clauses, default); comment}]
+    | None ->  { statement_desc = J.Int_switch (e,clauses, default); comment}
+
+Ambiguity 2: 
+| _  -> 
+    match declaration with 
+    | Some (kind,did) -> 
+      block [declare_variable ?comment ~kind did ;
+             { statement_desc = String_switch (e,clauses, default); comment}]
+    | None -> { statement_desc = String_switch (e,clauses, default); comment}

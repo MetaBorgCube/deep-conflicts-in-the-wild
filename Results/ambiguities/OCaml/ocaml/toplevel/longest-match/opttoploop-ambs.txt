@@ -1,0 +1,11 @@
+Ambiguity 1: 
+| Result r ->
+        match Obj.magic r with
+          | Ok x -> Result x
+          | Err s -> fatal_error ("Opttoploop.dll_run " ^ s)
+
+Ambiguity 2: 
+| items ->
+     match pr_item env items with
+     | None -> []
+     | Some (tree, valopt, items) -> (tree, valopt) :: item_list env items

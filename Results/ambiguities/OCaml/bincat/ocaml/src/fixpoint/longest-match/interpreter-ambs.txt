@@ -1,0 +1,75 @@
+Ambiguity 1: 
+| s::stmts' ->
+             match s with
+             | Call _ | Return  | Jmp _ -> true
+             | If (_, tstmts, estmts)   -> (has_jmp tstmts) || (has_jmp estmts)
+             | _ 		        -> (has_jmp stmts')
+
+Ambiguity 2: 
+and process_vertices (vertices: Cfa.State.t list) (s: Asm.stmt): (Cfa.State.t list * bool) =
+        try
+          List.fold_left (fun (l, b) v -> let d, b' = process_value v.Cfa.State.v s fun_stack in v.Cfa.State.v <- d; v::l, b||b') ([], false) vertices
+        with Jmp_exn ->
+             match s with 
+             | If (e, then_stmts, else_stmts) -> process_if_with_jmp vertices e then_stmts else_stmts
+		
+             | Jmp (A a) ->
+		begin
+		  try
+		    let res = import_call vertices a (fun v -> Cfa.pred g (Cfa.pred g v)) fun_stack in
+		    fun_stack := List.tl !fun_stack;
+		    res
+		  with Not_found ->
+		    List.map (fun v -> v.Cfa.State.ip <- a; v) vertices, false		      
+		end
+		  
+             | Jmp (R target) ->
+		  fold_to_target (fun _a -> ()) vertices target (fun v -> Cfa.pred g (Cfa.pred g v))
+			 
+             | Call (A a) ->
+		begin
+		  try		   
+		    import_call vertices a (fun v -> Cfa.pred g v) fun_stack 
+		  with Not_found ->
+		    add_to_fun_stack a;
+		    List.iter (fun v -> v.Cfa.State.ip <- a) vertices;
+		    vertices, false
+		end
+	     | Call (R target) -> fold_to_target add_to_fun_stack vertices target (fun v -> Cfa.pred g v)
+		
+             | Return -> List.fold_left (fun (l, b) v ->
+			     let v', b' = process_ret fun_stack v in
+			     match v' with
+			     | None -> l, b||b'
+			     | Some v -> v::l, b||b') ([], false) vertices
+				  
+             | _       -> vertices, false
+			    
+      
+
+Ambiguity 3: 
+| Directive (Forget _) -> d, false 
+	| Directive (Remove r) -> D.add_register r d, false
+	| Directive (Taint _) -> D.forget d, false
+	| Directive (Type _) -> D.forget d, false
+	| Directive (Unroll _) -> d, false
+	| Directive (Unroll_until _) -> d, false
+	| Directive Default_unroll -> d, false
+	| Directive (Stub _) -> d, false
+	| Set (dst, src) -> back_set dst src d
+	| Assert (_bexp, _msg) -> d, false (* TODO *)
+	| If (e, istmts, estmts) ->
+	   match branch with
+	   | Some true -> let d', b = List.fold_left (fun (d, b) s -> let d', b' = back d s in d', b||b') (d, false) istmts in let v, b' = restrict d' e true in v, b||b'
+	   | Some false -> let d', b = List.fold_left (fun (d, b) s -> let d', b' = back d s in d', b||b') (d, false) estmts in let v, b' = restrict d' e false in v, b||b'
+	   | None -> D.forget d, false
+
+Ambiguity 4: 
+begin
+	     try process_if d e istmts estmts fun_stack
+	     with Jmp_exn ->
+	       match branch with
+	       | Some true -> List.fold_left (fun (d, b) stmt -> let d', b' = forward d stmt in d', b||b') (restrict d e true) istmts
+	       | Some false -> List.fold_left (fun (d, b) stmt -> let d', b' = forward d stmt in d', b||b') (restrict d e false) estmts
+	       | None -> L.abort (fun p -> p "Illegal call to Interpreter.forward_process")
+	   end

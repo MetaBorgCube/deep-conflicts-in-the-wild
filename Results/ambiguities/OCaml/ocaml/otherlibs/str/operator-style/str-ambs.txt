@@ -1,0 +1,10 @@
+Ambiguity 1: 
+regexp1cont sb i =
+    if i >= len
+    || i + 2 <= len && s.[i] = '\\' && (let c = s.[i+1] in c = '|' || c = ')')
+    then
+      (SeqBuffer.extract sb, i)
+    else
+      let (r, j) = regexp2 i in
+      SeqBuffer.add sb r;
+      regexp1cont sb j

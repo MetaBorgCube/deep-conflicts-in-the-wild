@@ -1,0 +1,15 @@
+Ambiguity 1: 
+| Some b ->
+        match Data_encoding.Binary.of_bytes Ed25519.Public_key.encoding b with
+        | None -> Lwt.return default
+        | Some pk -> Lwt.return pk
+
+Ambiguity 2: 
+| Some _ ->
+        get_sandboxed ctxt >>=? function
+        | None ->
+            fail Unimplemented_sandbox_migration
+        | Some _ ->
+            (* FIXME GRGR fail if parameter changed! *)
+            (* failwith "Changing sandbox parameter is not yet implemented" *)
+            return ctxt

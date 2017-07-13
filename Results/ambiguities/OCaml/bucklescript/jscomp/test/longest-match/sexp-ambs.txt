@@ -1,0 +1,17 @@
+Ambiguity 1: 
+| x::l' ->
+        match f x with
+        | None -> None
+        | Some y -> recurse (y::acc) l'
+
+Ambiguity 2: 
+| x::tl ->
+        match f x with
+        | Some _ as res -> res
+        | None -> _list_any f tl
+
+Ambiguity 3: 
+| x::tl ->
+        match f x with
+        | Some y -> _list_all f (y::acc) tl
+        | None -> _list_all f acc tl

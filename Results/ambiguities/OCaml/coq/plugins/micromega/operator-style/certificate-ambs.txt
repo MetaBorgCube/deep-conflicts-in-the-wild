@@ -1,0 +1,10 @@
+Ambiguity 1: 
+acc vect ->
+    if is_small acc
+    then acc
+    else 
+     match Fourier.optimise vect sys with
+     | None -> acc
+     | Some i -> 
+      if debug then Printf.printf "Found a new bound %a" Vect.pp_vect vect ;
+      select_best (vect,i) acc

@@ -1,0 +1,14 @@
+Ambiguity 1: 
+([|2;4|], 
+            let  x = [|1;2;3;4;5|] in 
+            Bs.Vector.filterInPlace (fun[@bs] x ->  x mod 2 = 0) x;
+            x
+
+           )
+
+Ambiguity 2: 
+( true, 
+             let  x= [|1;2;3;4;5|] in 
+             Bs.Vector.filterInPlace  (fun [@bs] x -> x > 10) x ;
+             Array.length x = 0
+           )

@@ -1,0 +1,9 @@
+Ambiguity 1: 
+let b = bucket t x
+    in
+    if b.parent = x then b
+    else
+      let b0 = find_bucket t b.parent
+      in
+      b.parent <- b0.parent;
+      b0

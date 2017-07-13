@@ -1,0 +1,21 @@
+Ambiguity 1: 
+| f :: fs ->
+        match f v with
+        | Some l -> l
+        | None -> loop fs
+
+Ambiguity 2: 
+| k :: ks ->
+        match List.fold_left merge k ks with
+        | `Fixed n -> `Fixed (n + tag_size sz)
+        | k -> k
+
+Ambiguity 3: 
+| Case { encoding = e ; proj ; tag = Some tag } ->
+            let write = w.write e in
+            let write v buf ofs =
+              write_tag sz tag buf ofs |> write v buf in
+            fun v ->
+              match proj v with
+              | None -> None
+              | Some v -> Some (write v)

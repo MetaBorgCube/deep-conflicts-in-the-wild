@@ -1,0 +1,2 @@
+Ambiguity 1: 
+| h, [] -> match List.rev h with x::t -> x, ([],t) | [] -> raise Empty

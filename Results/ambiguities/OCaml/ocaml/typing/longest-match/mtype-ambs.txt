@@ -1,0 +1,43 @@
+Ambiguity 1: 
+| item :: rem ->
+      let rem' = nondep_sig env va rem in
+      match item with
+        Sig_value(id, d) ->
+          Sig_value(id,
+                    {d with val_type = Ctype.nondep_type env mid d.val_type})
+          :: rem'
+      | Sig_type(id, d, rs) ->
+          Sig_type(id, Ctype.nondep_type_decl env mid id (va = Co) d, rs)
+          :: rem'
+      | Sig_typext(id, ext, es) ->
+          Sig_typext(id, Ctype.nondep_extension_constructor env mid ext, es)
+          :: rem'
+      | Sig_module(id, md, rs) ->
+          Sig_module(id, {md with md_type=nondep_mty env va md.md_type}, rs)
+          :: rem'
+      | Sig_modtype(id, d) ->
+          begin try
+            Sig_modtype(id, nondep_modtype_decl env d) :: rem'
+          with Not_found ->
+            match va with
+              Co -> Sig_modtype(id, {mtd_type=None; mtd_loc=Location.none;
+                                     mtd_attributes=[]}) :: rem'
+            | _  -> raise Not_found
+          end
+      | Sig_class(id, d, rs) ->
+          Sig_class(id, Ctype.nondep_class_declaration env mid d, rs)
+          :: rem'
+      | Sig_class_type(id, d, rs) ->
+          Sig_class_type(id, Ctype.nondep_cltype_declaration env mid d, rs)
+          :: rem'
+
+Ambiguity 2: 
+let rec rollback_path subst p =
+  try Pident (PathMap.find p subst)
+  with Not_found ->
+    match p with
+      Pident _ | Papply _ -> p
+    | Pdot (p1, s, n) ->
+        let p1' = rollback_path subst p1 in
+        if Path.same p1 p1' then p else rollback_path subst (Pdot (p1', s, n))
+

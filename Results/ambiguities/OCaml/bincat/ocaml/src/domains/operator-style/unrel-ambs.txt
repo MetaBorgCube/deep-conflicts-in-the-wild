@@ -1,0 +1,12 @@
+Ambiguity 1: 
+if o = upper_bound then upper_bound, []
+		  else
+		    let n = upper_bound-o in
+		    let z = D.of_word (Data.Word.of_int (Z.of_int (Char.code pad_char)) 8) in
+		    if pad_left then L.abort (fun p -> p "left padding in i_get_bytes not managed")
+		    else
+		      let chars = ref [] in
+		      for _i = 0 to n-1 do
+			chars := z::!chars
+		      done;
+		      upper_bound, !chars

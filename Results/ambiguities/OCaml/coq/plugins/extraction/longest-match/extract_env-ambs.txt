@@ -1,0 +1,25 @@
+Ambiguity 1: 
+| [] -> []
+    | d :: l ->
+      let meb =
+        Modops.destr_nofunctor (Global.lookup_module (MPfile d)).mod_type
+      in
+      match dir_opt with
+      | Some d' when DirPath.equal d d' -> [MPfile d, meb]
+      | _ -> (MPfile d, meb) :: (parse l)
+
+Ambiguity 2: 
+| r::l ->
+      let q = snd (qualid_of_reference r) in
+      let mpo = try Some (Nametab.locate_module q) with Not_found -> None
+      and ro =
+        try Some (Smartlocate.global_with_alias r)
+        with Nametab.GlobalizationError _ | UserError _ -> None
+      in
+      match mpo, ro with
+	| None, None -> Nametab.error_global_not_found q
+	| None, Some r -> let refs,mps = locate_ref l in r::refs,mps
+	| Some mp, None -> let refs,mps = locate_ref l in refs,mp::mps
+	| Some mp, Some r ->
+           warning_ambiguous_name (q,mp,r);
+           let refs,mps = locate_ref l in refs,mp::mps

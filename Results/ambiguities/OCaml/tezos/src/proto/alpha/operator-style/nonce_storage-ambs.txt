@@ -1,0 +1,20 @@
+Ambiguity 1: 
+fail_unless
+    Cycle_repr.(min_cycle <= level.Level_repr.cycle)
+    Too_late_revelation >>=? fun () ->
+  fail_unless
+    Raw_level_repr.(level.level < cur_level.level)
+    Too_early_revelation >>=? fun () ->
+  Storage.Seed.Nonce.get c level >>=? function
+  | Revealed _ ->
+      fail Previously_revealed_nonce
+  | Unrevealed { nonce_hash; delegate_to_reward ; reward_amount  } ->
+      return (nonce_hash, delegate_to_reward, reward_amount)
+
+Ambiguity 2: 
+get_unrevealed c level >>=? fun (nonce_hash, delegate_to_reward, reward_amount) ->
+  fail_unless
+    (Seed_repr.check_hash nonce nonce_hash)
+    Unexpected_nonce >>=? fun () ->
+  Storage.Seed.Nonce.set c level (Revealed nonce) >>=? fun c ->
+  return (c, delegate_to_reward, reward_amount)

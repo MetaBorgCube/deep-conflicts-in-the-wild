@@ -1,0 +1,35 @@
+Ambiguity 1: 
+let rec compute ~pure ck : 'a value =
+  let _, _, fix_exn, c = get ck in
+  match !c with
+  | Val (x, _) -> `Val x
+  | Exn (e, info) -> `Exn (e, info)
+  | Delegated wait -> wait (); compute ~pure ck
+  | Closure f ->
+      try
+        let data = f () in
+        let state = if pure then None else Some (!freeze ()) in
+        c := Val (data, state); `Val data
+      with e ->
+        let e = CErrors.push e in
+        let e = fix_exn e in
+        match e with
+        | (NotReady _, _) -> `Exn e
+        | _ -> c := Exn e; `Exn e
+
+
+
+Ambiguity 2: 
+| Exn _ as x -> x
+  | Val (v, None)   when pure -> Val (f v, None)
+  | Val (v, Some _) when pure -> Val (f v, None)
+  | Val (v, Some state) -> Closure (fun () -> !unfreeze state; f v)
+  | Val (v, None) ->
+      match !ck with
+      | Finished _ -> CErrors.anomaly(Pp.str
+          "Future.chain ~pure:false call on an already joined computation")
+      | Ongoing _ -> CErrors.anomaly(Pp.strbrk(
+          "Future.chain ~pure:false call on a pure computation. "^
+          "This can happen if the computation was initial created with "^
+          "Future.from_val or if it was Future.chain ~pure:true with a "^
+          "function and later forced."))

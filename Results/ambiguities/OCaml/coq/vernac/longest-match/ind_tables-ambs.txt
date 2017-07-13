@@ -1,0 +1,11 @@
+Ambiguity 1: 
+let find_scheme ?(mode=InternalTacticRequest) kind (mind,i as ind) =
+  try find_scheme_on_env_too kind ind
+  with Not_found ->
+  match Hashtbl.find scheme_object_table kind with
+  | s,IndividualSchemeFunction f ->
+      define_individual_scheme_base kind s f mode None ind
+  | s,MutualSchemeFunction f ->
+      let ca, eff = define_mutual_scheme_base kind s f mode [] mind in
+      ca.(i), eff
+

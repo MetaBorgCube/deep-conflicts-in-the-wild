@@ -1,0 +1,48 @@
+Ambiguity 1: 
+f h >>=? fun rh ->
+        map_s f t >>=? fun rt ->
+        return (rh :: rt)
+
+Ambiguity 2: 
+tx >>= fun x ->
+        tl >>= fun l ->
+        match x, l with
+        | Ok x, Ok l -> Lwt.return (Ok (x :: l))
+        | Error exn1, Error exn2 -> Lwt.return (Error (exn1 @ exn2))
+        | Ok _, Error exn
+        | Error exn, Ok _ -> Lwt.return (Error exn)
+
+Ambiguity 3: 
+f h1 h2 >>=? fun rh ->
+        map2_s f t1 t2 >>=? fun rt ->
+        return (rh :: rt)
+
+Ambiguity 4: 
+f h1 h2 >>? fun rh ->
+        map2 f t1 t2 >>? fun rt ->
+        Ok (rh :: rt)
+
+Ambiguity 5: 
+f h >>=? function
+        | None -> map_filter_s f t
+        | Some rh ->
+            map_filter_s f t >>=? fun rt ->
+            return (rh :: rt)
+
+Ambiguity 6: 
+tx >>= fun tx_res ->
+        tl >>= fun tl_res ->
+        match tx_res, tl_res with
+        | Ok (), Ok () -> Lwt.return (Ok ())
+        | Error exn1, Error exn2 -> Lwt.return (Error (exn1 @ exn2))
+        | Ok (), Error exn
+        | Error exn, Ok () -> Lwt.return (Error exn)
+
+Ambiguity 7: 
+| t :: ts ->
+        t >>= function
+        | Error _ as err ->
+            join ts >>=? fun () ->
+            Lwt.return err
+        | Ok () ->
+            join ts

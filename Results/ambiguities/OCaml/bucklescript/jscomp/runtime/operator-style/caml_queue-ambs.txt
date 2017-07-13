@@ -1,0 +1,19 @@
+Ambiguity 1: 
+push x q =
+  if q.length = 0 then
+    let rec cell = {
+      content = x;
+      next = cell
+    } in
+    q.length <- 1;
+    q.tail <- cell
+  else
+    let tail = q.tail in
+    let head = tail.next in
+    let cell = {
+      content = x;
+      next = head
+    } in
+    q.length <- q.length + 1;
+    tail.next <- cell;
+    q.tail <- cell

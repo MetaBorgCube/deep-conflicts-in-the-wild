@@ -1,0 +1,5 @@
+Ambiguity 1: 
+| None ->
+        match type_list with
+          [] | [_] -> false
+        | _ -> true

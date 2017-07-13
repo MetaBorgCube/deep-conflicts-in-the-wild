@@ -1,0 +1,24 @@
+Ambiguity 1: 
+| name :: [] ->
+          (
+           (* Only one name, no need for label for the description. *)
+           match Parameter.desc_by_name p name with
+             None -> []
+           | Some t -> t
+          )
+      | l ->
+          (*  A list of names, we display those with a description. *)
+          let l2 = List.filter (fun n -> (Parameter.desc_by_name p n) <> None) l in
+          match l2 with
+            [] -> []
+          | _ ->
+              [List
+                  (List.map
+                     (fun n ->
+                       match Parameter.desc_by_name p n with
+                         None -> [] (* should not occur *)
+                       | Some t -> [Code (n^" ") ; Raw ": "] @ t
+                     )
+                     l2
+                  )
+              ]

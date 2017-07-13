@@ -1,0 +1,91 @@
+Ambiguity 1: 
+Lwt_unix.connect socket (Lwt_unix.ADDR_INET (uaddr, port)) >>= fun () ->
+  let io_sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 14) () in
+  let conn = P2p_io_scheduler.register io_sched socket in
+  P2p_connection.authenticate
+    ~proof_of_work_target:Crypto_box.default_target
+    ~incoming:false
+    conn
+    (addr, port)
+    identity Distributed_db.Raw.supported_versions >>=? fun (_, auth_fd) ->
+  P2p_connection.accept auth_fd Distributed_db.Raw.encoding >>= function
+  | Error _ -> failwith "Connection rejected by peer."
+  | Ok conn ->
+      action conn >>=? fun () ->
+      P2p_connection.close conn >>= fun () ->
+      return ()
+
+Ambiguity 2: 
+lwt_log_notice "sending %a transaction" pp_short op_hash >>= fun () ->
+  send conn (Operation op_signed) >>=? fun () ->
+  lwt_log_notice
+    "requesting %a transaction %d times"
+    pp_short op_hash n  >>= fun () ->
+  let op_hashes = replicate n op_hash in
+  send conn (Get_operations op_hashes)
+
+Ambiguity 3: 
+lwt_log_notice
+    "propagating fake %d byte operation %a"
+    n Operation_hash.pp_short op_hashed >>= fun () ->
+  send conn (Operation op_faked) >>=? fun () ->
+  let block = signed (block_forged [op_hashed]) in
+  let block_hashed = Block_hash.hash_bytes [block] in
+  lwt_log_notice
+    "propagating block %a with operation"
+    Block_hash.pp_short block_hashed >>= fun () ->
+  send conn (Block block)
+
+Ambiguity 4: 
+lwt_log_notice
+    "propagating operation %a with wrong signature"
+    pp_short hashed_wrong_op >>= fun () ->
+  send conn (Operation signed_wrong_op) >>=? fun () ->
+  let block = signed (block_forged [hashed_wrong_op]) in
+  let block_hashed = Block_hash.hash_bytes [block] in
+  lwt_log_notice
+    "propagating block %a with operation"
+    Block_hash.pp_short block_hashed >>= fun () ->
+  send conn (Block block)
+
+Ambiguity 5: 
+lwt_log_notice
+      "propagating operation %a"
+      Operation_hash.pp_short op_hashed >>= fun () ->
+    send conn (Operation op_signed) >>=? fun () ->
+    lwt_log_notice
+      "propagating block %a"
+      Block_hash.pp_short block_hashed >>= fun () ->
+    send conn (Block block_signed)
+
+Ambiguity 6: 
+loop k =
+    if k < 1 then
+      return ()
+    else
+      let block = signed (block_forged ~prev:!prev_ref []) in
+      prev_ref := Block_hash.hash_bytes [block] ;
+      send conn (Block block) >>=? fun () ->
+      loop (k-1)
+
+Ambiguity 7: 
+lwt_log_notice "propogating %d transactions" n >>= fun () ->
+  loop n >>=? fun () ->
+  lwt_log_notice
+    "propagating block %a with wrong signature"
+    Block_hash.pp_short (Block_hash.hash_bytes [signed_block]) >>= fun () ->
+  send conn (Block signed_block)
+
+Ambiguity 8: 
+lwt () >>= function
+        | Ok () -> Lwt.return_unit
+        | Error err ->
+            lwt_log_error "Error: %a" pp_print_error err >>= fun () ->
+            Lwt.return_unit
+
+Ambiguity 9: 
+lwt n >>= function
+        | Ok () -> Lwt.return_unit
+        | Error err ->
+            lwt_log_error "Error: %a" pp_print_error err >>= fun () ->
+            Lwt.return_unit

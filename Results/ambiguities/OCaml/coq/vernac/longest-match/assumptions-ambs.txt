@@ -1,0 +1,77 @@
+Ambiguity 1: 
+|MoreFunctor (mbid,_,e) ->
+    match args with
+    | [] -> assert false (* we should only encounter applied functors *)
+    | mpa :: args ->
+      let subs = join (map_mbid mbid mpa empty_delta_resolver (*TODO*)) subs in
+      fields_of_functor f subs mp0 args e
+
+Ambiguity 2: 
+let rec lookup_module_in_impl mp =
+  try Global.lookup_module mp
+  with Not_found ->
+    (* The module we search might not be exported by its englobing module(s).
+       We access the upper layer, and then do a manual search *)
+    match mp with
+    | MPfile _ -> raise Not_found (* can happen if mp is an open module *)
+    | MPbound _ -> assert false
+    | MPdot (mp',lab') ->
+       let fields = memoize_fields_of_mp mp' in
+       search_mod_label lab' fields
+
+and memoize_fields_of_mp mp =
+  try MPmap.find mp !modcache
+  with Not_found ->
+    let l = fields_of_mp mp in
+    modcache := MPmap.add mp l !modcache;
+    l
+
+and fields_of_mp mp =
+  let mb = lookup_module_in_impl mp in
+  let fields,inner_mp,subs = fields_of_mb empty_subst mb [] in
+  let subs =
+    if mp_eq inner_mp mp then subs
+    else add_mp inner_mp mp mb.mod_delta subs
+  in
+  Modops.subst_structure subs fields
+
+and fields_of_mb subs mb args = match mb.mod_expr with
+  |Algebraic expr -> fields_of_expression subs mb.mod_mp args expr
+  |Struct sign -> fields_of_signature subs mb.mod_mp args sign
+  |Abstract|FullStruct -> fields_of_signature subs mb.mod_mp args mb.mod_type
+
+(** The Abstract case above corresponds to [Declare Module] *)
+
+and fields_of_signature x =
+  fields_of_functor
+    (fun subs mp0 args struc ->
+      assert (List.is_empty args);
+      (struc, mp0, subs)) x
+
+and fields_of_expr subs mp0 args = function
+  |MEident mp ->
+    let mb = lookup_module_in_impl (subst_mp subs mp) in
+    fields_of_mb subs mb args
+  |MEapply (me1,mp2) -> fields_of_expr subs mp0 (mp2::args) me1
+  |MEwith _ -> assert false (* no 'with' in [mod_expr] *)
+
+and fields_of_expression x = fields_of_functor fields_of_expr x
+
+Ambiguity 3: 
+let lookup_constant_in_impl cst fallback =
+  try
+    let mp,dp,lab = repr_kn (canonical_con cst) in
+    let fields = memoize_fields_of_mp mp in
+    (* A module found this way is necessarily closed, in particular
+       our constant cannot be in an opened section : *)
+    search_cst_label lab fields
+  with Not_found ->
+    (* Either:
+       - The module part of the constant isn't registered yet :
+         we're still in it, so the [constant_body] found earlier
+         (if any) was a true axiom.
+       - The label has not been found in the structure. This is an error *)
+    match fallback with
+      | Some cb -> cb
+      | None -> anomaly (str "Print Assumption: unknown constant " ++ pr_con cst)
+

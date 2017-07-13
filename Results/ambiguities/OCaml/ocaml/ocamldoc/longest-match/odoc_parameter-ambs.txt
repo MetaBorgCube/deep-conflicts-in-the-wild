@@ -1,0 +1,12 @@
+Ambiguity 1: 
+| Some i ->
+      match s with
+        "" -> None
+      | _ ->
+          try
+            Some (List.assoc s i.Odoc_types.i_params)
+          with
+            Not_found ->
+              print_DEBUG ("desc_from_info_opt "^s^" not found in\n");
+              List.iter (fun (s, _) -> print_DEBUG s) i.Odoc_types.i_params;
+              None

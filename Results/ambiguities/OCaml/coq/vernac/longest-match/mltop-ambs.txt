@@ -1,0 +1,9 @@
+Ambiguity 1: 
+| e when CErrors.noncritical e ->
+        let e = CErrors.push e in
+        match fst e with
+        | (UserError _ | Failure _ | Not_found as u) -> Exninfo.iraise (u, snd e)
+        | exc ->
+            let msg = report_on_load_obj_error exc in
+            user_err ~hdr:"Mltop.load_object" (str"Cannot link ml-object " ++
+                  str s ++ str" to Coq code (" ++ msg ++ str ").")

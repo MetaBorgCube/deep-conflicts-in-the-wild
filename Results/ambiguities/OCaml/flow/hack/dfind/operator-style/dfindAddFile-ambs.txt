@@ -1,0 +1,19 @@
+Ambiguity 1: 
+call (add_watch links env) path >>= fun () ->
+      call (wrap Unix.opendir) path >>= fun dir_handle ->
+      let files = get_files path dir_handle in
+      SSet.iter (fun x -> ignore (add_file links env x)) files;
+      (try Unix.closedir dir_handle with _ -> ());
+      let prev_files =
+        try SMap.find_unsafe path env.dirs
+        with Not_found -> SSet.empty in
+      let prev_files = SSet.union files prev_files in
+      let files = SSet.fold begin fun file all_files ->
+        try
+          let sub_dir = SMap.find_unsafe file env.dirs in
+          SSet.union sub_dir all_files
+        with Not_found ->
+          SSet.add file all_files
+      end files prev_files in
+      env.dirs <- SMap.add path files env.dirs;
+      return ()

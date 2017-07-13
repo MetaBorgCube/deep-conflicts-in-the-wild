@@ -1,0 +1,69 @@
+Ambiguity 1: 
+begin
+        Disk_table.known s.disk k >>= function
+        | true ->
+            Scheduler.notify_duplicate s.scheduler p k ;
+            Lwt.return_unit
+        | false ->
+            Scheduler.notify_unrequested s.scheduler p k ;
+            Lwt.return_unit
+      end
+
+Ambiguity 2: 
+begin
+        Disk_table.known s.disk k >>= function
+        | true ->
+            Lwt.return_false
+        | false ->
+            Memory_table.add s.memory k (Found v) ;
+            Lwt.return_true
+      end
+
+Ambiguity 3: 
+| Found v ->
+        Disk_table.store s.disk k v >>= fun _ ->
+        Memory_table.remove s.memory k ;
+        Lwt.return_unit
+
+Ambiguity 4: 
+let shutdown = state.cancelation () >|= fun () -> `Shutdown
+      and timeout = compute_timeout state >|= fun () -> `Timeout
+      and events = state.wait_events () >|= fun events -> `Events events in
+      Lwt.pick [ timeout ; events ; shutdown ] >>= function
+      | `Shutdown -> Lwt.return_unit
+      | `Events events ->
+          Lwt_list.iter_s process events >>= fun () ->
+          loop ()
+      | `Timeout ->
+          let now = Unix.gettimeofday () in
+          let active_peers = Request.active state.param in
+          let requests =
+            Table.fold
+              (fun key { peers ; next_request ; delay } acc ->
+                 if next_request > now +. 0.2 then
+                   acc
+                 else
+                   let still_peers = P2p.Peer_id.Set.inter peers active_peers in
+                   if P2p.Peer_id.Set.is_empty still_peers &&
+                      not (P2p.Peer_id.Set.is_empty peers) then
+                     ( Table.remove state.pending key ; acc )
+                   else
+                     let requested_peers =
+                       if P2p.Peer_id.Set.is_empty peers
+                       then active_peers
+                       else peers in
+                     let next = { peers = still_peers ;
+                                  next_request = now +. delay ;
+                                  delay = delay *. 1.2 } in
+                     Table.replace state.pending key next ;
+                     P2p.Peer_id.Set.fold
+                       (fun gid acc ->
+                          let requests =
+                            try key :: P2p_types.Peer_id.Map.find gid acc
+                            with Not_found -> [key] in
+                          P2p_types.Peer_id.Map.add gid requests acc)
+                       requested_peers
+                       acc)
+              state.pending P2p_types.Peer_id.Map.empty in
+          P2p_types.Peer_id.Map.iter (Request.send state.param) requests ;
+          loop ()

@@ -1,0 +1,8 @@
+Ambiguity 1: 
+strbrk "To rename arguments the \"rename\" flag must be specified."
+    ++ spc () ++
+       match !example_renaming with
+       | None -> mt ()
+       | Some (o,n) ->
+          str "Argument " ++ pr_name o ++
+            str " renamed to " ++ pr_name n ++ str "."

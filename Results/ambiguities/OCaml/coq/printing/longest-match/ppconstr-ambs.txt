@@ -1,0 +1,40 @@
+Ambiguity 1: 
+| Default b ->
+        match t with
+          | CHole (_,_,Misctypes.IntroAnonymous,_) ->
+            let s = prlist_with_sep spc pr_lname nal in
+            hov 1 (surround_implicit b s)
+          | _ ->
+            let s = prlist_with_sep spc pr_lname nal ++ str " : " ++ pr t in
+            hov 1 (if many then surround_impl b s else surround_implicit b s)
+
+Ambiguity 2: 
+| CLocalDef (na,c,topt) ->
+      surround (pr_lname na ++
+                pr_opt_no_spc (fun t -> str " :" ++ ws 1 ++ pr_c t) topt ++
+                str" :=" ++ spc() ++ pr_c c)
+    | CLocalPattern (loc,p,tyo) ->
+      let p = pr_patt lsimplepatt p in
+      match tyo with
+        | None ->
+          str "'" ++ p
+        | Some ty ->
+          str "'" ++ surround (p ++ spc () ++ str ":" ++ ws 1 ++ pr_c ty)
+
+Ambiguity 3: 
+| Some (loc, id) ->
+        match (ro : Constrexpr.recursion_order_expr) with
+          | CStructRec ->
+            let names_of_binder = function
+              | CLocalAssum (nal,_,_) -> nal
+              | CLocalDef (_,_,_) -> []
+              | CLocalPattern _ -> assert false
+            in let ids = List.flatten (List.map names_of_binder bl) in
+               if List.length ids > 1 then
+                 spc() ++ str "{" ++ keyword "struct" ++ spc () ++ pr_id id ++ str"}"
+               else mt()
+          | CWfRec c ->
+            spc() ++ str "{" ++ keyword "wf" ++ spc () ++ pr_aux c ++ spc() ++ pr_id id ++ str"}"
+          | CMeasureRec (m,r) ->
+            spc() ++ str "{" ++ keyword "measure" ++ spc () ++ pr_aux m ++ spc() ++ pr_id id++
+              (match r with None -> mt() | Some r -> str" on " ++ pr_aux r) ++ str"}"

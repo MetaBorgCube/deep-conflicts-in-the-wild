@@ -1,0 +1,5 @@
+Ambiguity 1: 
+Not_found ->
+    match default with
+    | Some x -> x
+    | None -> failwith (sprintf "This command must have %S in his environment" var)

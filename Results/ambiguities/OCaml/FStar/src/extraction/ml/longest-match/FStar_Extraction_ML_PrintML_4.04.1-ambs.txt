@@ -1,0 +1,26 @@
+Ambiguity 1: 
+| ["Prims"] ->
+     (* as in the original printer, stripping "Prims" from some constructors *)
+     let remove_qual = ["Some"; "None"] in
+     if (BatList.mem sym remove_qual) then
+       mk_lident sym
+     else
+       mk_lident (BatString.concat "." ["Prims"; sym])
+  | hd::tl ->
+     let m_name = !current_module in
+     let suffix, prefix =
+       try BatList.find_map (split_path l) codegen_libs with
+       | Not_found -> l, []
+     in
+       let path_abbrev = BatString.concat "_" suffix in
+       if (prefix = [] && BatString.equal m_name path_abbrev) then
+         (* remove circular references *)
+          mk_lident sym
+       else
+         match prefix with
+         | [] ->  Ldot(Lident path_abbrev, sym) |> mk_sym_lident
+         | p_hd::p_tl ->
+            let q = fold_left (fun x y -> Ldot (x,y)) (Lident p_hd) p_tl in
+            (match path_abbrev with
+             | "" -> Ldot(q, sym) |> mk_sym_lident
+             | _ -> Ldot(Ldot(q, path_abbrev), sym) |> mk_sym_lident)

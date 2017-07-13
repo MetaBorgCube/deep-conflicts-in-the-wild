@@ -1,0 +1,5 @@
+Ambiguity 1: 
+| hd :: tl ->
+           match img hd s1 with
+           | None -> extract tl
+           | Some v ->(hd,  v) :: extract tl

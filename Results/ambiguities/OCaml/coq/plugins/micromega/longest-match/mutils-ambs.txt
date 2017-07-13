@@ -1,0 +1,13 @@
+Ambiguity 1: 
+| (f,s)::l -> match f x with
+     | None -> try_any l x
+     | x -> x
+
+Ambiguity 2: 
+| j::rpos ->
+      match l with
+       | []   -> failwith "select_pos"
+       | e::l ->
+	  if Int.equal i j
+	  then e:: (xselect (i+1) rpos l)
+	  else xselect (i+1) lpos l

@@ -1,0 +1,26 @@
+Ambiguity 1: 
+let rec inter cmp interlbl def n histo t t' =
+  try
+    let (i,j) = List.assoc_f (raw_eq2 cmp) (t,t') histo in
+    Param (n-i-1,j)
+  with Not_found ->
+  match t, t' with
+  | Param (i,j), Param (i',j') ->
+      assert (Int.equal i i' && Int.equal j j'); t
+  | Node (x, a), Node (x', a') ->
+      (match interlbl x x' with
+      | None -> mk_node def [||]
+      | Some x'' -> Node (x'', Array.map2 (inter cmp interlbl def n histo) a a'))
+  | Rec (i,v), Rec (i',v') ->
+     (* If possible, we preserve the shape of input trees *)
+     if Int.equal i i' && Int.equal (Array.length v) (Array.length v') then
+       let histo = ((t,t'),(n,i))::histo in
+       Rec(i, Array.map2 (inter cmp interlbl def (n+1) histo) v v')
+     else
+     (* Otherwise, mutually recursive trees are transformed into nested trees *)
+       let histo = ((t,t'),(n,0))::histo in
+       Rec(0, [|inter cmp interlbl def (n+1) histo (expand t) (expand t')|])
+  | Rec _, _ -> inter cmp interlbl def n histo (expand t) t'
+  | _ , Rec _ -> inter cmp interlbl def n histo t (expand t')
+  | _ -> assert false
+

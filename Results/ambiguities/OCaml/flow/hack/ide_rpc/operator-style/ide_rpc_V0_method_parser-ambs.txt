@@ -1,0 +1,9 @@
+Ambiguity 1: 
+get_client_name_field params >>= fun client_name ->
+  get_client_api_version_field params >>= fun client_api_version ->
+  Result.Ok { client_name; client_api_version; }
+
+Ambiguity 2: 
+get_filename_filed params >>= fun did_open_file_filename ->
+  get_text_field params >>= fun did_open_file_text ->
+  Result.Ok { did_open_file_filename; did_open_file_text; }

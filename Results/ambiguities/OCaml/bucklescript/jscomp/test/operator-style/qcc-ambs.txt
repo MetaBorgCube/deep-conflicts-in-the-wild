@@ -1,0 +1,29 @@
+Ambiguity 1: 
+binary stk lvl =
+  if lvl = -1 then unary stk else
+  let lvlof o =
+    if not (List.mem_assoc o lvls) then -1 else
+    List.assoc o lvls in
+  let rec fold () =
+    match next () with
+    | Op o when lvlof o = lvl ->
+      push 0;                   (* push %rax            *)
+      binary stk (lvl-1);
+      pop 1;                    (* pop %rcx             *)
+      begin match List.assoc o inss with
+      | Bin ops -> List.iter out ops
+      | Cmp c -> out 0x4839c1; cmp c
+      end;
+      fold ()
+    | t -> unnext t in
+  let rec foldtst loc =
+    match next () with
+    | Op o when lvlof o = lvl ->
+      let loc' = test (lvl-8) loc in
+      binary stk (lvl-1);
+      foldtst loc'
+    | t -> unnext t; loc in
+  binary stk (lvl-1);
+  if lvl < 8 then fold () else
+  let loc = foldtst 0 in
+  patch true loc !opos

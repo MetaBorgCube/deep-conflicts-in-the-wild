@@ -1,0 +1,10 @@
+Ambiguity 1: 
+let (v2, _) = Hashtbl.find q k in
+    if not (cmp v v2) then
+      let nv =
+        try v :: StrListMap.find k !clq
+        with Not_found -> [v; v2]
+      in
+      clq := StrListMap.add k nv !clq;
+      (* overwrite previous bindings, as coqc does *)
+      Hashtbl.add q k (v, b)

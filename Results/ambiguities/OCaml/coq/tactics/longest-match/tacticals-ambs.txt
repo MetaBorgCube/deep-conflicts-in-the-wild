@@ -1,0 +1,36 @@
+Ambiguity 1: 
+begin function (e, info) -> match e with
+            | SizeMismatch (i,_)->
+                let errmsg =
+                  str"Incorrect number of goals" ++ spc() ++
+                  str"(expected "++int i++str(String.plural i " tactic") ++ str")"
+                in
+                tclFAIL 0 errmsg
+            | reraise -> tclZERO ~info reraise
+          end
+
+Ambiguity 2: 
+begin function (e, info) -> match e with
+            | SizeMismatch (i,_)->
+                let errmsg =
+                  str"Incorrect number of goals" ++ spc() ++
+                  str"(expected "++int i++str(String.plural i " tactic") ++ str")"
+                in
+                tclFAIL 0 errmsg
+            | reraise -> tclZERO ~info reraise
+          end
+
+Ambiguity 3: 
+| Evd.Evar_defined c -> match Term.kind_of_term c with
+        | Term.Evar (evk,l) -> is_undefined_up_to_restriction sigma evk
+        | _ -> 
+          (* We make the assumption that there is no way to refine an
+            evar remaining after typing from the initial term given to
+            apply/elim and co tactics, is it correct? *)
+          None
+
+Ambiguity 4: 
+begin function (e, info) -> match e with
+        | Proofview.Timeout as e -> Proofview.tclZERO (Refiner.FailError (0,lazy (CErrors.print e)))
+        | e -> Proofview.tclZERO ~info e
+      end

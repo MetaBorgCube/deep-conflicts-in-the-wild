@@ -1,0 +1,19 @@
+Ambiguity 1: 
+| _ ->
+        let menhirError = Syntax_util.findMenhirErrorMessage loc in
+        match menhirError with
+          | Syntax_util.MenhirMessagesError errMessage ->
+              [Ast_helper.Str.mk ~loc:errMessage.Syntax_util.loc (Parsetree.Pstr_extension (Syntax_util.syntax_error_extension_node errMessage.Syntax_util.loc errMessage.Syntax_util.msg, []))]
+          | _ ->
+              [Ast_helper.Str.mk ~loc:loc (Parsetree.Pstr_extension (Syntax_util.syntax_error_extension_node loc invalidLex, []))]
+
+Ambiguity 2: 
+| Some triple ->
+              (* We just recovered from the error state, try the original token again *)
+              let checkpoint_with_previous_token = I.offer checkpoint triple in
+              match I.shifts checkpoint_with_previous_token with
+              | None ->
+                (* The original token still fail to be parsed, discard *)
+                loop_handle_yacc supplier false checkpoint
+              | Some env ->
+                loop_handle_yacc supplier false checkpoint_with_previous_token

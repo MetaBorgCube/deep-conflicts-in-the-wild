@@ -1,0 +1,40 @@
+Ambiguity 1: 
+make_nat len =
+  if len < 0 then invalid_arg "make_nat" else
+    let res = create_nat len in set_to_zero_nat res 0 len; res
+
+Ambiguity 2: 
+let len = num_digits_nat nat off len_nat in
+  if len = 1 then
+       raw_string_of_digit nat off
+  else
+       let len_copy = ref (succ len) in
+       let copy1 = create_nat !len_copy
+       and copy2 = make_nat !len_copy
+       and rest_digit = make_nat 2 in
+         if len > biggest_int / (succ pmax)
+            then failwith "number too long"
+            else let len_s = (succ pmax) * len in
+                 let s = Bytes.make len_s '0'
+                 and pos_ref = ref len_s in
+                   len_copy := pred !len_copy;
+                   blit_nat copy1 0 nat off len;
+                   set_digit_nat copy1 len 0;
+                   while not (is_zero_nat copy1 0 !len_copy) do
+                      div_digit_nat copy2 0
+                                     rest_digit 0
+                                     copy1 0 (succ !len_copy)
+                                     power_base_max 0;
+                      let str = raw_string_of_digit rest_digit 0 in
+                      String.blit str 0
+                                  s (!pos_ref - String.length str)
+                                  (String.length str);
+                      (* XL: il y avait pmax a la place de String.length str
+                         mais ca ne marche pas avec le blit de Caml Light,
+                         qui ne verifie pas les debordements *)
+                      pos_ref := !pos_ref - pmax;
+                      len_copy := num_digits_nat copy2 0 !len_copy;
+                      blit_nat copy1 0 copy2 0 !len_copy;
+                      set_digit_nat copy1 !len_copy 0
+                   done;
+                   Bytes.unsafe_to_string s

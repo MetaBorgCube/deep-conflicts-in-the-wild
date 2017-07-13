@@ -1,0 +1,31 @@
+Ambiguity 1: 
+Client_blocks.get_block_hash rpc_config block >>=? fun pred ->
+  Client_node_rpcs.Blocks.level rpc_config block >>=? fun level ->
+  let proto_level =
+    match command with
+    | Data.Command.Activate _ -> 1
+    | Data.Command.Activate_testnet (_,_) -> 0 in
+  call_service1 rpc_config
+    Services.Forge.block block
+    ((net_id, Int32.succ  level, proto_level,
+      pred, timestamp, fitness), command)
+
+Ambiguity 2: 
+Client_blocks.get_block_info rpc_config block >>=? fun bi ->
+  forge_block
+    rpc_config ?timestamp block bi.net_id command fitness >>=? fun blk ->
+  let signed_blk = Environment.Ed25519.Signature.append seckey blk in
+  Client_node_rpcs.inject_block rpc_config signed_blk [[]]
+
+Ambiguity 3: 
+mine cctxt.rpc_config ?timestamp cctxt.config.block
+           (Activate hash) fitness seckey >>=? fun hash ->
+         cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
+         return ()
+
+Ambiguity 4: 
+mine cctxt.rpc_config ?timestamp cctxt.config.block
+        (Activate_testnet (hash, Int64.mul 24L 3600L))
+        fitness seckey >>=? fun hash ->
+      cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
+      return ()

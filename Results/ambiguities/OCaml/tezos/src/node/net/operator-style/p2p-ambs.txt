@@ -1,0 +1,63 @@
+Ambiguity 1: 
+create_connection_pool
+      config limits meta_cfg msg_cfg io_sched >>= fun pool ->
+    let discoverer = may_create_discovery_worker config pool in
+    let maintenance = create_maintenance_worker limits pool discoverer in
+    may_create_welcome_worker config limits pool >>= fun welcome ->
+    Lwt.return {
+      config ;
+      limits ;
+      io_sched ;
+      pool ;
+      discoverer ;
+      maintenance ;
+      welcome ;
+    }
+
+Ambiguity 2: 
+Lwt_utils.may ~f:P2p_welcome.shutdown net.welcome >>= fun () ->
+    P2p_maintenance.shutdown net.maintenance >>= fun () ->
+    Lwt_utils.may ~f:P2p_discovery.shutdown net.discoverer >>= fun () ->
+    P2p_connection_pool.destroy net.pool >>= fun () ->
+    P2p_io_scheduler.shutdown ~timeout:3.0 net.io_sched
+
+Ambiguity 3: 
+P2p_connection_pool.read conn >>=? fun msg ->
+    lwt_debug "message read from %a"
+      Connection_info.pp
+      (P2p_connection_pool.Connection.info conn) >>= fun () ->
+    return msg
+
+Ambiguity 4: 
+Lwt.pick (
+      ( P2p_connection_pool.Pool_event.wait_new_connection net.pool >>= fun () ->
+        Lwt.return_none )::
+      pipes) >>= function
+    | None -> recv_any net ()
+    | Some conn ->
+        P2p_connection_pool.read conn >>= function
+        | Ok msg ->
+            lwt_debug "message read from %a"
+              Connection_info.pp
+              (P2p_connection_pool.Connection.info conn) >>= fun () ->
+            Lwt.return (conn, msg)
+        | Error _ ->
+            lwt_debug "error reading message from %a"
+              Connection_info.pp
+              (P2p_connection_pool.Connection.info conn) >>= fun () ->
+            Lwt_unix.yield () >>= fun () ->
+            recv_any net ()
+
+Ambiguity 5: 
+P2p_connection_pool.write conn m >>= function
+    | Ok () ->
+        lwt_debug "message sent to %a"
+          Connection_info.pp
+          (P2p_connection_pool.Connection.info conn) >>= fun () ->
+        return ()
+    | Error err ->
+        lwt_debug "error sending message from %a: %a"
+          Connection_info.pp
+          (P2p_connection_pool.Connection.info conn)
+          pp_print_error err >>= fun () ->
+        Lwt.return (Error err)

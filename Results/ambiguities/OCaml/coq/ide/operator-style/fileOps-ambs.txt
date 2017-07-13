@@ -1,0 +1,21 @@
+Ambiguity 1: 
+| Some f ->
+        if not buffer#modified then do_revert f
+        else
+          let answ = GToolbox.question_box
+            ~title:"Modified buffer changed on disk"
+            ~buttons:["Revert from File";
+                      "Overwrite File";
+                      "Disable Auto Revert"]
+            ~default:0
+            ~icon:(stock_to_widget `DIALOG_WARNING)
+            "Some unsaved buffers changed on disk"
+          in
+          match answ with
+            | 1 -> do_revert f
+            | 2 -> if self#save f then flash_info "Overwritten" else
+                flash_info "Could not overwrite file"
+            | _ ->
+              Minilib.log "Auto revert set to false";
+              Preferences.global_auto_revert#set false;
+              revert_timer.kill ()

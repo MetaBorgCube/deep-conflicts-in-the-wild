@@ -1,0 +1,8 @@
+Ambiguity 1: 
+forest' =
+        if Stack.is_empty t'.eval_stack then evaluated_tree :: t'.forest
+        else
+          let parent = match Stack.pop_exn t'.eval_stack with
+              Tree (node, children), ntd -> Tree (node, evaluated_tree :: children), ntd in
+          Stack.push t'.eval_stack parent;
+          t'.forest

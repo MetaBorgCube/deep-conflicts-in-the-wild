@@ -1,0 +1,24 @@
+Ambiguity 1: 
+begin try
+        Ctype.unify env self_type cl_sig.csig_self
+      with Ctype.Unify trace ->
+        match trace with
+          _::_::_::({desc = Tfield(n, _, _, _)}, _)::rem ->
+            raise(Error(loc, env, Field_type_mismatch ("method", n, rem)))
+        | _ ->
+            assert false
+      end
+
+Ambiguity 2: 
+| _ ->
+            match sargs @ more_sargs with
+              (l, sarg0)::_ ->
+                if omitted <> [] then
+                  raise(Error(sarg0.pexp_loc, val_env, Apply_wrong_label l))
+                else
+                  raise(Error(cl.cl_loc, val_env, Cannot_apply cl.cl_type))
+            | [] ->
+                (List.rev args,
+                 List.fold_left
+                   (fun ty_fun (l,ty) -> Cty_arrow(l,ty,ty_fun))
+                   ty_fun0 omitted)

@@ -1,0 +1,60 @@
+Ambiguity 1: 
+add x q =
+  if q.length = 0 then
+    let rec cell = {
+      content = x;
+      next = cell
+    } in
+    q.length <- 1;
+    q.tail <- cell
+  else
+    let tail = q.tail in
+    let head = tail.next in
+    let cell = {
+      content = x;
+      next = head
+    } in
+    q.length <- q.length + 1;
+    tail.next <- cell;
+    q.tail <- cell
+
+Ambiguity 2: 
+copy q =
+  if q.length = 0 then
+    create()
+  else
+    let tail = q.tail in
+
+    let rec tail' = {
+      content = tail.content;
+      next = tail'
+    } in
+
+    let rec copy prev cell =
+      if cell != tail
+      then let res = {
+        content = cell.content;
+        next = tail'
+      } in prev.next <- res;
+      copy res cell.next in
+
+    copy tail' tail.next;
+    {
+      length = q.length;
+      tail = tail'
+    }
+
+Ambiguity 3: 
+let length1 = q1.length in
+  if length1 > 0 then
+    let tail1 = q1.tail in
+    clear q1;
+    if q2.length > 0 then begin
+      let tail2 = q2.tail in
+      let head1 = tail1.next in
+      let head2 = tail2.next in
+      tail1.next <- head2;
+      tail2.next <- head1
+    end;
+    q2.length <- q2.length + length1;
+    q2.tail <- tail1

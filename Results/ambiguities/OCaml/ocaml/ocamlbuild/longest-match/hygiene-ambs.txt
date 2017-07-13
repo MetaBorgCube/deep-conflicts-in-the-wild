@@ -1,0 +1,11 @@
+Ambiguity 1: 
+| x :: rest ->
+        match f x with
+        | None -> loop result rest
+        | Some y -> loop (y :: result) rest
+
+Ambiguity 2: 
+| x :: rest ->
+        match f x with
+        | None -> loop rest
+        | y -> y

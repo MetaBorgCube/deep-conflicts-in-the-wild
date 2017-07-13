@@ -1,0 +1,5 @@
+Ambiguity 1: 
+protocol >>= fun protocol ->
+      get_method_name message protocol >>= fun method_name ->
+      get_params message protocol >>= fun params ->
+      Result.Ok { method_name; params; }

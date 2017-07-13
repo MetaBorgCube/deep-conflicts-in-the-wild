@@ -1,0 +1,17 @@
+Ambiguity 1: 
+Data.Init.may_initialize ctxt >>=? fun ctxt ->
+  Lwt.return (parse_block raw_block) >>=? fun block ->
+  check_signature ctxt block >>=? fun () ->
+  let fitness = raw_block.shell.fitness in
+  match block.command with
+  | Data.Command.Activate hash ->
+      let message =
+        Some (Format.asprintf "activate %a" Protocol_hash.pp_short hash) in
+      Updater.activate ctxt hash >>= fun ctxt ->
+      return { Updater.message ; context = ctxt ; fitness }
+  | Activate_testnet (hash, delay) ->
+      let message =
+        Some (Format.asprintf "activate testnet %a" Protocol_hash.pp_short hash) in
+      let expiration = Time.add raw_block.shell.timestamp delay in
+      Updater.fork_test_network ctxt hash expiration >>= fun ctxt ->
+      return { Updater.message ; context = ctxt ; fitness }

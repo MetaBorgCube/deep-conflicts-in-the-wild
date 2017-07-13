@@ -1,0 +1,100 @@
+Ambiguity 1: 
+| f :: rest ->
+        match f exn with
+        | Some _ as r -> r
+        | None -> loop rest
+
+Ambiguity 2: 
+| Unattached ->
+           prerr_warning ds.ds_loc (Warnings.Bad_docstring true)
+         | Docs ->
+             match ds.ds_associated with
+             | Zero | One -> ()
+             | Many ->
+               prerr_warning ds.ds_loc (Warnings.Bad_docstring false)
+
+Ambiguity 3: 
+| a::l -> 
+    match p a with
+    | None -> for_all_opt p l
+    | v -> v
+
+Ambiguity 4: 
+| x :: l -> 
+    match  p x with 
+    | Some _ as v  ->  v
+    | None -> find_opt p l
+
+Ambiguity 5: 
+(function x -> 
+     match x with 
+     | Error error_info -> 
+       Some (Format.asprintf "%a" pp_error error_info)
+
+     | _ -> None
+    )
+
+Ambiguity 6: 
+| key1::rest -> 
+    eq_key key   key1 ||
+    match rest with 
+    | [] -> false 
+    | key2 :: rest -> 
+      eq_key key   key2 ||
+      match rest with 
+      | [] -> false 
+      | key3 :: rest -> 
+        eq_key key   key3 ||
+        small_bucket_mem eq_key key rest
+
+Ambiguity 7: 
+let implem ast =
+    try
+      let fields, ast =
+        match ast with
+        | {pstr_desc = Pstr_attribute ({txt = "ocaml.ppx.context"}, x)} :: l ->
+            PpxContext.get_fields x, l
+        | _ -> [], ast
+      in
+      PpxContext.restore fields;
+      let mapper = mapper () in
+      let ast = mapper.structure mapper ast in
+      let fields = PpxContext.update_cookies fields in
+      Str.attribute (PpxContext.mk fields) :: ast
+    with exn ->
+      match error_of_exn exn with
+      | Some error ->
+          [{pstr_desc = Pstr_extension (extension_of_error error, []);
+            pstr_loc  = Location.none}]
+      | None -> raise exn
+  in
+  let iface ast =
+    try
+      let fields, ast =
+        match ast with
+        | {psig_desc = Psig_attribute ({txt = "ocaml.ppx.context"}, x)} :: l ->
+            PpxContext.get_fields x, l
+        | _ -> [], ast
+      in
+      PpxContext.restore fields;
+      let mapper = mapper () in
+      let ast = mapper.signature mapper ast in
+      let fields = PpxContext.update_cookies fields in
+      Sig.attribute (PpxContext.mk fields) :: ast
+    with exn ->
+      match error_of_exn exn with
+      | Some error ->
+          [{psig_desc = Psig_extension (extension_of_error error, []);
+            psig_loc  = Location.none}]
+      | None -> raise exn
+  in
+  let ast =
+    if magic = Config.ast_impl_magic_number
+    then Obj.magic (implem (Obj.magic ast))
+    else Obj.magic (iface (Obj.magic ast))
+  in
+  let oc = open_out_bin target in
+  output_string oc magic;
+  output_value oc !Location.input_name;
+  output_value oc ast;
+  close_out oc

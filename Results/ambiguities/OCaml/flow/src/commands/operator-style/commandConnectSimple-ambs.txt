@@ -1,0 +1,10 @@
+Ambiguity 1: 
+Timeout.with_timeout
+      ~timeout:1
+      ~on_timeout:(fun _ -> raise ConnectTimeout)
+      ~do_:begin fun timeout ->
+        establish_connection ~timeout ~tmp_dir root >>= fun (sockaddr, (ic, oc)) ->
+        get_cstate ~timeout sockaddr ic oc
+      end >>= fun (ic, oc, cstate) ->
+      verify_cstate ic cstate >>= fun () ->
+      Result.Ok (ic, oc)

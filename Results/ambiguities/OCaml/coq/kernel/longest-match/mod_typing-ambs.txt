@@ -1,0 +1,12 @@
+Ambiguity 1: 
+|MEwith _ -> assert false (* No 'with' syntax for modules *)
+  |MEident mp1 ->
+    let mb = lookup_module mp1 env in
+    match mb.mod_type, mb.mod_type_alg, mb.mod_expr with
+    |MoreFunctor _, Some _, _ ->
+      (* functor + restricted signature = error *)
+      error_include_restricted_functor mp1
+    |MoreFunctor _, None, Algebraic me ->
+      (* functor, no signature yet, a definition which may be restricted *)
+      forbid_incl_signed_functor env (unfunct me)
+    |_ -> ()

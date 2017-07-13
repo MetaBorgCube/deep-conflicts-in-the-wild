@@ -1,0 +1,15 @@
+Ambiguity 1: 
+let n = String.length s in
+    if n mod 2 <> 0 then
+      failwith "string_of_hex: invalid length"
+    else
+      let res = Bytes.create (n/2) in
+      let rec aux i =
+        if i >= n then ()
+        else (
+          Bytes.set res (i/2) (hex_to_char s.[i] s.[i+1]);
+          aux (i+2)
+        )
+      in
+      aux 0;
+      res

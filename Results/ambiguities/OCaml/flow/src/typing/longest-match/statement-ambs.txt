@@ -1,0 +1,17 @@
+Ambiguity 1: 
+| None ->
+            match if_uninitialized with
+            | Some f ->
+              if not optional
+              then init_var cx name ~has_anno (f loc) id_loc
+            | None ->
+              if has_anno
+              then Env.pseudo_init_declared_type cx name id_loc
+              else declare_var cx name id_loc
+
+Ambiguity 2: 
+Ast.Class.(function {id; _;} ->
+  match id with
+  | Some(name_loc, name) -> (name_loc, name)
+  | None -> (class_loc, "<<anonymous class>>")
+)

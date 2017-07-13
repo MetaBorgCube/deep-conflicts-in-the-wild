@@ -1,0 +1,58 @@
+Ambiguity 1: 
+| Some _ -> false
+	| None ->
+          match Notation.current_type_scope_name () with
+          | Some type_scope ->
+              let is_type_scope = match env.tmp_scope with
+              | None -> false
+              | Some sc -> String.equal sc type_scope
+              in
+              is_type_scope ||
+              String.List.mem type_scope env.scopes
+          | None -> false
+
+Ambiguity 2: 
+| Some (n, head, pl) ->
+          let pl =
+            if !asymmetric_patterns then pl else
+            let pars = List.make n (CPatAtom (loc, None)) in
+            List.rev_append pars pl in
+	  match drop_syndef top scopes head pl with
+	    |Some (a,b,c) -> RCPatCstr(loc, a, b, c)
+	    |None -> raise (InternalizationError (loc,NotAConstructor head))
+
+Ambiguity 3: 
+| (a,e)::l ->
+      let (eargs,rargs) = aux l in
+      match e with
+      | None -> (eargs,a::rargs)
+      | Some (loc,pos) ->
+	  let id = match pos with
+	  | ExplByName id ->
+	      if not (exists_implicit_name id imps) then
+		user_err ~loc 
+		  (str "Wrong argument name: " ++ pr_id id ++ str ".");
+	      if Id.Map.mem id eargs then
+		user_err ~loc  (str "Argument name " ++ pr_id id
+		++ str " occurs more than once.");
+	      id
+	  | ExplByPos (p,_id) ->
+	      let id =
+		try
+		  let imp = List.nth imps (p-1) in
+		  if not (is_status_implicit imp) then failwith "imp";
+		  name_of_implicit imp
+		with Failure _ (* "nth" | "imp" *) ->
+		  user_err ~loc 
+		    (str"Wrong argument position: " ++ int p ++ str ".")
+	      in
+	      if Id.Map.mem id eargs then
+		user_err ~loc  (str"Argument at position " ++ int p ++
+		  str " is mentioned more than once.");
+	      id in
+	  (Id.Map.add id (loc, a) eargs, rargs)
+
+Ambiguity 4: 
+| l -> match f with 
+      | GApp (loc', g, args) -> GApp (Loc.merge loc' loc, g, args@l)
+      | _ -> GApp (Loc.merge (loc_of_glob_constr f) loc, f, l)

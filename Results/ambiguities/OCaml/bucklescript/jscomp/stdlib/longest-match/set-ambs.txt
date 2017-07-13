@@ -1,0 +1,31 @@
+Ambiguity 1: 
+| (t1, Empty) -> Empty
+      | (Node(l1, v1, r1, _), t2) ->
+          match split v1 t2 with
+            (l2, false, r2) ->
+              concat (inter l1 l2) (inter r1 r2)
+          | (l2, true, r2) ->
+              join (inter l1 l2) v1 (inter r1 r2)
+
+Ambiguity 2: 
+| (t1, Empty) -> t1
+      | (Node(l1, v1, r1, _), t2) ->
+          match split v1 t2 with
+            (l2, false, r2) ->
+              join (diff l1 l2) v1 (diff r1 r2)
+          | (l2, true, r2) ->
+              concat (diff l1 l2) (diff r1 r2)
+
+Ambiguity 3: 
+| 1, x0 :: l -> Node (Empty, x0, Empty, 1), l
+        | 2, x0 :: x1 :: l -> Node (Node(Empty, x0, Empty, 1), x1, Empty, 2), l
+        | 3, x0 :: x1 :: x2 :: l ->
+            Node (Node(Empty, x0, Empty, 1), x1, Node(Empty, x2, Empty, 1), 2),l
+        | n, l ->
+          let nl = n / 2 in
+          let left, l = sub nl l in
+          match l with
+          | [] -> assert false
+          | mid :: l ->
+            let right, l = sub (n - nl - 1) l in
+            create left mid right, l

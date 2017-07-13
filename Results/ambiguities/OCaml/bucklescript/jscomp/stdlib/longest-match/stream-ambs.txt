@@ -1,0 +1,7 @@
+Ambiguity 1: 
+| Sgen ({curr = Some _} as g) -> set_count s (succ s.count); g.curr <- None
+  | Sbuffio b -> set_count s (succ s.count); b.ind <- succ b.ind
+  | _ ->
+      match peek s with
+        None -> ()
+      | Some _ -> junk s
