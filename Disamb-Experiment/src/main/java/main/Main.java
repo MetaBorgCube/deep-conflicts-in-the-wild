@@ -7,7 +7,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -228,7 +227,7 @@ public class Main {
 			// FIXME the problematic files cause a stack overflow in SGLR when
 			// imploding
 			if (checkProblematicFiles(f, debugLogger, resultLogger)) {
-				probfilesLogger.info(f.getAbsolutePath());
+				probfilesLogger.info(f.getPath());
 				continue;
 			}
 
@@ -238,7 +237,7 @@ public class Main {
 			}
 			i++;
 
-			debugLogger.info(f.getAbsolutePath());
+			debugLogger.info(f.getPath());
 			resultLogger.info(f.getName() + ";");
 
 			long lineCount;
@@ -250,7 +249,7 @@ public class Main {
 				debugLogger.info("Could not open file.");
 				resultLogger.info("could not open file");
 				e.printStackTrace();
-				probfilesLogger.info(f.getAbsolutePath());
+				probfilesLogger.info(f.getPath());
 				continue;
 			}
 
@@ -264,7 +263,7 @@ public class Main {
 				debugLogger.info("Could not create individual parse table.");
 				resultLogger.info("could not create individual parse table;");
 				e.printStackTrace();
-				probfilesLogger.info(f.getAbsolutePath());
+				probfilesLogger.info(f.getPath());
 				continue;
 			}
 
@@ -277,7 +276,7 @@ public class Main {
 				debugLogger.info("Parsing failed with exception {}", e.getMessage());
 				resultLogger.info("parsing failed.");
 				e.printStackTrace();
-				probfilesLogger.info(f.getAbsolutePath());
+				probfilesLogger.info(f.getPath());
 				continue;
 			}
 
@@ -288,7 +287,7 @@ public class Main {
 				debugLogger.info("Parsing failed with exception {}", e.getMessage());
 				resultLogger.info("parsing failed.");
 				e.printStackTrace();
-				probfilesLogger.info(f.getAbsolutePath());
+				probfilesLogger.info(f.getPath());
 				continue;
 			}
 
@@ -299,7 +298,7 @@ public class Main {
 				debugLogger.info("Operator-style ambiguity parser failed with exception {}", e.getMessage());
 				resultLogger.info("operator-style parsing failed.");
 				e.printStackTrace();
-				probfilesLogger.info(f.getAbsolutePath());
+				probfilesLogger.info(f.getPath());
 				continue;
 			}
 
@@ -310,7 +309,7 @@ public class Main {
 				debugLogger.info("Dangling else parser failed with exception {}", e.getMessage());
 				resultLogger.info("dangling else parsing failed.");
 				e.printStackTrace();
-				probfilesLogger.info(f.getAbsolutePath());
+				probfilesLogger.info(f.getPath());
 				continue;
 			}
 
@@ -321,7 +320,7 @@ public class Main {
 				debugLogger.info("Longest match parser failed with exception {}", e.getMessage());
 				resultLogger.info("longest match parsing failed.");
 				e.printStackTrace();
-				probfilesLogger.info(f.getAbsolutePath());
+				probfilesLogger.info(f.getPath());
 				continue;
 			}
 
@@ -334,7 +333,7 @@ public class Main {
 			if (!ast.equals(individualAst)) {
 				debugLogger.info("AST from local parser is different from AST from global parser.");
 				resultLogger.info("local and global asts are different;");
-				probfilesLogger.info(f.getAbsolutePath());
+				probfilesLogger.info(f.getPath());
 				continue;
 			}
 
@@ -349,7 +348,7 @@ public class Main {
 			if (ambs != 0) {
 				debugLogger.info("Original input contains ambiguities");
 				resultLogger.info("input contains ambiguities;");
-				probfilesLogger.info(f.getAbsolutePath());
+				probfilesLogger.info(f.getPath());
 				continue;
 			}
 
@@ -401,7 +400,7 @@ public class Main {
 
 			countBrackets(ast, ptg, debugLogger, resultLogger);
 
-			filesLogger.info(f.getAbsolutePath());
+			filesLogger.info(f.getPath());
 			filesParsed++;
 			System.gc();
 		}
