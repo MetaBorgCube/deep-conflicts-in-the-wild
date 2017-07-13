@@ -7,7 +7,7 @@ library(extrafont)
 library(scales)
 loadfonts()
 
-setwd("~/repos/decl-disamb/deep-conflicts-in-the-wild")
+# setwd("~/repos/decl-disamb/deep-conflicts-in-the-wild")
 rm(list = ls())
 cat("\014")
 
