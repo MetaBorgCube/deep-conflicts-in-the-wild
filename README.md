@@ -1,8 +1,8 @@
 # Installation
 
-Download the artefact (Oracle VirtualBox OVA file) from: 
+Download the artefact (Oracle VirtualBox OVA file) from [Google Drive](https://drive.google.com/open?id=0B65KX17FYXLNTXVVOU12SlpyVjQ).
 
-Size: X GB
+Size: 4 GB
 
 The artefact is distributed as a VirtualBox image. To setup the image:
   
@@ -18,7 +18,7 @@ The user account is *artefact* and the password is *artefact*.
 
 # Experiment
 
-Below, we describe how the experiment is organized, considering the content of the paper. We also provide instructions for running the experiment and visualizing the data. Finally, we describe how it can be extended. All directories presented in this section are relative to the directory `/home/artefact/deep-conflicts-in-the-wild` in the VM, which is also stored in a global variable `$BASE_DIR` for convenience.
+Below, we describe how the experiment is organized, considering the content of the paper. We also provide instructions for running the experiment and visualizing the data. Finally, we describe how it can be extended. All directories presented in this section are relative to the directory `/home/artefact/deep-conflicts-in-the-wild` in the VM.
 
 ## Organization
 
@@ -32,11 +32,13 @@ The source code of the experiment is organized as follows:
 
 - The folder `Calc` contains a Spoofax project for a small Calculator language.
 
+- The folder `Results` contains the results that we have used to generate the figures in the paper.
+
 ## Running the Experiment
 
-To run the experiment, execute the command `mvn clean verify` on the top-level directory (`$BASE_DIR`). The full experiment takes ~7 hours to run. The results are produced in the folder `Disamb-Experiment/logs`.
+To run the experiment, execute the command `mvn clean verify` on the top-level directory (`/home/artefact/deep-conflicts-in-the-wild`) . The full experiment takes ~7 hours to run. The results are produced in the folder `Disamb-Experiment/logs`.
 
-Optionally, it is also possible to run a subset of the experiment, containing just 10 files for each language. To set up the smaller version of the experiment, edit the file `Disamb-Experiment/src/main/java/main/Main.java`, setting the variable `SHORTRUN` to `true`. The smaller version of the experiment takes approximately 5 minutes to run.
+Optionally, it is also possible to run a subset of the experiment, containing just 10 files for each language. To set up the smaller version of the experiment, edit the file `Disamb-Experiment/src/main/java/main/Main.java`, setting the variable `SHORTRUN` to `true`. The smaller version of the experiment takes ~7 minutes to run.
 
 We have also included the results of running the full experiment in the folder `results`. This folder has the same structure of the resulting  `Disamb-Experiment/logs` directory, and includes the information about:
  
@@ -48,9 +50,11 @@ We have also included the results of running the full experiment in the folder `
 
 ## Visualizing the Data
 
-Executing `./gen-pdf.sh <Logs-folder>` produces all the tables and graphs in the paper based on the directory containing the logs passed as argument (relative to `BASE_DIR`). The script generate the pdfs in the directory `pdfs`. 
+Executing `./gen-pdf.sh <Logs-folder>` produces all the tables and graphs in the paper based on the directory containing the logs passed as argument (relative to the main directory). The script generate the pdfs in the directory `<Logs-folder>/pdfs`. 
 
-For example, running `./gen-pdf.sh Results` generates the tables and plots used in the paper under the folder `Results/pdfs`, whereas running `./gen-pdf.sh Disamb-Experiment/logs` generates the tables and plots for whatever logs have been generated when running the experiment.
+For example, running `./gen-pdf.sh Results` generates the tables and plots used in the paper under the folder `Results/pdfs`, whereas running `./gen-pdf.sh Disamb-Experiment/logs` generates the tables and plots for the logs that have been generated when running the experiment.
+
+Note that we have changed the scale of the generated plots to cover cases in which the percentages are higher than 40.
 
 ## Reusability
 
@@ -68,7 +72,7 @@ We have defined a small language named *Calc*, under the directory `Calc`. Build
 
 To include this additional language as part of the experiment, follow the steps:
 
-- Create the directory to copy the normalized grammar to, i.e., create `Disamb-Experiment/normalizedGrammars/<LangName>/normalized` copying the content of `src-gen/syntax/normalized` into it. 
+- Create the directory to copy the normalized grammar to, i.e., create `Disamb-Experiment/normalizedGrammars/<LangName>/normalized` copying the content of `src-gen/syntax/normalized` into it. In this case, `<LangName>` is `Calc`.
 
 - Edit the file `Disamb-Experiment/src/main/java/main/Main.java`, adding a new entry to the arrays:
 
@@ -90,15 +94,18 @@ To include this additional language as part of the experiment, follow the steps:
 
 - It is also necessary to add logging support for the new language. The file `Disamb-Experiment/src/main/resources/log4j.properties` contains the information about all the loggers and also a template for creating a logger for a new language. In this case, nothing needs to be done as the properties for the *Calc* language are already set up.
 
-To run the experiment only for this new language and for the testing file, set the array `runExperiment` accordingly and the variable `TESTING` to true. Finally, run `mvn clean verify` on the top-level folder (`BASE_DIR`) to produce the statistics for the new language.
+To run the experiment only for this new language and for the testing file, set the array `runExperiment` accordingly and the variable `TESTING` to true. Finally, run `mvn clean verify` on the top-level folder to produce the statistics for the new language.
 
 # Technical Details
 
 The following packages have already been installed on the virtual machine:
 
+      sudo apt-get install openssh-server
       sudo apt-get install openjdk-8-jdk
       sudo apt install maven
       sudo apt-get install r-base
+      sudo apt install texlive-latex-extra
+      sudo apt-get install ghostscript
 
 The following R packages were installed:
 
@@ -114,7 +121,7 @@ Another option to run the experiment is to use SSH to access the server in the V
 
 There are several options for network settings in Virtual Box. One of the options that allows for SSH connection together with the internet connection available in the VM is using NAT + Port forwarding.
 
-In the VirtualBox click Settings → Network → Choose Adapter 1 → switch to NAT → Expand Advanced → Port Forwarding and fill in the table such that host port *3022* will be forwarded to guest port *22*, naming the entry *ssh*. 
+In the VirtualBox click Settings → Network → Choose Adapter 1 → switch to NAT → Expand Advanced → Port Forwarding and fill in the table such that host port *3022* will be forwarded to guest port *22*, naming the entry *ssh* and leaving the rest blank. 
 
 To SSH into the guest VM, run:
 
@@ -123,12 +130,12 @@ To SSH into the guest VM, run:
 
 ## Running the Experiment Locally
 
-Optionally, it is possible to run the experiment locally, i.e., outside the VM. Please check the *Technical Details* for information about the requirements. 
+Optionally, it is possible to run the experiment locally, i.e., outside the VM. Please check the applications above, which should be installed. 
 
 To download the artefact and run the experiment locally, checkout the github project [https://github.com/MetaBorgCube/deep-conflicts-in-the-wild](https://github.com/MetaBorgCube/deep-conflicts-in-the-wild). The steps to perform the experiment locally are similar to the ones described below, which are specific to running it on the VM. The main advantage of running the experiment locally consists of the UI support to copy/modify/visualize files. 
 
 Note that the test files are not included in the repository. However, it is possible to copy them from the VM using the command 
-`scp -r artefact@127.0.0.1:REMOTE_FOLDER LOCAL_FOLDER`, where `REMOTE_FOLDER` is the full path of the test folder (i.e., `$BASE_DIR/Disamb-Experiment/test`), and `LOCAL FOLDER` is the folder to which the tests should be copied to. 
+`scp -P 3022 -r artefact@127.0.0.1:REMOTE_FOLDER LOCAL_FOLDER`, where `REMOTE_FOLDER` is the full path of the test folder (i.e., `[...]/Disamb-Experiment/test`), and `LOCAL FOLDER` is the folder to which the tests should be copied to. This may take a few minutes.
 
 ## Troubleshooting
 
