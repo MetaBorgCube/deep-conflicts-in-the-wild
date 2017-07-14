@@ -36,9 +36,9 @@ The source code of the experiment is organized as follows:
 
 ## Running the Experiment
 
-To run the experiment, execute the command `mvn clean verify` on the top-level directory (`/home/artefact/deep-conflicts-in-the-wild`) . The full experiment takes ~7 hours to run. The results are produced in the folder `Disamb-Experiment/logs`.
+To run the experiment, execute the command `mvn clean verify` on the top-level directory (`/home/artefact/deep-conflicts-in-the-wild`) . The full experiment takes ~7 hours to run on a single core on an Intel Core i7 @ 2,7 GHz processor host. The results are produced in the folder `Disamb-Experiment/logs`.
 
-Optionally, it is also possible to run a subset of the experiment, containing just 10 files for each language. To set up the smaller version of the experiment, edit the file `Disamb-Experiment/src/main/java/main/Main.java`, setting the variable `SHORTRUN` to `true`. The smaller version of the experiment takes ~7 minutes to run.
+Optionally, it is also possible to run a subset of the experiment, containing just 10 files for each language. To set up the smaller version of the experiment, edit the file `Disamb-Experiment/src/main/java/main/Main.java`, setting the variable `SHORTRUN` to `true`. The smaller version of the experiment takes ~7 minutes to run, using a machine with the specifications above.
 
 We have also included the results of running the full experiment in the folder `results`. This folder has the same structure of the resulting  `Disamb-Experiment/logs` directory, and includes the information about:
  
