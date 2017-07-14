@@ -2,7 +2,7 @@
 
 Download the artefact (Oracle VirtualBox OVA file) from [Google Drive](https://drive.google.com/open?id=0B65KX17FYXLNTXVVOU12SlpyVjQ).
 
-Size: 4 GB
+Size: 4.68 GB
 
 The artefact is distributed as a VirtualBox image. To setup the image:
   
