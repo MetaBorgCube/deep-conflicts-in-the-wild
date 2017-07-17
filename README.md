@@ -1,6 +1,6 @@
 # Installation
 
-Download the artefact (Oracle VirtualBox OVA file) from [Google Drive](https://drive.google.com/open?id=0B65KX17FYXLNTXVVOU12SlpyVjQ).
+Download the artefact (Oracle VirtualBox OVA file) from [https://drive.google.com/open?id=0B65KX17FYXLNTXVVOU12SlpyVjQ](https://drive.google.com/open?id=0B65KX17FYXLNTXVVOU12SlpyVjQ).
 
 Size: 4.4 GB
 
@@ -8,13 +8,29 @@ The artefact is distributed as a VirtualBox image. To setup the image:
   
   - Download and install VirtualBox: [https://www.virtualbox.org](https://www.virtualbox.org)
   - Open VirtualBox 
-  - Click *Machine → Add* and add the OVA file
+  - Click *File → Import Appliance* and add the OVA file
   - The VM image will appear. Go to *Settings → System → Motherboard* and set at least 8GB of RAM.
   - Start the VM
 
 The VM is running Ubuntu Server 16.04.2 LTS.
 
 The user account is *artefact* and the password is *artefact*.
+
+## SSH connection
+
+Another option to run the experiment is to use SSH to access the server in the VM. All configuration for making an SSH connection should already be in place when the VM image is imported from the OVA format. 
+
+There are several options for network settings in Virtual Box. One of the options that allows for SSH connection together with the internet connection available in the VM is using NAT + Port forwarding.
+
+In the VirtualBox click Settings → Network → Choose Adapter 1 → switch to NAT → Expand Advanced → Port Forwarding and fill in the table such that host port *3022* will be forwarded to guest port *22*, naming the entry *ssh* and leaving the rest blank. 
+
+To SSH into the guest VM, run:
+
+      ssh -p 3022 artefact@127.0.0.1       
+
+## Experiment Contents
+
+It is also possible to find the contents of the experiment on GitHub: [https://github.com/MetaBorgCube/deep-conflicts-in-the-wild](https://github.com/MetaBorgCube/deep-conflicts-in-the-wild). Even though we provide further details for running the experiment locally (see below), we hardly advise to use the VM, as the following instructions are specific to it. The repository can be used as an alternative for file browsing and visualization. 
 
 # Experiment
 
@@ -38,7 +54,7 @@ The source code of the experiment is organized as follows:
 
 To run the experiment, execute the command `mvn clean verify` on the top-level directory (`/home/artefact/deep-conflicts-in-the-wild`) . The full experiment takes ~7 hours to run on a single core on an Intel Core i7 @ 2,7 GHz processor host. The results are produced in the folder `Disamb-Experiment/logs`.
 
-Optionally, it is also possible to run a subset of the experiment, containing just 10 files for each language. To set up the smaller version of the experiment, edit the file `Disamb-Experiment/src/main/java/main/Main.java`, setting the variable `SHORTRUN` to `true`. The smaller version of the experiment takes ~7 minutes to run, using a machine with the specifications above.
+Optionally, it is also possible to run a subset of the experiment, containing just 10 files for each language. To run this version execute the command `mvn clean verify -Dshortrun=true`. The smaller version of the experiment takes ~7 minutes to run, using a machine with the specifications above.
 
 We have also included the results of running the full experiment in the folder `results`. This folder has the same structure of the resulting  `Disamb-Experiment/logs` directory, and includes the information about:
  
@@ -115,24 +131,11 @@ The following R packages were installed:
       install.packages("extrafont")
       install.packages("scales")
 
-## SSH connection
-
-Another option to run the experiment is to use SSH to access the server in the VM. All configuration for making an SSH connection should already be in place when the VM image is imported from the OVA format. 
-
-There are several options for network settings in Virtual Box. One of the options that allows for SSH connection together with the internet connection available in the VM is using NAT + Port forwarding.
-
-In the VirtualBox click Settings → Network → Choose Adapter 1 → switch to NAT → Expand Advanced → Port Forwarding and fill in the table such that host port *3022* will be forwarded to guest port *22*, naming the entry *ssh* and leaving the rest blank. 
-
-To SSH into the guest VM, run:
-
-      ssh -p 3022 artefact@127.0.0.1       
-
-
 ## Running the Experiment Locally
 
 Optionally, it is possible to run the experiment locally, i.e., outside the VM. Please check the applications above, which should be installed. 
 
-To download the artefact and run the experiment locally, checkout the github project [https://github.com/MetaBorgCube/deep-conflicts-in-the-wild](https://github.com/MetaBorgCube/deep-conflicts-in-the-wild). The steps to perform the experiment locally are similar to the ones described below, which are specific to running it on the VM. The main advantage of running the experiment locally consists of the UI support to copy/modify/visualize files. 
+To download the artefact and run the experiment locally, checkout the github project [https://github.com/MetaBorgCube/deep-conflicts-in-the-wild](https://github.com/MetaBorgCube/deep-conflicts-in-the-wild). The steps to perform the experiment locally should be similar to the ones described above, which are specific to running it on the VM. The main advantage of running the experiment locally consists of the UI support to copy/modify/visualize files. 
 
 Note that the test files are not included in the repository. However, it is possible to copy them from the VM using the command 
 `scp -P 3022 -r artefact@127.0.0.1:REMOTE_FOLDER LOCAL_FOLDER`, where `REMOTE_FOLDER` is the full path of the test folder (i.e., `[...]/Disamb-Experiment/test`), and `LOCAL FOLDER` is the folder to which the tests should be copied to. This may take a few minutes.
@@ -140,4 +143,6 @@ Note that the test files are not included in the repository. However, it is poss
 ## Troubleshooting
 
 Some files fail to parse due to technical issues in the implementation of SGLR and may terminate the experiment prematurely. Therefore, they were manually skipped when running the experiment and included in the set of failing files (see the method `checkProblematicFiles` in  `Disamb-Experiment/src/main/java/main/Main.java`). 
+
+Furthermore, when running the experiment on the VM some large files may lead the parser to time out on slower machines. That may imply on _slightly_ different statistics from the ones in the folder `Results`. 
 
