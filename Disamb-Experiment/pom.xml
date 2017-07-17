@@ -3,10 +3,11 @@
 	<modelVersion>4.0.0</modelVersion>
 	<artifactId>disamb-test</artifactId>
 
-  <properties>
-    <main-class>main.Main</main-class>
-    <log4j.configuration>file:./src/main/resources/log4j.properties</log4j.configuration>
-  </properties>
+	<properties>
+		<main-class>main.Main</main-class>
+		<shortrun>false</shortrun>
+		<log4j.configuration>file:./src/main/resources/log4j.properties</log4j.configuration>
+	</properties>
 
 	<parent>
 		<groupId>org.metaborg</groupId>
@@ -51,7 +52,7 @@
 		</dependency>
 	</dependencies>
 
-  <build>
+	<build>
 		<resources>
 			<resource>
 				<directory>src/main/resources</directory>
@@ -62,55 +63,57 @@
 			</resource>
 		</resources>
 
-  	<plugins>
-      <!-- Create an executable JAR -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-shade-plugin</artifactId>
-        <executions>
-          <execution>
-            <phase>package</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-            <configuration>
-              <transformers>
-                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                  <mainClass>${main-class}</mainClass>
-                </transformer>
-              </transformers>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
+		<plugins>
+			<!-- Create an executable JAR -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-shade-plugin</artifactId>
+				<executions>
+					<execution>
+						<phase>package</phase>
+						<goals>
+							<goal>shade</goal>
+						</goals>
+						<configuration>
+							<transformers>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+									<mainClass>${main-class}</mainClass>
+								</transformer>
+							</transformers>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 
-      <!-- Testing if the code is runnable, and if the shaded JAR is runnable -->
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>exec-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>test-executable</id>
-            <phase>test</phase>
-            <goals>
-              <goal>exec</goal>
-            </goals>
-            <configuration>
-              <executable>java</executable>
-              <arguments>
-                <argument>-Xmx4G</argument>
-                <argument>-Xss16m</argument>
-                <argument>-XX:MaxPermSize=256M</argument>
-                <argument>-classpath</argument>
-                <classpath />
-                <argument>${main-class}</argument>
-              </arguments>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-  	</plugins>
-  </build>
+			<!-- Testing if the code is runnable, and if the shaded JAR is runnable -->
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>test-executable</id>
+						<phase>test</phase>
+						<goals>
+							<goal>exec</goal>
+						</goals>
+						<configuration>
+							<executable>java</executable>
+							<arguments>
+								<argument>-Xmx4G</argument>
+								<argument>-Xss16m</argument>
+								<argument>-XX:MaxPermSize=256M</argument>
+								<argument>-classpath</argument>
+								<classpath />
+								<argument>${main-class}</argument>
+								<argument>${shortrun}</argument>
+							</arguments>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
 
 	<repositories>
 		<repository>

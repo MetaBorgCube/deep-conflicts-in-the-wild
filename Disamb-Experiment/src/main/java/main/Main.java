@@ -72,13 +72,21 @@ public class Main {
 	private final static String[] testingFile = { "disamb.ml", "disamb.java" };
 
 	private final static boolean TESTING = false;
-	private final static boolean SHORTRUN = false;
+	private static boolean SHORTRUN = false;
 
 	private final static ITermFactory tf = new TermFactory();
 	private static Logger debugLogger = LoggerFactory.getLogger(Main.class);
 
 	public static void main(String[] args) {
 		PropertyConfigurator.configure("src/main/resources/log4j.properties");
+		
+		if(args.length > 0) {
+			SHORTRUN = Boolean.parseBoolean(args[0]);
+		}
+		
+		if(SHORTRUN) {
+			debugLogger.warn("\n\n-- Running short version of the experiment --\n\n ");
+		}
 
 		for (int i = 0; i < languages.length; i++) {
 			if (runExperiment[i]) {
