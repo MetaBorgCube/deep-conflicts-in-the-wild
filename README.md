@@ -1,12 +1,12 @@
 # Installation
 
-Download the artefact (Oracle VirtualBox OVA file) from [https://drive.google.com/open?id=0B65KX17FYXLNTXVVOU12SlpyVjQ](https://drive.google.com/open?id=0B65KX17FYXLNTXVVOU12SlpyVjQ).
+Download the artefact (Oracle VirtualBox OVA file) from [https://drive.google.com/open?id=0B65KX17FYXLNTXVVOU12SlpyVjQ](https://drive.google.com/open?id=0B65KX17FYXLNTXVVOU12SlpyVjQ). The file is compacted as a `tar.gz` file. Sometimes when extracting the file, the extractor creates an `.vmdk` and an `.ovf` file. In this case, import the `.ovf` file into Virtual Box using the instructions below.
 
 Size: 4.4 GB
 
 The artefact is distributed as a VirtualBox image. To setup the image:
   
-  - Download and install VirtualBox: [https://www.virtualbox.org](https://www.virtualbox.org)
+  - Download and install VirtualBox (These instructions were tested with VirtualBox 5.1.22): [https://www.virtualbox.org](https://www.virtualbox.org)
   - Open VirtualBox 
   - Click *File → Import Appliance* and add the OVA file
   - The VM image will appear. Go to *Settings → System → Motherboard* and set at least 8GB of RAM.
@@ -18,7 +18,7 @@ The user account is *artefact* and the password is *artefact*.
 
 ## SSH connection
 
-Another option to run the experiment is to use SSH to access the server in the VM. All configuration for making an SSH connection should already be in place when the VM image is imported from the OVA format. 
+_Optionally_, it is possible to run the experiment using SSH to access the server in the VM. All configuration for making an SSH connection should already be in place when the VM image is imported from the OVA format. 
 
 There are several options for network settings in Virtual Box. One of the options that allows for SSH connection together with the internet connection available in the VM is using NAT + Port forwarding.
 
@@ -28,9 +28,11 @@ To SSH into the guest VM, run:
 
       ssh -p 3022 artefact@127.0.0.1       
 
-## Experiment Contents
+## Browsing the Experiment Contents
 
 It is also possible to find the contents of the experiment on GitHub: [https://github.com/MetaBorgCube/deep-conflicts-in-the-wild](https://github.com/MetaBorgCube/deep-conflicts-in-the-wild). Even though we provide further details for running the experiment locally (see below), we hardly advise to use the VM, as the following instructions are specific to it. The repository can be used as an alternative for file browsing and visualization. 
+
+Another option consists of using SSHFS, which mounts the VM's file system locally. See [https://osxfuse.github.io/](https://osxfuse.github.io/) and [https://www.raspberrypi.org/documentation/remote-access/ssh/sshfs.md](https://www.raspberrypi.org/documentation/remote-access/ssh/sshfs.md) for more instructions.
 
 # Experiment
 
@@ -44,7 +46,7 @@ The source code of the experiment is organized as follows:
 
 - The folder `org.metaborg.sdf2table` contains the SDF3 parse table generator. The parse table generator supports different configurations to generate parse tables that solve the different types of deep priority conflicts, as specified in the paper.
 
-- The folder `org.spoofax.sglr` contains SGLR, an implementation of a scannerless generalized LR parser with support to lazy parse table generation.
+- The folder `org.spoofax.sglr` contains SGLR, an implementation of a scannerless generalized LR parser that supports lazy parse table generation.
 
 - The folder `Calc` contains a Spoofax project for a small Calculator language.
 
@@ -78,7 +80,7 @@ The experiment is organized such that it can be "easily" extended to consider la
 
 ### Adding additional files 
  
- To increase the size of the corpuses, copy the additional project(s) to the directory `/Disamb-experiment/test/<LangName>/<ProjectName>`. Note that `<LanguageName>` and the file extension of the additional files should follow the variables defined in `/Disamb-Experiment/src/main/java/main/Main.java`. 
+ To add additional files or projects, copy them to `Disamb-experiment/test/<LangName>/<ProjectName>`. Note that `<LanguageName>` and the file extension of the additional files should follow the variables defined in `/Disamb-Experiment/src/main/java/main/Main.java`. 
 
 ### Including another language
 
@@ -88,7 +90,9 @@ We have defined a small language named *Calc*, under the directory `Calc`. Build
 
 To include this additional language as part of the experiment, follow the steps:
 
-- Create the directory to copy the normalized grammar to, i.e., create `Disamb-Experiment/normalizedGrammars/<LangName>/normalized` copying the content of `src-gen/syntax/normalized` into it. In this case, `<LangName>` is `Calc`.
+- Create the directory to copy the normalized grammar to, i.e., create the directory `Disamb-Experiment/normalizedGrammars/<LangName>/normalized` copying the content of `src-gen/syntax/normalized` into it[^1]. In this case, `<LangName>` is `Calc`.
+
+[^1]: If using the command-line, execute: `mkdir -p Disamb-Experiment/normalizedGrammars/Calc/normalized` and `cp -a Calc/src-gen/syntax/normalized/. Disamb-Experiment/normalizedGrammars/Calc/normalized/`
 
 - Edit the file `Disamb-Experiment/src/main/java/main/Main.java`, adding a new entry to the arrays:
 
@@ -106,9 +110,11 @@ To include this additional language as part of the experiment, follow the steps:
     
     - *testingFile*: this string corresponds to running the experiment on a single file, if the variable `TESTING` is set to true. Add the entry `example.cal` if `TESTING` is set to true, otherwise, add a different filename with the `cal` extension.
 
-- The files to be tested should be added to the test folder. In this case, create a directory `Disamb-Experiment/test/Calc/example` and copy the file `Calc/example/example.cal` from the calc project into it. 
+- The files to be tested should be added to the test folder. In this case, create a directory `Disamb-Experiment/test/Calc/example` and copy the file `Calc/example/example.cal` from the calc project into it.[^2] 
 
-- It is also necessary to add logging support for the new language. The file `Disamb-Experiment/src/main/resources/log4j.properties` contains the information about all the loggers and also a template for creating a logger for a new language. In this case, nothing needs to be done as the properties for the *Calc* language are already set up.
+[^2]: If using the command-line, execute: `mkdir -p Disamb-Experiment/test/Calc/example` and `cp -a Calc/example/. Disamb-Experiment/test/Calc/example/`
+
+- It is also necessary to add logging support for the new language. All logging information is specified in the file `Disamb-Experiment/src/main/resources/log4j.properties`. This file contains the information about all the loggers and also a template for creating a logger for a new language. In this case, nothing needs to be done as the properties for the *Calc* language are already set up.
 
 To run the experiment only for this new language and for the testing file, set the array `runExperiment` accordingly and the variable `TESTING` to true. Finally, run `mvn clean verify` on the top-level folder to produce the statistics for the new language.
 
@@ -138,7 +144,7 @@ Optionally, it is possible to run the experiment locally, i.e., outside the VM. 
 To download the artefact and run the experiment locally, checkout the github project [https://github.com/MetaBorgCube/deep-conflicts-in-the-wild](https://github.com/MetaBorgCube/deep-conflicts-in-the-wild). The steps to perform the experiment locally should be similar to the ones described above, which are specific to running it on the VM. The main advantage of running the experiment locally consists of the UI support to copy/modify/visualize files. 
 
 Note that the test files are not included in the repository. However, it is possible to copy them from the VM using the command 
-`scp -P 3022 -r artefact@127.0.0.1:REMOTE_FOLDER LOCAL_FOLDER`, where `REMOTE_FOLDER` is the full path of the test folder (i.e., `[...]/Disamb-Experiment/test`), and `LOCAL FOLDER` is the folder to which the tests should be copied to. This may take a few minutes.
+`scp -P 3022 -r artefact@127.0.0.1:REMOTE_FOLDER LOCAL_FOLDER`, where `REMOTE_FOLDER` is the full path of the test folder (i.e., `[...]/Disamb-Experiment/test`), and `LOCAL_FOLDER` is the folder to which the tests should be copied to. This may take a few minutes.
 
 ## Troubleshooting
 

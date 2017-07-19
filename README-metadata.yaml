@@ -5,6 +5,7 @@ header-includes:
   - \hypersetup{colorlinks=true,
             allbordercolors={0 0 0},
             pdfborderstyle={/U 1}}
-  - \providecommand{\subtitle}[1]{\usepackage{titling}\posttitle{\par\large#1\end{center}}}           
+  - \providecommand{\subtitle}[1]{\usepackage{titling}\posttitle{\par\large#1\end{center}}}  
+geometry: margin=3cm         
 output: pdf_document
 ---
