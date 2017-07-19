@@ -6,7 +6,7 @@ Size: 4.4 GB
 
 The artefact is distributed as a VirtualBox image. To setup the image:
   
-  - Download and install VirtualBox (These instructions were tested with VirtualBox 5.1.22): [https://www.virtualbox.org](https://www.virtualbox.org)
+  - Download and install VirtualBox (These instructions were tested using VirtualBox 5.1.22): [https://www.virtualbox.org](https://www.virtualbox.org)
   - Open VirtualBox 
   - Click *File → Import Appliance* and add the OVA file
   - The VM image will appear. Go to *Settings → System → Motherboard* and set at least 8GB of RAM.
